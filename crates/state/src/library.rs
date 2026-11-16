@@ -2288,7 +2288,13 @@ impl Library {
                     skipped,
                 } = imported;
                 let Some(playlist) = playlist else {
-                    Toasts::about(Outcome::Failed, "toast-playlist-import-empty", name, cx);
+                    // a file that names no song at all is empty or not a playlist, which is
+                    // another thing to fix than songs that are not in the library
+                    let key = match skipped {
+                        0 => "toast-playlist-import-unreadable",
+                        _ => "toast-playlist-import-empty",
+                    };
+                    Toasts::about(Outcome::Failed, key, name, cx);
                     return;
                 };
                 let target = Some(Target::Playlist(SharedString::from(playlist.id.clone())));

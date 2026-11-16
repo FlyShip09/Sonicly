@@ -1436,6 +1436,7 @@ toast-playlist-imported-partly = Imported { $name }, leaving out { $count ->
         [one] one song
        *[other] { $count } songs
     } not in your library
+toast-playlist-import-unreadable = { $name } lists no songs. It may be empty, or not an M3U, PLS or XSPF playlist
 toast-playlist-import-empty = None of the songs in { $name } are in your library
 toast-playlist-exported = Playlist exported
 toast-link-downloaded = { $count ->
