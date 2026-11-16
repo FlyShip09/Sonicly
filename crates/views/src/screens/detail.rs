@@ -947,12 +947,26 @@ impl Render for DetailView {
             weak.update(cx, |_, cx| cx.notify()).ok();
         });
         let rails = self.recommended(window, &notify, cx);
+        // once the header has scrolled away, the title bar carries the page's name
+        let (title, cover) = self
+            .detail
+            .read(cx)
+            .header()
+            .map(|header| {
+                (
+                    SharedString::from(header.title.clone()),
+                    header.cover.clone().map(SharedString::from),
+                )
+            })
+            .unwrap_or_default();
+        let past = inset + cx.theme().metrics.cover;
 
         div()
             .relative()
             .size_full()
             .child(
                 Scroller::new("detail-page", &self.scrollbar)
+                    .headed(past, title, cover)
                     .hold()
                     .bottom_inset(crate::chrome::Chrome::bottom(cx))
                     .px(crate::chrome::Chrome::margin(window, cx))

@@ -1,13 +1,14 @@
 use crate::metrics::Text;
+use crate::motion::{HoverFade, Motion, dim_span};
 use crate::theme::ActiveTheme as _;
 use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui::prelude::*;
 use gpui::{
-    App, Bounds, Div, DragMoveEvent, ElementId, Empty, Hsla, MouseButton, MouseDownEvent,
-    MouseUpEvent, Pixels, Point, Render, SharedString, Stateful, StyleRefinement, Window, canvas,
-    div, px, relative,
+    App, Bounds, Div, DragMoveEvent, ElementId, Empty, HoverListenerMode, Hsla, MouseButton,
+    MouseDownEvent, MouseUpEvent, Pixels, Point, Render, SharedString, Stateful, StyleRefinement,
+    Window, canvas, div, px, relative,
 };
 
 const TRACK: f32 = 0.5;
@@ -18,6 +19,17 @@ const BUBBLE: f32 = 7.;
 const LIFT: Pixels = px(12.);
 /// How far one screen reader step moves the slider, as a share of its length.
 const STEP: f32 = 0.05;
+/// How much thicker a swelling track grows under the pointer, as a share of its resting
+/// thickness, and how big its knob stands at rest, as a share of its full size: nothing, so the
+/// knob appears as the pointer arrives.
+const SWELL_TRACK: f32 = 0.5;
+const SWELL_KNOB: f32 = 0.;
+
+/// Whether the pointer is over a swelling scrubber, and how far the swell has come.
+struct Swell {
+    pointer: bool,
+    fade: HoverFade,
+}
 
 type Slide = Box<dyn Fn(&f32, &mut Window, &mut App) + 'static>;
 type Release = Box<dyn Fn(&MouseUpEvent, &mut Window, &mut App) + 'static>;
@@ -108,6 +120,8 @@ pub struct Scrubber {
     bubble: Option<(f32, SharedString)>,
     ranges: Vec<(f32, f32, Hsla)>,
     lift: Pixels,
+    /// Whether the track swells under the pointer, and whether a scrub holds it swollen.
+    swell: Option<bool>,
     on_move: Option<Slide>,
     on_release: Option<Release>,
 }
@@ -129,9 +143,18 @@ impl Scrubber {
             bubble: None,
             ranges: Vec::new(),
             lift: LIFT,
+            swell: None,
             on_move: None,
             on_release: None,
         }
+    }
+
+    /// Lets a horizontal track thicken a little and its knob appear while the pointer is over
+    /// it, easing back once the pointer leaves, for the one slider a listener reaches for most:
+    /// the seek bar. `held` keeps it swollen while a scrub is under way, wherever the pointer is.
+    pub fn swells(mut self, held: bool) -> Self {
+        self.swell = Some(held);
+        self
     }
 
     pub fn bubble(mut self, fraction: f32, text: impl Into<SharedString>) -> Self {
@@ -217,10 +240,32 @@ impl Styled for Scrubber {
 }
 
 impl RenderOnce for Scrubber {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let pad = cx.theme().metrics.pad;
         let line = track(pad);
         let pin = thumb(pad);
+        // a swelling track keeps its state by its id, and stays swollen through a scrub
+        let swell = self.swell.filter(|_| !self.vertical).map(|held| {
+            let key = ElementId::Name(SharedString::from(format!("{}-swell", self.id)));
+            let state = window.use_keyed_state(key, cx, |_, _| Swell {
+                pointer: false,
+                fade: HoverFade::new(Motion::Quick.span()).leaving(dim_span()),
+            });
+            let level = state.update(cx, |swell, cx| {
+                let on = swell.pointer || held;
+                swell.fade.set(on);
+                swell.fade.level(window, cx)
+            });
+            (state, level)
+        });
+        let level = swell.as_ref().map(|(_, level)| *level);
+        let (line, knob) = match level {
+            Some(level) => (
+                line * (1. + SWELL_TRACK * level),
+                pin * (SWELL_KNOB + (1. - SWELL_KNOB) * level),
+            ),
+            None => (line, pin),
+        };
         let reach = hit(pad);
         let bubble_width = px((pad / px(1.) * BUBBLE).round());
         let popover = cx.theme().popover;
@@ -243,6 +288,7 @@ impl RenderOnce for Scrubber {
             bubble,
             ranges,
             lift,
+            swell: _,
             on_move,
             on_release,
         } = self;
@@ -436,14 +482,14 @@ impl RenderOnce for Scrubber {
                                 .rounded_full()
                                 .bg(color)
                         }))
-                        .when(enabled, |this| {
+                        .when(enabled && knob > Pixels::ZERO, |this| {
                             this.child(
                                 div()
                                     .absolute()
-                                    .top((line - pin) / 2.)
+                                    .top((line - knob) / 2.)
                                     .left(relative(fraction))
-                                    .ml(Pixels::ZERO - pin / 2.)
-                                    .size(pin)
+                                    .ml(Pixels::ZERO - knob / 2.)
+                                    .size(knob)
                                     .rounded_full()
                                     .bg(thumb),
                             )
@@ -508,6 +554,15 @@ impl RenderOnce for Scrubber {
                 |this| this.justify_center().h_full().w(reach),
                 |this| this.items_center().w_full().h(reach),
             )
+            .when_some(swell.map(|(state, _)| state), |this, state| {
+                this.hover_listener_mode(HoverListenerMode::InputModalityIndependent)
+                    .on_hover(move |hovered, _, cx| {
+                        state.update(cx, |swell, cx| {
+                            swell.pointer = *hovered;
+                            cx.notify();
+                        });
+                    })
+            })
             .child(
                 canvas(move |b, _, _| bounds.set(b), |_, _, _, _| {})
                     .absolute()

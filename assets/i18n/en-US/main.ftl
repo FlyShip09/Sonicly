@@ -589,6 +589,7 @@ powerbar-open = Open
 powerbar-song = Go to song
 powerbar-download-link = Download from this link
 powerbar-commands = Command
+powerbar-group-commands = Commands
 powerbar-command-mini-player = Open the mini player
 
 # search page

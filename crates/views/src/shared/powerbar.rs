@@ -9,7 +9,7 @@ use i18n::t;
 use input::{POWERBAR_CONTEXT, PowerbarDetails, ToggleMiniPlayer};
 use music::ytdlp;
 use router::{Destination, navigate};
-use state::{Hit, Origin, Playback, Search, Sonicly};
+use state::{Hit, Kind, Origin, Playback, Search, Sonicly};
 use ui::{
     ActiveTheme as _, Button, Card, Cascade, Dismiss, Input, Kbd, SelectNext, SelectPrevious,
     Spinner, Sprung, Submit, Text, Unfold, blurring, corners, effects, eyebrow, popover_fill,
@@ -286,10 +286,21 @@ impl Powerbar {
             return;
         }
         let search = self.search.read(cx);
-        let hits: Vec<Hit> = match search.query().trim().is_empty() {
+        let mut hits: Vec<Hit> = match search.query().trim().is_empty() {
             true => recent(cx),
             false => search.hits().iter().take(MAX_HITS).cloned().collect(),
         };
+        // Answers stand in groups by kind, in the order each kind first came up, so the best
+        // match still leads; the history keeps its own order.
+        if !search.query().trim().is_empty() {
+            let mut order: Vec<Kind> = Vec::new();
+            for hit in &hits {
+                if !order.contains(&hit.kind()) {
+                    order.push(hit.kind());
+                }
+            }
+            hits.sort_by_key(|hit| order.iter().position(|kind| *kind == hit.kind()));
+        }
         let commands = Command::named(self.input.read(cx).text());
 
         // A row the arrow keys moved to keeps the cursor as a new answer reorders the list,
@@ -505,13 +516,21 @@ impl Powerbar {
         let recalling = self.recalling(cx);
         let muted = cx.theme().muted_foreground;
         let offset = self.commands.len();
+        let groups = !recalling && !self.hits.is_empty();
         let mut rows: Vec<AnyElement> = self
             .commands
             .clone()
             .into_iter()
             .enumerate()
-            .map(|(idx, command)| self.command_row(command, idx, cx))
+            .map(|(idx, command)| {
+                let row = self.command_row(command, idx, cx);
+                match groups && idx == 0 {
+                    true => grouped(row, "powerbar-group-commands", true, cx),
+                    false => row,
+                }
+            })
             .collect();
+        let kinds: Vec<Kind> = self.hits.iter().map(Hit::kind).collect();
         let hits: Vec<AnyElement> = self
             .hits
             .iter()
@@ -556,7 +575,13 @@ impl Powerbar {
                             }),
                     )
                 });
-                Cascade::surface(card, shown).into_any_element()
+                let row = Cascade::surface(card, shown).into_any_element();
+                let place = item_idx - offset;
+                let kind = kinds[place];
+                match groups && (place == 0 || kinds[place - 1] != kind) {
+                    true => grouped(row, kind_key(kind), offset == 0 && place == 0, cx),
+                    false => row,
+                }
             })
             .collect();
         rows.extend(hits);
@@ -838,6 +863,45 @@ impl Render for Powerbar {
 }
 
 /// The latest of the search history, as many as the panel lists.
+/// `row` under the heading of the group it opens, `key` naming it, with a rule above it unless it
+/// is the `first` group. The heading rides on the row, so the list keeps one child per row and
+/// the arrow keys scroll to the right one.
+fn grouped(row: AnyElement, key: &'static str, first: bool, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    let label = i18n::lookup(key, None);
+    div()
+        .flex()
+        .flex_col()
+        .when(!first, |this| {
+            this.mt(theme.metrics.pad / 2.)
+                .pt(theme.metrics.pad / 2.)
+                .border_t_1()
+                .border_color(theme.border)
+        })
+        .child(
+            eyebrow(label.clone(), cx)
+                .id(SharedString::from(format!("powerbar-group-{key}")))
+                .role(Role::Heading)
+                .aria_level(2)
+                .aria_label(label)
+                .px(theme.metrics.pad)
+                .pt(theme.metrics.pad / 2.)
+                .pb(theme.metrics.pad / 4.),
+        )
+        .child(row)
+        .into_any_element()
+}
+
+/// The heading of a group of answers of `kind`.
+fn kind_key(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Song => "nav-songs",
+        Kind::Artist => "nav-artists",
+        Kind::Album => "nav-albums",
+        Kind::Playlist => "nav-playlists",
+    }
+}
+
 fn recent(cx: &App) -> Vec<Hit> {
     Hit::recent(cx).into_iter().take(MAX_HITS).collect()
 }
