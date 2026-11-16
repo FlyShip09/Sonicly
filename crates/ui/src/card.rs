@@ -83,6 +83,9 @@ pub struct Card {
     chosen: bool,
     tucked: bool,
     glance: bool,
+    /// Whether the card is a row of a source list, one `nav_row` tall with a small cover and its
+    /// title alone, as the sidebar's other rows are.
+    compact: bool,
     action: Option<AnyElement>,
     /// Whether the hover action takes no room until the card is hovered.
     collapsed: bool,
@@ -129,6 +132,7 @@ impl Card {
             chosen: false,
             tucked: false,
             glance: false,
+            compact: false,
             action: None,
             collapsed: false,
             drag_start: None,
@@ -334,6 +338,13 @@ impl Card {
         self
     }
 
+    /// Sets the card as a row of a source list: as tall as the sidebar's navigation rows, its
+    /// cover shrunk to fit and its meta line left to screen readers, which still hear it.
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
+        self
+    }
+
     pub fn chosen(mut self, chosen: bool) -> Self {
         self.chosen = chosen;
         self
@@ -404,6 +415,7 @@ impl RenderOnce for Card {
             chosen,
             tucked,
             glance,
+            compact,
             action,
             collapsed,
             drag_start,
@@ -411,8 +423,13 @@ impl RenderOnce for Card {
         } = self;
 
         let theme = *cx.theme();
-        let inset = theme.metrics.pad;
-        let height = snapped(theme.metrics.list_row, window);
+        let (inset, height) = match compact {
+            true => (
+                theme.metrics.pad / 2.,
+                snapped(theme.metrics.nav_row, window),
+            ),
+            false => (theme.metrics.pad, snapped(theme.metrics.list_row, window)),
+        };
         let listed = art.is_none() && tile.is_none();
         // The play button wears the cover's own colours once the cache has the art,
         // and the theme's primary until then.
@@ -645,7 +662,7 @@ impl RenderOnce for Card {
                 })
                 .into_any_element(),
         };
-        let caption = meta.map(|meta| match bare {
+        let caption = meta.filter(|_| !compact).map(|meta| match bare {
             true => div().child(meta),
             false => div()
                 .min_w_0()
@@ -672,7 +689,12 @@ impl RenderOnce for Card {
             .when_else(
                 tile.is_some(),
                 |this| this.flex_col().gap_2().w(art),
-                |this| this.items_center().gap_3().px(inset),
+                |this| {
+                    this.items_center().map(|this| match compact {
+                        true => this.gap_2().px(theme.metrics.pad),
+                        false => this.gap_3().px(inset),
+                    })
+                },
             )
             .rounded(match tucked {
                 true => crate::metrics::tucked(theme.radius, window),
