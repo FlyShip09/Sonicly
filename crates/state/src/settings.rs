@@ -1702,10 +1702,11 @@ impl AppSettings {
         let directory = themes_path(&self.path);
         if let Err(error) = themes::remove(&family, &directory) {
             log::warn!("settings: cannot delete theme {id}: {error:#}");
-            Toasts::about(
+            Toasts::with_detail(
                 Outcome::Failed,
                 "toast-theme-delete-failed",
-                family.name,
+                Some(family.name.into()),
+                format!("{error:#}"),
                 cx,
             );
             return false;

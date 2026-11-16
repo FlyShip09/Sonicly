@@ -748,10 +748,14 @@ impl Library {
                         }
                         log::warn!("library: cannot update the {}: {error:#}", S::TROUBLE);
                         let key = match saved {
-                            true => "toast-library-add-failed",
-                            false => "toast-library-remove-failed",
+                            true => "toast-favorite-add-failed",
+                            false => "toast-favorite-remove-failed",
                         };
-                        Toasts::linked(Outcome::Failed, key, name, target, cx);
+                        let toast = Toast::new(Outcome::Failed, key)
+                            .name(name)
+                            .target(target)
+                            .detail(crate::blamed(&error, cx));
+                        Toasts::post(toast, cx);
                         None
                     }
                 };
@@ -1612,7 +1616,7 @@ impl Library {
                     }
                     Err(error) => {
                         log::warn!("library: cannot update the library pin: {error:#}");
-                        Toasts::show(Outcome::Failed, "toast-library-pin-failed", cx);
+                        Toasts::failed("toast-library-pin-failed", None, &error, cx);
                         done(false, cx);
                     }
                 }
@@ -1971,7 +1975,7 @@ impl Library {
                             true => "toast-library-add-failed",
                             false => "toast-library-remove-failed",
                         };
-                        Toasts::linked(Outcome::Failed, failed, name, None, cx);
+                        Toasts::failed(failed, Some(name.into()), &error, cx);
                     }
                 }
                 cx.notify();
@@ -2894,7 +2898,7 @@ impl Library {
             }
             Err(error) => {
                 log::warn!("library: cannot reorder a playlist: {error:#}");
-                Toasts::show(Outcome::Failed, "toast-playlist-failed", cx);
+                Toasts::failed("toast-playlist-reorder-failed", None, &error, cx);
                 self.reorders.remove(&id);
                 cx.emit(LibraryEvent::ReorderFailed(id));
             }
@@ -3440,11 +3444,13 @@ impl Library {
                     }
                     Err(error) => {
                         log::warn!("library: cannot {action}: {error:#}");
-                        let key = match music::cover::unusable(&error) {
-                            Some(unusable) => cover_problem(unusable),
-                            None => "toast-playlist-failed",
-                        };
-                        Toasts::show(Outcome::Failed, key, cx);
+                        // a picture that cannot be a cover has words of its own that say why
+                        match music::cover::unusable(&error) {
+                            Some(unusable) => {
+                                Toasts::show(Outcome::Failed, cover_problem(unusable), cx)
+                            }
+                            None => Toasts::failed("toast-playlist-failed", None, &error, cx),
+                        }
                         for id in invalidated {
                             cx.emit(LibraryEvent::PlaylistChanged(id));
                         }

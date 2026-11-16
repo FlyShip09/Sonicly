@@ -213,10 +213,11 @@ impl Links {
             }
             Err(error) => {
                 log::warn!("links: cannot install theme: {error:#}");
-                Toasts::about(
+                Toasts::with_detail(
                     Outcome::Failed,
                     "toast-theme-install-failed",
-                    offer.family.name,
+                    Some(offer.family.name.into()),
+                    format!("{error:#}"),
                     cx,
                 );
                 false

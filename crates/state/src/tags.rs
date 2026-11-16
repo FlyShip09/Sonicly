@@ -129,7 +129,7 @@ impl Tags {
                     }
                     Err(error) => {
                         log::warn!("tags: cannot save the tags: {error:#}");
-                        Toasts::show(Outcome::Failed, "toast-tags-failed", cx);
+                        Toasts::failed("toast-tags-failed", None, &error, cx);
                     }
                 }
                 cx.notify();

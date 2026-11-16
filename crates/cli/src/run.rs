@@ -313,7 +313,9 @@ fn describe(failure: &Failure) -> String {
             format!("the link is for {link}, but {current} is the current provider")
         }
         Failure::Unqueueable(item) => format!("'{item}' cannot be queued"),
-        Failure::Unreadable(path) => format!("cannot read '{path}'"),
+        Failure::Unreadable(path) => {
+            format!("'{path}' is not an audio file Sonicly can play")
+        }
         Failure::Unfetched(link) => format!("cannot fetch '{link}'"),
         Failure::UnknownProvider(slug) => {
             format!("no provider is called '{slug}'; see `sonicly providers`")
