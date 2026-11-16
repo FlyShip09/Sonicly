@@ -32,7 +32,7 @@ running Sonicly.
 | App | Themes, theme files, adaptive tint | Ported; theme previews redrawn as frame, page and player bar, seen |
 | App | Keyboard shortcuts, quick search, CLI control | Ported; CLI `current`, `pause`, `play`, `seek`, `next`, `prev`, `add`, `queue` and `lyrics` seen against a running Sonicly on Windows; Tab walks buttons, switches and option cards (built, not yet driven from a keyboard); quick search dims instead of blurring |
 | App | Tray, single instance, deep links (`sonicly://`) | Ported |
-| App | Auto-update | Disabled (no releases yet) |
+| App | Auto-update | The code that downloaded and ran an installer is deleted. What is left can tell you a newer release exists and link to its page; it is off until Sonicly has releases |
 | App | Install counter | Removed |
 | App | GitHub star count (title bar, Settings, About) | Not in upstream; built; the count seen in the title bar of a release build on Windows. The About rows, the off switch and the narrow-window form compile but have not been seen |
 | App | `settings.json` version and migration | Upstream had atomic saves, a backup and broken-file protection but no version; version and steps built, unit tested, no step exists yet |

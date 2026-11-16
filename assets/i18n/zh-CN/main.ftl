@@ -1103,12 +1103,8 @@ lyrics-source-local = 歌词来自本地文件
 lyrics-writers = 由 { $writers } 创作
 
 update-available = Sonicly { $version } 已发布
-update-detail = 你当前使用的是 { $running }。查看更新内容，或立即更新。
 update-detail-notes = 你当前使用的是 { $running }。查看更新内容，然后按你的安装方式更新 Sonicly。
 update-notes = 新内容
-update-now = 更新
-update-working = 正在下载更新…
-update-failed = 更新无法安装。请从发布页面重试。
 update-never = 不检查更新
 notice-never = 不再显示
 requirement-audio-bridge-title = Sonicly 无法连接到你的声音服务器

@@ -1103,12 +1103,8 @@ lyrics-source-local = Tekste nga skedari lokal
 lyrics-writers = Shkruar nga { $writers }
 
 update-available = Sonicly { $version } është jashtë
-update-detail = Je te { $running }. Lexo çfarë ndryshoi, ose përditëso tani.
 update-detail-notes = Je te { $running }. Lexo çfarë ndryshoi, pastaj përditëso Sonicly ashtu si e instalove.
 update-notes = Çfarë ka të re
-update-now = Përditëso
-update-working = Duke shkarkuar përditësimin…
-update-failed = Përditësimi nuk mund të instalohej. Provo përsëri nga faqja e publikimeve.
 update-never = Mos kontrollo për përditësime
 notice-never = Mos e shfaq më
 requirement-audio-bridge-title = Sonicly nuk arrin te serveri yt i zërit

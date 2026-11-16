@@ -1142,12 +1142,8 @@ lyrics-source-local = Tekst z lokalnego pliku
 lyrics-writers = Autorzy: { $writers }
 
 update-available = Sonicly { $version } jest dostępna
-update-detail = Masz wersję { $running }. Zobacz, co się zmieniło, albo zaktualizuj teraz.
 update-detail-notes = Masz { $running }. Zobacz, co się zmieniło, a potem zaktualizuj Sonorę tak, jak ją zainstalowano.
 update-notes = Co nowego
-update-now = Aktualizuj
-update-working = Pobieranie aktualizacji…
-update-failed = Nie udało się zainstalować aktualizacji. Spróbuj ze strony wydań.
 update-never = Nie sprawdzaj aktualizacji
 notice-never = Nie pokazuj ponownie
 requirement-audio-bridge-title = Sonicly nie może połączyć się z serwerem dźwięku

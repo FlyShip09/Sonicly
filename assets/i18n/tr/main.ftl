@@ -1091,12 +1091,8 @@ lyrics-source-local = Şarkı sözleri yerel dosyadan
 lyrics-writers = Yazan: { $writers }
 
 update-available = Sonicly { $version } çıktı
-update-detail = { $running } sürümünü kullanıyorsun. Nelerin değiştiğini oku ya da şimdi güncelle.
 update-detail-notes = { $running } sürümünü kullanıyorsun. Nelerin değiştiğini oku, sonra Sonicly'yı kurduğun yoldan güncelle.
 update-notes = Yenilikler
-update-now = Güncelle
-update-working = Güncelleme indiriliyor…
-update-failed = Güncelleme kurulamadı. Yayınlar sayfasından yeniden dene.
 update-never = Güncellemeleri denetleme
 notice-never = Bir daha gösterme
 requirement-audio-bridge-title = Sonicly ses sunucuna ulaşamıyor

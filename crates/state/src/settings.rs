@@ -47,7 +47,6 @@ use self::equalizer::Profile;
 use crate::equalizer::DeviceRule;
 use crate::pins::PinSort;
 use crate::queue::{Resume, gap_target};
-use crate::updates::{Channel, updates_itself};
 use crate::{Hit, Outcome, Repeat, Sonicly, Toasts};
 
 /// How Sonicly is named on the device list of the provider's apps. `Both` is the app's name with
@@ -521,9 +520,6 @@ struct Values {
     check_updates: bool,
     /// Whether GitHub is asked, at most once a day, how many stars the repository has.
     github_stars: bool,
-    /// The release channel chosen in settings, by its id. Empty follows the running build's own
-    /// channel, and a copy a package manager installed ignores it.
-    update_channel: String,
     close_to_tray: bool,
     tray_icon: bool,
     stay_awake: bool,
@@ -757,10 +753,8 @@ impl Default for Values {
             lyrics_style: LyricsStyle::default(),
             lyrics_presets: Vec::new(),
             adaptive_menu: false,
-            check_updates: crate::updates::RELEASE_REPO.is_some()
-                && (cfg!(target_os = "windows") || updates_itself()),
+            check_updates: crate::updates::RELEASE_REPO.is_some(),
             github_stars: true,
-            update_channel: String::new(),
             close_to_tray: true,
             tray_icon: true,
             stay_awake: true,
@@ -1312,10 +1306,6 @@ impl AppSettings {
 
     pub fn adaptive_menu(&self) -> bool {
         self.values.adaptive_menu
-    }
-
-    pub fn update_channel(&self) -> Channel {
-        Channel::from_id(&self.values.update_channel)
     }
 
     pub fn check_updates(&self) -> bool {
@@ -1978,11 +1968,6 @@ impl AppSettings {
         cx: &mut Context<Self>,
     ) {
         self.values.keybinds = keybinds;
-        self.schedule_save(cx);
-    }
-
-    pub fn set_update_channel(&mut self, channel: Channel, cx: &mut Context<Self>) {
-        self.values.update_channel = channel.id().to_owned();
         self.schedule_save(cx);
     }
 

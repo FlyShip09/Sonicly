@@ -5,10 +5,10 @@ use std::path::{Path, PathBuf};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, FontWeight, SharedString, div, img};
 use i18n::t;
-use state::{Channel, Stars};
+use state::Stars;
 use ui::{ActiveTheme as _, Switch, Text};
 
-use super::rows::{outward, segmented};
+use super::rows::outward;
 use super::{Group, SettingsView, Slot};
 
 /// How large the app icon stands, in covers.
@@ -21,24 +21,17 @@ const NOTICES: &str = "THIRD-PARTY.md";
 
 impl SettingsView {
     pub(super) fn about_groups(&self) -> Vec<Group> {
-        // no release repository means nothing to check, so neither update row stands
+        // no release repository means nothing to check, so the update row does not stand
         let updates = state::RELEASE_REPO.is_some().then_some(Slot::Updates);
-        let channel = state::updates_itself().then_some(Slot::Channel);
         vec![
-            Group::untitled().rows(
-                [Slot::Version]
-                    .into_iter()
-                    .chain(updates)
-                    .chain(channel)
-                    .chain([
-                        Slot::Log,
-                        Slot::License,
-                        Slot::Licenses,
-                        Slot::Source,
-                        Slot::Star,
-                        Slot::StarCount,
-                    ]),
-            ),
+            Group::untitled().rows([Slot::Version].into_iter().chain(updates).chain([
+                Slot::Log,
+                Slot::License,
+                Slot::Licenses,
+                Slot::Source,
+                Slot::Star,
+                Slot::StarCount,
+            ])),
         ]
     }
 
@@ -69,28 +62,6 @@ impl SettingsView {
                     this.settings
                         .update(cx, |settings, cx| settings.set_check_updates(!on, cx));
                 }))
-                .into_any_element(),
-        )
-    }
-
-    pub(super) fn channel_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let current = self.settings.read(cx).update_channel();
-
-        let choices = segmented(
-            "update-channel",
-            Channel::ALL.map(|channel| (channel, channel.label())),
-            current,
-            cx.listener(|this, channel: &Channel, _, cx| {
-                let channel = *channel;
-                this.settings
-                    .update(cx, |settings, cx| settings.set_update_channel(channel, cx));
-            }),
-        );
-
-        self.row(
-            t!("settings-update-channel"),
-            choices
-                .name(t!("settings-update-channel"))
                 .into_any_element(),
         )
     }

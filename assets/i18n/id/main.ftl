@@ -1103,12 +1103,8 @@ lyrics-source-local = Lirik dari file lokal
 lyrics-writers = Ditulis oleh { $writers }
 
 update-available = Sonicly { $version } telah dirilis
-update-detail = Anda menggunakan versi { $running }. Baca perubahannya, atau perbarui sekarang.
 update-detail-notes = Anda menggunakan versi { $running }. Baca perubahannya, lalu perbarui Sonicly sesuai cara Anda memasangnya.
 update-notes = Yang baru
-update-now = Perbarui
-update-working = Mengunduh pembaruan…
-update-failed = Pembaruan tidak dapat dipasang. Coba lagi dari halaman rilis GitHub.
 update-never = Jangan periksa pembaruan
 notice-never = Jangan tampilkan lagi
 requirement-audio-bridge-title = Sonicly tidak dapat menjangkau server suara Anda
