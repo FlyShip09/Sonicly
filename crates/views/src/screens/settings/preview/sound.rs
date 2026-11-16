@@ -105,6 +105,10 @@ pub(in crate::screens::settings) fn preview(
         .map(|provider| provider.name())
         .or_else(|| session.client().and_then(|_| session.provider_name()));
 
+    // a service's own web player plays to the system itself, so the path ends with it rather
+    // than with Sonicly's equalizer, resampler and device
+    let direct = track.as_ref().is_some_and(|track| track.direct);
+
     let mut steps = Vec::new();
     steps.push(Step {
         icon: slug.map_or("icons/music.svg", provider_logo),
@@ -120,7 +124,8 @@ pub(in crate::screens::settings) fn preview(
         Some(Normalisation::Gain(db)) => Some(Some(db)),
         Some(Normalisation::Limited) => Some(None),
         None => view.settings.read(cx).normalisation().then_some(None),
-    };
+    }
+    .filter(|_| !direct);
     if let Some(gain) = normalised {
         steps.push(Step {
             icon: "icons/gauge.svg",
@@ -129,7 +134,15 @@ pub(in crate::screens::settings) fn preview(
             detail: gain.map(|db| t!("settings-signal-gain", db = signed(db))),
         });
     }
-    if view.equalizer.read(cx).enabled() {
+    if direct {
+        steps.push(Step {
+            icon: "icons/headphones.svg",
+            tint: None,
+            label: t!("settings-signal-web-player"),
+            detail: Some(t!("settings-signal-web-player-detail")),
+        });
+    }
+    if view.equalizer.read(cx).enabled() && !direct {
         steps.push(Step {
             icon: "icons/sliders-horizontal.svg",
             tint: None,
@@ -146,7 +159,7 @@ pub(in crate::screens::settings) fn preview(
         });
     }
     let outputs = view.outputs.read(cx);
-    let device = outputs.current();
+    let device = outputs.current().filter(|_| !direct);
     steps.push(Step {
         icon: "icons/speaker.svg",
         tint: None,

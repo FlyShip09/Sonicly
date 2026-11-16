@@ -141,5 +141,6 @@ fn reason(problem: SignInProblem) -> &'static str {
         SignInProblem::Network => "login-problem-network",
         SignInProblem::Cancelled => "login-problem-cancelled",
         SignInProblem::Refused => "login-problem-refused",
+        SignInProblem::Subscription => "login-problem-subscription",
     }
 }
