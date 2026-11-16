@@ -1,7 +1,11 @@
 use std::rc::Rc;
 
 use gpui::prelude::*;
-use gpui::{App, Div, ElementId, Hsla, Pixels, SharedString, StyleRefinement, Window, div};
+use gpui::{
+    AnyView, App, Div, ElementId, Hsla, Pixels, SharedString, StyleRefinement, Window, div,
+};
+
+use crate::hover_card::HoverCarded as _;
 
 const RAMP: f32 = 6.;
 const DEPTH: usize = 5;
@@ -22,6 +26,8 @@ impl InlineLink {
 }
 
 type ClickHandler = Rc<dyn Fn(SharedString, &mut App) + 'static>;
+/// Builds the hover card of a link from its value and its label.
+type CardBuilder = Rc<dyn Fn(SharedString, SharedString, &mut Window, &mut App) -> AnyView>;
 
 #[derive(IntoElement)]
 pub struct InlineLinks {
@@ -33,6 +39,7 @@ pub struct InlineLinks {
     text_size: Option<Pixels>,
     clip: bool,
     on_click: Option<ClickHandler>,
+    card: Option<CardBuilder>,
 }
 
 impl InlineLinks {
@@ -51,6 +58,7 @@ impl InlineLinks {
             text_size: None,
             clip: false,
             on_click: None,
+            card: None,
         }
     }
 
@@ -66,6 +74,16 @@ impl InlineLinks {
 
     pub fn on_click(mut self, handler: impl Fn(SharedString, &mut App) + 'static) -> Self {
         self.on_click = Some(Rc::new(handler));
+        self
+    }
+
+    /// Gives every link with a value a hover card, which `build` makes from the link's value
+    /// and its label.
+    pub fn hover_card(
+        mut self,
+        build: impl Fn(SharedString, SharedString, &mut Window, &mut App) -> AnyView + 'static,
+    ) -> Self {
+        self.card = Some(Rc::new(build));
         self
     }
 }
@@ -91,6 +109,7 @@ impl RenderOnce for InlineLinks {
             text_size,
             clip,
             on_click,
+            card,
         } = self;
         let empty = items.is_empty();
         let overrides = std::mem::take(base.style());
@@ -141,6 +160,12 @@ impl RenderOnce for InlineLinks {
                             })
                             .hover(|style| style.underline())
                             .cursor_pointer()
+                            .when_some(card.clone(), |this, card| {
+                                let (value, label) = (value.clone(), label.clone());
+                                this.hover_card(move |window, cx| {
+                                    card(value.clone(), label.clone(), window, cx)
+                                })
+                            })
                             .when_some(handler, |this, handler| {
                                 this.on_click(move |_, _, cx| {
                                     cx.stop_propagation();

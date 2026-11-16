@@ -543,6 +543,9 @@ impl PlayerBar {
                         .text_size(artists)
                         .on_click(|id, cx| {
                             navigate(Destination::Artist(id), cx);
+                        })
+                        .hover_card(|id, name, _, cx| {
+                            crate::chrome::PeekCard::artist(id, name, cx)
                         }),
                     )
                     .max_w_full()

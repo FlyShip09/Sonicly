@@ -16,6 +16,7 @@ mod generated;
 mod glass;
 mod glide;
 mod hold;
+mod hover_card;
 mod info_card;
 mod inline_links;
 mod input;
@@ -97,6 +98,7 @@ pub use glass::{
 };
 pub use glide::{Glide, ScrollPosition};
 pub use hold::{Held, Hold, held};
+pub use hover_card::{HoverCard, HoverCarded};
 pub use info_card::{Fact, InfoCard};
 pub use inline_links::{InlineLink, InlineLinks};
 pub use input::{

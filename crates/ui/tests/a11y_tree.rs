@@ -39,9 +39,9 @@ use gpui::{
     div,
 };
 use ui::{
-    Button, Card, Checkbox, DraggedPin, Field, Form, GeneratedCover, Glowing as _, Input, Marquee,
-    OptionCard, OtpInput, Pin, PinKind, Pinnable as _, Radio, RangeScrubber, RangeState, Scrubber,
-    ScrubberState, Spot, Theme, Toast,
+    Button, Card, Checkbox, DraggedPin, Field, Form, GeneratedCover, Glowing as _,
+    HoverCarded as _, Input, Marquee, OptionCard, OtpInput, Pin, PinKind, Pinnable as _, Radio,
+    RangeScrubber, RangeState, Scrubber, ScrubberState, Spot, Theme, Toast,
 };
 
 /// Formats what the frame builder would put in the tree for `element`.
@@ -899,5 +899,34 @@ async fn fluid_field_stays_out_of_the_tree(cx: &mut TestAppContext) {
     assert!(
         lines.iter().all(|line| line.contains("NO NODE")),
         "the fluid field reached the accessibility tree, where it says nothing: {lines:?}"
+    );
+}
+
+/// What a test hover card holds: nothing, since only its host is under test.
+struct Blank;
+
+impl Render for Blank {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
+}
+
+#[gpui::test]
+async fn hover_card_leaves_its_host_announced(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |_, _| {
+        let element = div()
+            .id("artist-link")
+            .role(Role::Link)
+            .aria_label("Vela North")
+            .hover_card(|_, cx| cx.new(|_| Blank).into())
+            .into_element();
+        snapshot("hover-card-host", &element)
+    });
+    let lines = rendered(&lines, "hover-card-host");
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("role=Link") && line.contains("Vela North")),
+        "a name with a hover card stops being announced as its link: {lines:?}"
     );
 }
