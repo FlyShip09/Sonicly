@@ -5,7 +5,7 @@ use gpui::prelude::*;
 use gpui::{App, ClickEvent, Entity, MouseDownEvent, Pixels, SharedString, Window, div};
 use music::{GenreItem, Track};
 use state::Playback;
-use ui::{ActiveTheme as _, Button, Card, eyebrow, heading, snapped, vacant};
+use ui::{ActiveTheme as _, Button, Card, eyebrow, section_heading, snapped, vacant};
 
 use crate::shared::cards;
 use crate::shared::track_card::{ContextHandler, StartHandler, TrackCard};
@@ -57,7 +57,9 @@ impl Rows {
     }
 }
 
-/// A framed deck of list rows in up to three columns, paged with the arrows in its head.
+/// A deck of list rows in up to three columns under a section heading, paged with the arrows
+/// beside it. It stands on the page like a shelf, with no frame of its own: the rows reach into
+/// the page margin by their own inset, so their covers line up with the heading above them.
 #[derive(IntoElement)]
 pub(crate) struct Picks {
     id: &'static str,
@@ -205,21 +207,13 @@ impl RenderOnce for Picks {
             .w_full()
             .flex()
             .flex_col()
-            .overflow_hidden()
-            .rounded(theme.radius)
-            .border_1()
-            .border_color(theme.border)
+            .gap_3()
             .child(
                 div()
                     .flex()
                     .items_end()
                     .justify_between()
                     .gap_4()
-                    .px_4()
-                    .pt_4()
-                    .pb_3()
-                    .border_b_1()
-                    .border_color(theme.border)
                     .child(
                         div()
                             .flex()
@@ -233,7 +227,7 @@ impl RenderOnce for Picks {
                             }))
                             .child({
                                 let title = i18n::lookup(self.title, None);
-                                heading(title.clone(), cx)
+                                section_heading(title.clone(), cx)
                                     .id(SharedString::from(format!("{id}-heading")))
                                     .role(Role::Heading)
                                     .aria_level(2)
@@ -245,11 +239,10 @@ impl RenderOnce for Picks {
                             .flex()
                             .items_center()
                             .gap_1()
-                            .pb_1()
                             .child(
                                 Button::new(SharedString::from(format!("{id}-previous")))
                                     .small()
-                                    .outline()
+                                    .ghost()
                                     .icon("icons/chevron-left.svg")
                                     .tooltip("common-previous")
                                     .disabled(empty || page == 0)
@@ -262,7 +255,7 @@ impl RenderOnce for Picks {
                             .child(
                                 Button::new(SharedString::from(format!("{id}-next")))
                                     .small()
-                                    .outline()
+                                    .ghost()
                                     .icon("icons/chevron-right.svg")
                                     .tooltip("common-next")
                                     .disabled(empty || page + 1 >= shape.pages)
@@ -284,17 +277,17 @@ impl RenderOnce for Picks {
                 )
             })
             .when(!barren, |this| {
-                this.child(div().flex().gap_2().p_2().when_else(
+                this.child(div().flex().gap_2().mx(-theme.metrics.pad).when_else(
                     empty,
                     |this| {
                         this.children((0..shape.columns).map(|column| {
-                            column_shell(column, theme.border)
+                            column_shell()
                                 .children((0..ROWS).map(|slot| skeleton(id, column * ROWS + slot)))
                         }))
                     },
                     |this| {
                         this.children((0..shape.columns).map(|column| {
-                            column_shell(column, theme.border).children((0..ROWS).map(|slot| {
+                            column_shell().children((0..ROWS).map(|slot| {
                                 let place = start + column * ROWS + slot;
 
                                 match &rows {
@@ -339,16 +332,8 @@ impl RenderOnce for Picks {
     }
 }
 
-fn column_shell(column: usize, border: gpui::Hsla) -> gpui::Div {
-    div()
-        .flex()
-        .flex_1()
-        .min_w_0()
-        .flex_col()
-        .gap_1()
-        .when(column > 0, |this| {
-            this.border_l_1().border_color(border).pl_2()
-        })
+fn column_shell() -> gpui::Div {
+    div().flex().flex_1().min_w_0().flex_col().gap_1()
 }
 
 fn skeleton(id: &'static str, place: usize) -> impl IntoElement {

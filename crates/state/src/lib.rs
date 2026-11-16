@@ -98,7 +98,10 @@ pub use updates::{
 };
 pub use vault::CACHE_GB_RANGE;
 pub use wake::Wake;
-pub use window_shape::{apply_window_rounding, install_rounded_window_hook};
+pub use window_shape::{
+    apply_window_polarity, apply_window_rounding, install_rounded_window_hook,
+    install_window_polarity_hook,
+};
 
 use std::future::Future;
 use std::sync::Arc;

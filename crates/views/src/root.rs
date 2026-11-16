@@ -193,6 +193,9 @@ pub struct Root {
     font: Option<(String, Font)>,
     #[cfg(target_os = "windows")]
     rounded: Option<ui::Rounding>,
+    /// Whether DWM was last told the frame is dark, so the Mica under it matches the theme.
+    #[cfg(target_os = "windows")]
+    dark_frame: Option<bool>,
     /// The corners and traffic-light position last handed to AppKit.
     #[cfg(target_os = "macos")]
     framed: Option<(ui::Rounding, gpui::Point<gpui::Pixels>)>,
@@ -339,6 +342,15 @@ impl Root {
         })
         .detach();
 
+        // GPUI hands DWM the system's polarity on every system change, after this runs, so the
+        // next frame hands it Sonicly's again.
+        #[cfg(target_os = "windows")]
+        cx.observe_window_appearance(window, |this, _, cx| {
+            this.dark_frame = None;
+            cx.notify();
+        })
+        .detach();
+
         cx.observe_window_activation(window, |_, window, cx| update_focus_for_wake(window, cx))
             .detach();
         update_focus_for_wake(window, cx);
@@ -424,6 +436,8 @@ impl Root {
             font: None,
             #[cfg(target_os = "windows")]
             rounded: None,
+            #[cfg(target_os = "windows")]
+            dark_frame: None,
             #[cfg(target_os = "macos")]
             framed: None,
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
@@ -1188,7 +1202,7 @@ impl Render for Root {
 
         let theme = *cx.theme();
         window.set_rem_size(theme.font_size);
-        let appearance = ui::backdrop(theme.blur_window, theme.transparent);
+        let appearance = ui::backdrop(theme.blur_window, theme.transparent, ui::material(cx));
         if self.background != Some(appearance) {
             self.background = Some(appearance);
             window.set_background_appearance(appearance);
@@ -1197,6 +1211,15 @@ impl Render for Root {
         // Windows can only round a window's corners while it's opaque (DWM never rounds a
         // per-pixel-alpha window), so this only takes effect once `backdrop` above lands on
         // `Opaque`; Linux/FreeBSD round their own chrome directly instead, below.
+        #[cfg(target_os = "windows")]
+        {
+            let dark = theme.background.l < 0.5;
+            if self.dark_frame != Some(dark) {
+                self.dark_frame = Some(dark);
+                state::apply_window_polarity(window, dark, cx);
+            }
+        }
+
         #[cfg(target_os = "windows")]
         {
             let rounding = match window.is_fullscreen() {
@@ -1267,6 +1290,7 @@ impl Render for Root {
         // the page colour under it would only stack a second alpha beneath that and leave a
         // see-through fullscreen reading nearly solid.
         let ambient = matches!(self.view, RootView::Fullscreen) && ambient::shown(cx);
+        let framed = matches!(self.view, RootView::Workspace) && !show_sign_in && ui::material(cx);
 
         // The shell enters the way a page enters the workspace. An opaque window fades it
         // under a scrim of the page colour, which leaves the workspace's cached views alone,
@@ -1388,7 +1412,9 @@ impl Render for Root {
             .when_some(radius, |this, radius| {
                 this.rounded(radius).overflow_hidden()
             })
-            .when(!ambient, |this| this.bg(theme.background))
+            // On the platform's material the workspace paints its own page and frame, and the
+            // window behind them stays clear for the material to show through.
+            .when(!ambient && !framed, |this| this.bg(theme.background))
             .text_color(theme.foreground)
             .capture_any_mouse_down(|_, window, cx| {
                 if ui::cancel_middle_scroll(cx) {

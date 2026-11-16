@@ -841,8 +841,18 @@ impl Render for SidebarLeft {
                 cx.notify();
             }))
             .when(!self.is_open(), |this| this.hidden())
-            .when(!theme.transparent, |this| this.bg(sidebar_bg))
-            .border_color(sidebar_border)
+            // Docked, the sidebar is the frame and the page draws the edge between them. Laid
+            // over the page it is a solid sheet with an edge of its own, since a thin frame
+            // there would show the page through it rather than the material.
+            .map(|this| match (overlaid, ui::frame_fill(cx)) {
+                (_, None) => this,
+                (true, Some(_)) => this.bg(sidebar_bg),
+                (false, Some(fill)) => this.bg(fill),
+            })
+            .border_color(match overlaid {
+                true => sidebar_border,
+                false => gpui::transparent_black(),
+            })
             // A sidebar dragged shut keeps only its edge until the drag lets go.
             .when(closing, |this| this.border_r_0())
             .when(overlaid, |this| {

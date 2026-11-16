@@ -9,7 +9,8 @@ use std::rc::Rc;
 use music::{GenreItem, GenreSection};
 use state::Playback;
 use ui::{
-    ActiveTheme as _, Button, Card, Deck, Glide, Hold, Mode, Skeleton, Text, heading, snapped,
+    ActiveTheme as _, Button, Card, Deck, Glide, Hold, Mode, Skeleton, Text, section_heading,
+    snapped,
 };
 
 use crate::shared::album_grid::CardGrid;
@@ -21,10 +22,8 @@ const ROWS: usize = 3;
 const STEADY: Pixels = px(0.5);
 const PENDING: usize = 3;
 const RAIL_GAP: Pixels = px(16.);
-const STACK_GAP: Pixels = px(32.);
 const LANE_GAP: Pixels = px(8.);
 const HEADING_GAP: Pixels = px(12.);
-const LEADING: f32 = 1.4;
 const HEADING: Pixels = px(140.);
 
 pub(crate) struct Shelves {
@@ -114,7 +113,7 @@ impl Shelves {
         let stack = Deck::new(self.tag("stack", 0))
             .hold()
             .rows(heights)
-            .gap(STACK_GAP)
+            .gap(cx.theme().metrics.section)
             .draw(move |place, window, cx| {
                 let Some(view) = me.upgrade() else {
                     return div().into_any_element();
@@ -343,7 +342,7 @@ impl Shelves {
 
         Button::new(id)
             .small()
-            .outline()
+            .ghost()
             .icon(match forward {
                 true => "icons/chevron-right.svg",
                 false => "icons/chevron-left.svg",
@@ -435,7 +434,8 @@ fn spread(cards: Vec<AnyElement>, lanes: usize) -> Div {
 fn head(window: &Window, cx: &App) -> Pixels {
     let theme = *cx.theme();
 
-    snapped(theme.text(Text::Title) * LEADING, window).max(theme.metrics.control_small)
+    snapped(theme.text(Text::Large) * Text::Large.leading(), window)
+        .max(theme.metrics.control_small)
 }
 
 fn dressed(card: Card, tile: Option<Pixels>, cx: &App) -> Card {
@@ -679,7 +679,7 @@ fn arrow(
 
     Button::new(id)
         .small()
-        .outline()
+        .ghost()
         .icon(match forward {
             true => "icons/chevron-right.svg",
             false => "icons/chevron-left.svg",
@@ -707,7 +707,7 @@ fn sideways(event: &ScrollWheelEvent) -> bool {
 /// A shelf or rail title as a level two heading, so screen readers can jump from one shelf to
 /// the next. `id` has to be unique on the page.
 fn shelf_heading(id: impl Into<ElementId>, title: SharedString, cx: &App) -> Stateful<Div> {
-    heading(title.clone(), cx)
+    section_heading(title.clone(), cx)
         .id(id)
         .role(Role::Heading)
         .aria_level(2)

@@ -3,15 +3,16 @@ use std::rc::Rc;
 use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, Div, ElementId, Entity, FontWeight, MouseButton,
-    MouseDownEvent, Pixels, Rems, SharedString, Stateful, Window, div, px, relative, rems,
+    AnyElement, App, ClickEvent, Context, Div, ElementId, Entity, FontWeight, Hsla, MouseButton,
+    MouseDownEvent, Pixels, Rems, SharedString, Stateful, Window, div, linear_color_stop,
+    linear_gradient, px, relative, rems,
 };
 use i18n::t;
 use music::{Album, Track};
 use state::{Origin, Playback};
 use ui::{
-    ActiveTheme as _, Artwork, Badge, Button, Flight, LEADING, MenuItem, Perch, Pin, Pinnable as _,
-    Skeleton, TableState, Tails as _, Text, Theme, Tipped as _, spoken,
+    ActiveTheme as _, Artwork, Badge, Button, Flight, LEADING, MenuItem, Motion, Motioned as _,
+    Perch, Pin, Pinnable as _, Skeleton, TableState, Tails as _, Text, Theme, Tipped as _, spoken,
 };
 
 use crate::shared::tracks::{self, TrackSource};
@@ -368,6 +369,7 @@ pub(crate) struct PageHero {
     cover_away: bool,
     pin: Option<Pin>,
     pending: bool,
+    washed: bool,
 }
 
 impl PageHero {
@@ -388,6 +390,7 @@ impl PageHero {
             cover_away: false,
             pin: None,
             pending: false,
+            washed: false,
         }
     }
 
@@ -470,6 +473,14 @@ impl PageHero {
         self
     }
 
+    /// Lays a wash of the cover's own colour behind the hero, from the top edge of the page down
+    /// to the hero's foot, once the cover is drawn and its colour known. It fades in as it
+    /// arrives, a cover with no hue leaves the page neutral, and it scrolls with the page.
+    pub(crate) fn washed(mut self) -> Self {
+        self.washed = true;
+        self
+    }
+
     /// Draws the cover, title, meta line and actions as skeletons while the page has nothing
     /// to fill them with yet. The eyebrow stays, since it names the kind of page.
     pub(crate) fn pending(mut self, pending: bool) -> Self {
@@ -479,8 +490,23 @@ impl PageHero {
 }
 
 impl RenderOnce for PageHero {
-    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = *cx.theme();
+        let wash = self
+            .cover
+            .as_deref()
+            .filter(|_| self.washed && !self.pending)
+            .and_then(|cover| Some((cover, ui::cover_palette(cover, cx)?.primary?)))
+            .map(|(cover, tint)| {
+                let reach = theme.metrics.inset + crate::chrome::Chrome::margin(window, cx);
+                wash(
+                    cover,
+                    theme.header_wash(tint),
+                    reach,
+                    theme.metrics.inset,
+                    cx,
+                )
+            });
 
         let art = theme.metrics.cover;
         let drag_start = self.drag_start.map(Rc::from);
@@ -535,11 +561,13 @@ impl RenderOnce for PageHero {
         div()
             .id(self.id.clone())
             .when_some(self.pin, |hero, pin| hero.pin(pin))
+            .relative()
             .flex()
             .flex_none()
             .items_end()
             .gap(COVER_GAP)
             .pb_6()
+            .children(wash)
             .child({
                 let artwork = Artwork::new(self.cover)
                     .size(art)
@@ -596,7 +624,8 @@ impl RenderOnce for PageHero {
                             .gap_3()
                             .min_w_0()
                             .text_size(theme.text(Text::Display))
-                            .font_weight(FontWeight::BOLD)
+                            .line_height(relative(Text::Display.leading()))
+                            .font_weight(FontWeight::SEMIBOLD)
                             .child(
                                 div()
                                     .id((self.id.clone(), "title"))
@@ -631,6 +660,34 @@ impl RenderOnce for PageHero {
                     .children(self.meta)
                     .children(self.actions.map(|actions| div().pt_1().child(actions))),
             )
+    }
+}
+
+/// The header wash: `color` at the page's top edge, `above` over the hero, fading to nothing at
+/// the hero's foot and reaching `reach` past it on either side to the page's edges. It fades in
+/// over the slow motion span, keyed by its cover so a new cover washes in again, and appears at
+/// once with motion reduced.
+fn wash(cover: &str, color: Hsla, reach: Pixels, above: Pixels, cx: &App) -> AnyElement {
+    let wash = div()
+        .absolute()
+        .top(-above)
+        .left(-reach)
+        .right(-reach)
+        .bottom_0()
+        .bg(linear_gradient(
+            180.,
+            linear_color_stop(color, 0.),
+            linear_color_stop(color.opacity(0.), 1.),
+        ));
+    match cx.reduce_motion() {
+        true => wash.into_any_element(),
+        false => wash
+            .motion(
+                SharedString::from(format!("hero-wash-{cover}")),
+                Motion::Slow,
+                |wash, delta| wash.opacity(delta),
+            )
+            .into_any_element(),
     }
 }
 

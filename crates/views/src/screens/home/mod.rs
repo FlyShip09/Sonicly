@@ -117,9 +117,12 @@ impl HomeView {
     }
 
     /// Debug builds only, for capture runs: once the feed lists one, opens the first album,
-    /// artist or playlist on it, or the context menu of the first album for `menu`.
+    /// artist (an album's lead artist when the feed lists none) or playlist on it, or the
+    /// context menu of the first album for `menu`.
     #[cfg(debug_assertions)]
     pub(crate) fn stage(&mut self, what: &str, cx: &mut Context<Self>) {
+        use router::Destination;
+
         let what = what.to_owned();
         let done = Rc::new(std::cell::Cell::new(false));
         cx.observe(&self.home, move |this, home, cx| {
@@ -127,36 +130,41 @@ impl HomeView {
                 return;
             }
             let sections = home.read(cx).sections();
-            let found = sections
-                .iter()
-                .flat_map(|section| section.items.iter())
-                .find(|item| {
-                    matches!(
-                        (what.as_str(), item),
-                        ("album" | "menu", GenreItem::Album(_))
-                            | ("artist", GenreItem::Artist(_))
-                            | ("playlist", GenreItem::Playlist(_))
-                    )
-                })
-                .cloned();
-            let Some(item) = found else {
-                return;
-            };
-            done.set(true);
-            let destination = match &item {
-                _ if what == "menu" => {
-                    if let Some(item) = Item::of(&item) {
-                        let at = gpui::point(STAGED_MENU, STAGED_MENU);
-                        CardMenu::open(item, this.playback.clone(), at, cx);
-                    }
+            let items = || sections.iter().flat_map(|section| section.items.iter());
+            let album = items().find_map(|item| match item {
+                GenreItem::Album(album) => Some(album.clone()),
+                _ => None,
+            });
+            let destination = match what.as_str() {
+                "menu" => {
+                    let Some(album) = album else {
+                        return;
+                    };
+                    done.set(true);
+                    let at = gpui::point(STAGED_MENU, STAGED_MENU);
+                    CardMenu::open(Item::Album(album), this.playback.clone(), at, cx);
                     return;
                 }
-                GenreItem::Album(album) => router::Destination::Album(album.id.clone().into()),
-                GenreItem::Artist(artist) => router::Destination::Artist(artist.id.clone().into()),
-                GenreItem::Playlist(list) => router::Destination::Playlist(list.id.clone().into()),
-                GenreItem::Genre(_) | GenreItem::Track(_) => return,
+                "album" => album.map(|album| Destination::Album(album.id.into())),
+                "artist" => items()
+                    .find_map(|item| match item {
+                        GenreItem::Artist(artist) => Some(artist.id.clone()),
+                        _ => None,
+                    })
+                    .or_else(|| album?.artist_refs.into_iter().find_map(|artist| artist.id))
+                    .map(|id| Destination::Artist(id.into())),
+                "playlist" => items().find_map(|item| match item {
+                    GenreItem::Playlist(list) => {
+                        Some(Destination::Playlist(list.id.clone().into()))
+                    }
+                    _ => None,
+                }),
+                _ => None,
             };
-            router::navigate(destination, cx);
+            if let Some(destination) = destination {
+                done.set(true);
+                router::navigate(destination, cx);
+            }
         })
         .detach();
     }
@@ -271,7 +279,7 @@ impl Render for HomeView {
                 div()
                     .flex()
                     .flex_col()
-                    .gap_8()
+                    .gap(theme.metrics.section)
                     .child(ui::held("home-quick-picks", picks))
                     .children(shelves),
             )

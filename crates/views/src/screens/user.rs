@@ -5,7 +5,7 @@ use gpui::{
 };
 use i18n::t;
 use state::{Playback, Profile};
-use ui::{ActiveTheme as _, Card, Scrollbar, Scroller, heading, vacant};
+use ui::{ActiveTheme as _, Card, Scrollbar, Scroller, section_heading, vacant};
 
 use crate::chrome::Chrome;
 use crate::shared::album_grid::CardGrid;
@@ -118,7 +118,7 @@ impl UserView {
             .gap_4()
             .child({
                 let label = t!("user-playlists");
-                heading(label.clone(), cx)
+                section_heading(label.clone(), cx)
                     .id("user-playlists-heading")
                     .role(Role::Heading)
                     .aria_level(2)

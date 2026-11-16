@@ -148,6 +148,8 @@ fn main() -> ExitCode {
         state::init(cx, io, database, providers, local_provider, lyrics);
         #[cfg(target_os = "windows")]
         state::install_rounded_window_hook(set_corner_preference, cx);
+        #[cfg(target_os = "windows")]
+        state::install_window_polarity_hook(set_dark_frame, cx);
         #[cfg(target_os = "macos")]
         state::install_rounded_window_hook(set_toolbar_style, cx);
         let startup = Sonicly::global(cx).settings.read(cx).startup().to_owned();
@@ -386,7 +388,7 @@ fn open_window(cx: &mut App) {
     #[cfg(not(target_os = "macos"))]
     let traffic_lights = gpui::point(px(9.), px(9.));
     let look = settings.look();
-    let background = ui::backdrop(look.blur_window, look.transparent);
+    let background = ui::backdrop(look.blur_window, look.transparent, false);
 
     cx.open_window(
         WindowOptions {
@@ -423,6 +425,7 @@ fn open_window(cx: &mut App) {
             state::attach_remote(handle, cx);
             #[cfg(windows)]
             if let Some(handle) = handle {
+                ui::WindowMaterial::set(takes_backdrop(handle), cx);
                 app_icon::install(handle);
                 thumbbar::install(window.window_handle().window_id(), handle, cx);
             }
@@ -461,6 +464,52 @@ fn set_corner_preference(window: &gpui::Window, rounding: ui::Rounding) {
             DWMWA_WINDOW_CORNER_PREFERENCE as u32,
             &preference as *const _ as *const std::ffi::c_void,
             size_of_val(&preference) as u32,
+        );
+    }
+}
+
+/// Whether DWM draws a system backdrop (Mica) under this window, which takes Windows 11 22H2,
+/// build 22621. Asking for the automatic backdrop changes nothing on a window that has none yet,
+/// and an older DWM refuses the attribute.
+#[cfg(target_os = "windows")]
+fn takes_backdrop(handle: *mut std::ffi::c_void) -> bool {
+    use windows_sys::Win32::Graphics::Dwm::{
+        DWMSBT_AUTO, DWMWA_SYSTEMBACKDROP_TYPE, DwmSetWindowAttribute,
+    };
+
+    let backdrop = DWMSBT_AUTO;
+    let result = unsafe {
+        DwmSetWindowAttribute(
+            handle,
+            DWMWA_SYSTEMBACKDROP_TYPE as u32,
+            &backdrop as *const _ as *const std::ffi::c_void,
+            size_of_val(&backdrop) as u32,
+        )
+    };
+    result >= 0
+}
+
+/// Tells DWM whether the frame is dark, so the Mica it draws under the frame follows Sonicly's
+/// theme rather than the system's. GPUI sets it from the system on every system change, so the
+/// root sets it again after each one.
+#[cfg(target_os = "windows")]
+fn set_dark_frame(window: &gpui::Window, dark: bool) {
+    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+    use windows_sys::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
+
+    let Ok(RawWindowHandle::Win32(handle)) =
+        HasWindowHandle::window_handle(window).map(|handle| handle.as_raw())
+    else {
+        return;
+    };
+    let handle = handle.hwnd.get() as *mut std::ffi::c_void;
+    let dark = i32::from(dark);
+    unsafe {
+        DwmSetWindowAttribute(
+            handle,
+            DWMWA_USE_IMMERSIVE_DARK_MODE as u32,
+            &dark as *const _ as *const std::ffi::c_void,
+            size_of_val(&dark) as u32,
         );
     }
 }

@@ -4,7 +4,7 @@ use std::rc::Rc;
 use gpui::accesskit::{Role, Toggled};
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, Entity, FontWeight, Pixels, Point, Render, ScrollHandle,
+    AnyElement, App, ClickEvent, Context, Entity, Pixels, Point, Render, ScrollHandle,
     ScrollWheelEvent, SharedString, WeakEntity, Window, div, linear_color_stop, linear_gradient,
     point, px, relative,
 };
@@ -19,8 +19,8 @@ use ui::ActiveTheme as _;
 use ui::Listing as _;
 use ui::{
     Artwork, Button, Card, Deck, MIN_CONTENT, Modal, Mode, Pending, Picker, Pin, PinKind, Popovers,
-    Popup, Scrollbar, Scroller, TableDelegate, TableEvent, TableState, Text, effects, scrolled,
-    snapped, spoken, table,
+    Popup, Scrollbar, Scroller, TableDelegate, TableEvent, TableState, effects, scrolled, snapped,
+    spoken, table,
 };
 
 use crate::chrome::tools;
@@ -738,7 +738,6 @@ impl ArtistView {
     /// the height `release_height` reports, which is what the collapse padding is measured
     /// against.
     fn releases(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let theme = *cx.theme();
         let detail = self.detail.read(cx);
         let albums = detail.albums();
         // A discography still on its way reads as loading only while nothing of it is up.
@@ -831,15 +830,7 @@ impl ArtistView {
                 .gap_3()
                 .pt_6()
                 .child({
-                    let label = t!("artist-releases");
-                    div()
-                        .id("artist-releases-heading")
-                        .role(Role::Heading)
-                        .aria_level(2)
-                        .aria_label(label.clone())
-                        .text_size(theme.text(Text::Title))
-                        .font_weight(FontWeight::BOLD)
-                        .child(label)
+                    ui::spoken_heading("artist-releases-heading", t!("artist-releases"), 2, cx)
                 })
                 .when(!filters.is_empty(), |this| {
                     this.child(
@@ -1383,15 +1374,7 @@ impl Render for ArtistView {
                     .when(listed, |this| {
                         let label = t!("artist-popular");
                         this.child(
-                            div()
-                                .id("artist-popular-heading")
-                                .role(Role::Heading)
-                                .aria_level(2)
-                                .aria_label(label.clone())
-                                .pb_3()
-                                .text_size(theme.text(Text::Title))
-                                .font_weight(FontWeight::BOLD)
-                                .child(label),
+                            ui::spoken_heading("artist-popular-heading", label, 2, cx).pb_3(),
                         )
                     }),
             )

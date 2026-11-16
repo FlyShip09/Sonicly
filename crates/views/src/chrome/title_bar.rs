@@ -369,9 +369,10 @@ impl Render for TitleBar {
             .h(height)
             .flex_none()
             .when_some(radius, |this, radius| this.rounded_t(radius))
-            .when(!self.options.transparent && !theme.transparent, |this| {
-                this.bg(theme.background)
-            })
+            .when_some(
+                ui::frame_fill(cx).filter(|_| !self.options.transparent),
+                |this, fill| this.bg(fill),
+            )
             // The height is a border box, so a bar that drops its border centres its controls
             // one pixel lower than one that keeps it. The edge is always an edge; only its
             // colour goes, and fullscreen's controls land where the workspace's do.

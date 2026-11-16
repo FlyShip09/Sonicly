@@ -16,7 +16,7 @@ use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, ElementId, Entity, FontWeight, MouseButton, Pixels, Point, Render,
-    ScrollHandle, SharedString, WeakEntity, Window, div, point, px, relative,
+    ScrollHandle, SharedString, WeakEntity, Window, div, point, px,
 };
 use i18n::t;
 use music::{Arrival, Shape, Track};
@@ -26,9 +26,9 @@ use state::{
     Playback, Scan, Shelf, Sonicly,
 };
 use ui::{
-    ActiveTheme as _, Button, Card, Deck, FilterChange, LEADING, Mode, Pin, Pinnable, Popovers,
-    Popup, Scrollbar, Scroller, Sort, SortAxis, TableDelegate, TableEvent, TableSource, TableState,
-    Text, Vacancy, Viewport, heading, quantize, runtime, scrolled, snapped, table,
+    ActiveTheme as _, Button, Card, Deck, FilterChange, Mode, Pin, Pinnable, Popovers, Popup,
+    Scrollbar, Scroller, Sort, SortAxis, TableDelegate, TableEvent, TableSource, TableState, Text,
+    Vacancy, Viewport, quantize, runtime, scrolled, section_heading, snapped, table,
 };
 
 use crate::shared::album_grid::{AlbumTiles, CardGrid, TileLook};
@@ -1521,19 +1521,18 @@ fn deck_row(rows: &[DeckRow], key: DeckKey) -> Option<usize> {
 }
 
 fn head(display: usize, label: SharedString, cx: &App) -> AnyElement {
-    heading(label.clone(), cx)
+    section_heading(label.clone(), cx)
         .id(("library-group", display))
         .role(Role::Heading)
         .aria_level(2)
         .aria_label(label)
         .w_full()
         .pt_2()
-        .line_height(relative(LEADING))
         .into_any_element()
 }
 
 fn head_height(window: &Window, cx: &App) -> Pixels {
-    let title = px((cx.theme().text(Text::Title) / px(1.) * LEADING).round());
+    let title = px((cx.theme().text(Text::Large) / px(1.) * Text::Large.leading()).round());
 
     snapped(window.rem_size() * 0.5 + title, window)
 }
