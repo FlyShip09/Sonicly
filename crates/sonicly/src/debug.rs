@@ -31,7 +31,8 @@
 //! - `--debug-guest=<slug>` signs in to the service `<slug>` with no account, where it has such
 //!   a session. `apple` has one only under this flag: Apple's catalog and, in the hidden web
 //!   player, the 30-second previews Apple gives any visitor, which is how the web player is
-//!   checked without an account.
+//!   checked without an account. It also turns lyrics off in the profile, so the run looks
+//!   nothing up anywhere else.
 //! - `--debug-play-id=<id>[,<id>]` plays the signed-in service's tracks with those ids, in
 //!   order, once it is signed in.
 //! - `--debug-level=<path>` appends a line to `<path>` twice a second: the position in seconds
@@ -130,6 +131,10 @@ impl Launch {
             settings.update(cx, |settings, cx| {
                 settings.set_fullscreen_tab(Some(SideTab::Lyrics), cx)
             });
+        }
+        if self.guest.is_some() {
+            // a check of one service's player then reaches that service and nobody else
+            settings.update(cx, |settings, cx| settings.set_lyrics_enabled(false, cx));
         }
         if self.mute {
             let playback = Sonicly::global(cx).playback.clone();
