@@ -1,9 +1,8 @@
 # Report
 
-Written on the `integration` branch after the four feature branches were merged. It says what
-is built, what was checked in a running Sonicly and how, what was not, and what is known to be
-wrong. Everything here was done on Windows 11 with a debug build. It is updated as later
-milestones land.
+Written on the `integration` branch. It says what is built, what was checked in a running
+Sonicly and how, what was not, and what is known to be wrong. Everything here was done on
+Windows 11, with a debug build unless a line says release.
 
 ## What is built
 
@@ -20,8 +19,24 @@ milestones land.
 - **Floating (M6):** the mini player, file drops into the library, drawn covers for Favorites,
   Local Music and Recents, and CLI requests reaching the running app on Windows.
 - **Integration:** one module of debug launch flags (`crates/sonicly/src/debug.rs`), one
-  `scripts/shot.ps1`, design decisions renumbered 14-28, neutral sample lines in the lyrics
-  settings preview, and the playback fix below.
+  `scripts/shot.ps1`, neutral sample lines in the lyrics settings preview, and the playback
+  fix below.
+- **Onboarding and settings (M8):** a welcome screen that leads with music on this computer,
+  then the services, then browsing without an account; Home, Songs and the rest working with
+  local files alone; Tab reaching buttons, switches and option cards; covers without art
+  coloured from the album's name; dead controls replaced with one plain line (Discord).
+- **Release (M8):** `LICENSE`, generated `THIRD-PARTY.md` (14 licences, 866 crates), a star
+  count in the title bar and under Settings, About, a version in `settings.json` with
+  migration steps, a portable Windows zip, and the installer script made Sonicly's own.
+- **Removed for safety:** the code that downloaded and ran an installer to update the app.
+- **Apple Music (M9):** back, played by Apple's own web player in a hidden page of the system
+  web view (`docs/DESIGN.md` 37). Sonicly holds no decryption module, asks for no licence and
+  receives no audio, so these tracks have no equalizer, visualizer or download.
+- **Look and motion (M9):** the built-in themes moved to calm desktop neutrals, a full-height
+  source-list sidebar with a highlight that glides, a unified title bar, a floating player
+  bar, grouped settings lists, one soft shadow for raised surfaces, a sliding segmented
+  control, pages that enter from the side of the move, a title that rises in on a track
+  change, a heart that pops only from a click on it (`docs/DESIGN.md` 38-42).
 
 ## What was verified, and how
 
@@ -122,10 +137,37 @@ while it is, engine events that name the track are dropped, as events about anot
 already were. After the fix, 6 of 6 relaunches on the same saved state played. No saved state
 is deleted.
 
-### Screens seen in the merged build
+### Apple Music, as a signed-out visitor
 
-Home, Playlists, Albums (light theme), Lyrics settings with the new sample lines, the mini
-player, and Now playing with synced lyrics.
+Run muted through `scripts/shot.ps1` with `--debug-guest=apple`, which plays the unprotected
+previews Apple gives anyone.
+
+| Check | Result |
+| --- | --- |
+| Catalog | `sonicly search "daft punk discovery"` returned songs, the artist and the album |
+| Position | 5, 8, 11 s at 3 s intervals |
+| `pause`, `play` | held at 12 s, then playing at 14 s |
+| `seek 0:20` | 23 s three seconds later |
+| `next`, and the end of a preview | the next track played in both cases |
+| Hidden page | no window of the web view was visible, focused or on the taskbar |
+| Lifecycle | no web view before the first play; closed 3 minutes after a pause; reopened on `play` and resumed |
+| Memory | Sonicly 120-131 MB; the web view's seven processes 500-531 MB summed while a track plays |
+
+Read by the lead: the script run in Apple's page (`crates/music/src/apple/player.js`) calls
+only the player's own queue, play, pause, seek, volume and stop, and posts state back. A grep
+of the tree finds no key handling, licence request or decryption, and no DRM dependency.
+
+### The look, seen by the lead in the merged build
+
+Home with a local library (dark), Songs, an album page (light), Settings, General, the welcome
+screen with Apple Music listed, a menu, and the floating player bar. Two faults found in those
+captures were fixed and seen fixed: Home showed only Quick picks when no account was signed in
+(a sign-out settling at startup cancelled the local feed), and rows passing under the Settings
+header stayed legible through it.
+
+Cost of the new look, Home at 1080x1080 on the test library, one run each: 114 MB idle before
+and after; CPU between 12 s and 42 s after start 0.3 s before, 0.1 s after; with a track
+playing 131 MB and 0.6 s before, 126 MB and 0.7 s after.
 
 ## Memory
 
@@ -166,6 +208,15 @@ no input, so frame times at 60 or 120 Hz are still unknown.
 
 ## Not verified
 
+- Apple Music with an account: the sign-in window, the library, a whole protected track, and
+  the not-subscribed and sign-in-again errors. It needs the owner to sign in inside the app.
+  If the web view refuses protected audio in its private, hidden page, the listener is told
+  so; the fix would be a non-private profile for that page.
+- Anything that needs a pointer or a keyboard: hover states (card play button, shelf arrows,
+  row hover), the heart pop, Tab order and focus rings, drag and drop from the system, and
+  scrolling. Captures take no input.
+- The frame's Mica material on an active window: captures show the inactive flat fallback.
+- User theme files over the new structure.
 - The Windows installer: its script is reviewed but Inno Setup is not installed, so it has
   never been compiled. Nothing is code-signed.
 - Scrolling frame times, and the fix for playlists that name a cue-split file (unit test
@@ -202,5 +253,14 @@ no input, so frame times at 60 or 120 Hz are still unknown.
 - A window asked for a size taller than the display opens at the display's height.
 - YouTube's rotating cookies can lie unsealed for up to a minute (`docs/DESIGN.md` 16).
 - The lyrics video background is Windows only.
-- Albums and artists without artwork all draw the same placeholder, so a library with no
-  embedded art reads as a wall of identical tiles.
+- While Apple Music plays, the system web view adds about half a gigabyte of memory.
+- Apple Music works on Windows only. Linux's web view has no licensed player; macOS needs a
+  message channel and cookie seeding that are not written.
+- Apple Music uses the web player's own access token, as upstream did, not one registered to
+  Sonicly. Apple may block that.
+- Not animated on purpose: a level meter on the playing row and the sidebar's width, since
+  both would redraw the window every frame. Not done: the seek bar growing on hover, titles
+  scrolling on hover, list rows closing a gap, a sticky title on scrolled detail pages, a
+  hairline under the title bar when content scrolls beneath it.
+- Pinned sidebar entries are still 52 px cards rather than 28 px rows.
+- The text size default moved from 14 to 13 px, and a saved size of exactly 14 moves with it.

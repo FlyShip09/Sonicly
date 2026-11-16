@@ -7,6 +7,25 @@ account with, in one library.
 Sonicly is free software under the GPL, version 3 or later. Its engine began as
 a port of [Sonora](https://github.com/sonorahq/sonora); see `NOTICE.md`.
 
+![Home](docs/screenshots/m9/home-local-dark.png)
+
+| | |
+| --- | --- |
+| ![An album, light](docs/screenshots/m9/after-album-light.png) | ![Songs](docs/screenshots/m9/after-songs-dark.png) |
+| ![Lyrics over a video](docs/screenshots/m5/lyrics-video.png) | ![Settings](docs/screenshots/m9/settings-general-dark.png) |
+
+## What it does
+
+- One library over local files and the services below, with quick search, a queue, and
+  playlists you can import from M3U, PLS and XSPF files or split from a cue sheet.
+- Now playing with synced lyrics you can style: a wave, fluid, cover, picture or video
+  background, your own typeface, spacing and emphasis, saved as looks.
+- A parametric equalizer, output device choice, a spectrum, and a sound chain that shows what
+  each track passes through on its way out.
+- A floating mini player, a tray icon, media keys, a command line, and `sonicly://` links.
+- Download from a link with the yt-dlp you already have, into a music folder of yours.
+- Drop a folder on the window to add it. The first run asks where your music comes from.
+
 ## What it plays
 
 | Source | Needs |
@@ -35,7 +54,9 @@ scripts/check --no-test  # the same without the test run
 
 ## Privacy and safety
 
-Sonicly has no telemetry, no update pings, and no servers of its own. It
+Sonicly has no telemetry, no servers of its own, and cannot download or install anything
+by itself. The one request it makes unasked is the repository's star count, at most once a
+day, which Settings, About turns off. It
 contacts only the music, lyrics, artwork and scrobbling services you use. Saved
 logins are sealed with your Windows account's key. What Sonicly contacts and
 stores is in `docs/PRIVACY.md`, and what was removed from the upstream code,

@@ -3,10 +3,10 @@
 Read this first in a new session.
 
 - **Branch:** `integration`, cut from `m0/setup` with `m1/sources`, `m2/identity`,
-  `m6/floating` and `m5/lyrics-style` merged in that order (merge commits). `m8/release`
-  is merged on top. Pushed; pull request 2 into `main` is open. `main` holds the
-  M0 setup;
-  `archive/v0-native` is the earlier from-scratch build, kept for reference.
+  `m6/floating` and `m5/lyrics-style` merged in that order (merge commits), then
+  `m8/release`, `m8/onboarding`, `m9/apple` and `m9/motion`. Pushed; pull request 2
+  into `main` is open. `main` holds the M0 setup; `archive/v0-native` is the earlier
+  from-scratch build, kept for reference.
 - **Base:** Sonora at commit `6e3cfb0` (full hash in `docs/UPSTREAM.md`), cloned
   read-only into the git-ignored `reference/sonora`. Do not build or run it.
 - **Built:** the ported engine (`docs/DESIGN.md` 13); M1 sources (PLS, XSPF,
@@ -16,7 +16,13 @@ Read this first in a new session.
   sidebar shortcuts; 17-24, captures in `docs/screenshots/m2/`); M6 floating
   mini player, file drops and drawn covers (25-27, `docs/screenshots/m6/`); M5
   lyrics style with a Media Foundation video background (28,
-  `docs/screenshots/m5/`).
+  `docs/screenshots/m5/`); M8 welcome screen, local-only use, Tab focus, seeded
+  covers, settings pass (31-36, `docs/screenshots/m8/`) and release work (29-30,
+  see Release below); M9 Apple Music through Apple's web player (37) and the
+  calm desktop look with its motion (38-42, `docs/screenshots/m9/`). The
+  self-updater's download-and-install code is deleted.
+- **Direction from the owner (2026-11-16):** clean and macOS-like, detailed, with
+  small action-driven animations.
 - **Checks:** `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D
   warnings` and `cargo build -p sonicly` pass on `integration`. `cargo test` has
   not been run.
@@ -30,12 +36,14 @@ Read this first in a new session.
   in its header and in `CLAUDE.md`. `scripts/shot.ps1` takes `-Profile`,
   `-Size`, `-Title`, `-ExeArgs` and prints memory and CPU. The scratch files of
   the integration checks are in the git-ignored `.targets/integration/`.
-- **Not verified:** streaming sources, sign-ins and yt-dlp downloads (they need
-  the owner); macOS and Linux; a real drag from the system; gapless joins,
-  loudness normalization and the equalizer by ear; anything at audible volume.
+- **Not verified:** streaming sources, sign-ins (Apple Music's whole-track
+  playback among them) and yt-dlp downloads (they need the owner); macOS and
+  Linux; anything that needs a pointer or keyboard (hover, focus rings, drag);
+  gapless joins, loudness normalization and the equalizer by ear; anything at
+  audible volume.
 - **Known issues:** see the end of `docs/REPORT.md`.
-- **Next:** the owner's pass over streaming, sign-in and a yt-dlp download; then
-  the open items in `docs/REPORT.md`.
+- **Next:** the owner's pass over streaming, sign-in (Apple Music first) and a
+  yt-dlp download; then the motion items listed as not done in `docs/REPORT.md`.
 - **Waiting on the owner:** Discord application id, Inter Display (a download),
   Inno Setup for the installer, review of the open pull request.
 - **House rules:** never open tryliner/desktop; no DRM circumvention; no
