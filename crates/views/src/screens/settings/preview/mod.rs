@@ -36,9 +36,12 @@ pub(super) struct Previews {
     pub(super) lyrics: lyrics::LyricsPreview,
     pub(super) sound: sound::SoundPreview,
     pub(super) discord: discord::DiscordPreview,
-    /// The ambient field the Now playing and Lyrics previews paint behind themselves, following
-    /// the cover of the track they show.
+    /// The ambient field the Now playing preview paints behind itself, following the cover of
+    /// the track it shows.
     ambient: Entity<Ambient>,
+    /// The field the Lyrics preview paints behind itself, which wears the lyrics style's
+    /// background.
+    lyrics_ambient: Entity<Ambient>,
     /// A random number drawn each time settings open, which picks the track from history.
     seed: Cell<u64>,
     /// The track from history the previews show while nothing plays, kept from the moment it
@@ -82,6 +85,8 @@ impl Previews {
         // redraw once that lands
         let ambient = cx.new(Ambient::framed);
         cx.observe(&ambient, |_, _, cx| cx.notify()).detach();
+        let lyrics_ambient = cx.new(Ambient::lyrics_framed);
+        cx.observe(&lyrics_ambient, |_, _, cx| cx.notify()).detach();
 
         Self {
             now_playing: now_playing::NowPlayingPreview::new(cx),
@@ -89,6 +94,7 @@ impl Previews {
             sound: sound::SoundPreview::new(cx),
             discord: discord::DiscordPreview::new(cx),
             ambient,
+            lyrics_ambient,
             seed: Cell::new(random()),
             picked: RefCell::new(None),
         }
@@ -145,6 +151,13 @@ impl Previews {
         self.ambient
             .update(cx, |ambient, cx| ambient.follow(cover, cx));
         self.ambient.clone()
+    }
+
+    /// The field wearing the lyrics style's background, following `cover`.
+    pub(super) fn lyrics_ambient(&self, cover: Option<String>, cx: &mut App) -> Entity<Ambient> {
+        self.lyrics_ambient
+            .update(cx, |ambient, cx| ambient.follow(cover, cx));
+        self.lyrics_ambient.clone()
     }
 }
 
