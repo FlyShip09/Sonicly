@@ -7,7 +7,7 @@
 # The child gets SONICLY_SHOT=1; Sonicly's binaries honor it by opening their
 # window unfocused. Whatever the exe does, the window is moved off-screen the
 # moment it exists, and captured there.
-param([string]$Exe, [int]$ProcId = 0, [string]$Out = "shot.png", [double]$Wait = 4, [switch]$Keep, [string]$ExeArgs = "", [string]$Size = "")
+param([string]$Exe, [int]$ProcId = 0, [string]$Out = "shot.png", [double]$Wait = 4, [switch]$Keep, [string]$ExeArgs = "", [string]$Size = "", [string]$Profile = "shot")
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System; using System.Runtime.InteropServices;
@@ -21,6 +21,8 @@ public static class SonShot {
 "@
 [void][SonShot]::SetProcessDPIAware()
 $env:SONICLY_SHOT = "1"
+# A separate profile: captures never read or change the user's own library, settings or logins.
+$env:SONICLY_PROFILE = $Profile
 if ($Exe) {
   $p = if ($ExeArgs) { Start-Process -FilePath $Exe -ArgumentList $ExeArgs -PassThru } else { Start-Process -FilePath $Exe -PassThru }
 } else { $p = Get-Process -Id $ProcId }
@@ -53,5 +55,6 @@ $dc = $g.GetHdc()
 [void][SonShot]::PrintWindow($h, $dc, 2)
 $g.ReleaseHdc($dc); $g.Dispose()
 $bmp.Save((Join-Path (Get-Location) $Out), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
-Write-Output "OK pid=$($p.Id) title='$($p.MainWindowTitle)' size=${w}x${ht} at=$($r.L),$($r.T) out=$Out"
+$mem = "ws=$([math]::Round($p.WorkingSet64/1MB))MB private=$([math]::Round($p.PrivateMemorySize64/1MB))MB cpu=$([math]::Round($p.TotalProcessorTime.TotalSeconds,1))s"
+Write-Output "OK $mem pid=$($p.Id) title='$($p.MainWindowTitle)' size=${w}x${ht} at=$($r.L),$($r.T) out=$Out"
 if (-not $Keep) { $p.Kill() }

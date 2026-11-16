@@ -5,6 +5,17 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use anyhow::{Context as _, Result};
+
+/// The folder name Sonicly keeps its config, data and cache under. Setting
+/// `SONICLY_PROFILE=name` selects a separate `sonicly-name` profile, so a
+/// development or capture run never touches the user's own library and logins.
+pub fn folder() -> &'static str {
+    static FOLDER: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    FOLDER.get_or_init(|| match std::env::var("SONICLY_PROFILE") {
+        Ok(profile) if !profile.is_empty() => format!("sonicly-{profile}"),
+        _ => "sonicly".to_owned(),
+    })
+}
 use rusqlite::Connection;
 
 pub use cache::Cache;
@@ -92,7 +103,7 @@ impl Database {
     pub fn standard() -> Self {
         let data = dirs::data_local_dir()
             .unwrap_or_else(std::env::temp_dir)
-            .join("sonicly");
+            .join(crate::folder());
         Self {
             path: data.join("state.sqlite"),
             ready: Arc::new(Mutex::new(false)),
