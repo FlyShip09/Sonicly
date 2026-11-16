@@ -13,7 +13,9 @@ Only services you use, and only while you use them.
 
 | When | Who is contacted | What is sent |
 | --- | --- | --- |
-| You play or browse a streaming service | That service: YouTube Music, Spotify, Tidal, or your own Subsonic, Navidrome or Jellyfin server | Your sign-in and what you ask for, as that service's own apps send it |
+| You play or browse a streaming service | That service: YouTube Music, Spotify, Tidal, Apple Music, or your own Subsonic, Navidrome or Jellyfin server | Your sign-in and what you ask for, as that service's own apps send it |
+| Apple Music is browsed | Apple, at `music.apple.com` (for the web player's public token, read once and kept for months) and `amp-api.music.apple.com`; covers come from Apple's `mzstatic.com` | Your Apple Music sign-in and what you ask for |
+| An Apple Music song plays | Apple's own web player, `music.apple.com`, in a hidden page inside Sonicly. The page contacts whatever Apple's player contacts in a browser: its scripts, the audio, the licence for it and Apple's play reporting | What Apple's web player sends for a signed-in listener. Sonicly adds nothing to it and reads none of it |
 | Lyrics are looked up | The lyrics sources switched on under Settings, Playback: LRCLIB, Musixmatch, NetEase, Kugou, and the third-party proxy Binimum, which is off until you turn it on | The title, artist, album and length of the track |
 | Discord status shows a local file, once Discord Rich Presence exists (it is disabled today) | Deezer, iTunes search, MusicBrainz and the Cover Art Archive, to find a public cover | The artist and album or title of the track |
 | YouTube plays | A hidden YouTube page inside Sonicly, which YouTube's bot check needs, and SponsorBlock when you switch it on | The id of the video |
@@ -93,7 +95,7 @@ elsewhere, cannot read it. On macOS and Linux the files are readable by your
 user alone (mode 600). A sign-in file an older build left in plain text is
 sealed the first time it is read.
 
-This covers Tidal, Subsonic, Jellyfin, YouTube Music and Spotify:
+This covers Tidal, Subsonic, Jellyfin, YouTube Music, Spotify and Apple Music:
 
 - **Spotify.** The library Sonicly uses for Spotify (librespot) would write the
   credential as plain JSON. Sonicly has it keep the credential in memory only
@@ -111,5 +113,16 @@ This covers Tidal, Subsonic, Jellyfin, YouTube Music and Spotify:
   unsealed, in your own profile folder, for up to a minute, or until the next
   launch if Sonicly closes or crashes inside that minute. Removing the gap
   needs a change to the `ytmusic` library itself, which Sonicly does not carry.
+
+- **Apple Music.** You sign in on Apple's own page in Sonicly's sign-in window;
+  Sonicly never sees the password. What it keeps is one cookie Apple sets,
+  `media-user-token`, sealed in `accounts/apple`. Beside it, sealed the same
+  way, is the web player's bearer token, which is the same for every visitor
+  to music.apple.com and identifies nobody. When a song plays, the cookie is
+  put into the hidden player page's session, which is private to that page;
+  the page's browser files are in `webview2-player` in Sonicly's cache
+  folder. The page closes three minutes after playback stops. Sonicly holds
+  no media keys or licences and stores no audio from Apple Music: the web
+  view plays it and nothing of it reaches Sonicly.
 
 Signing out deletes the sign-in file and, for YouTube, both cookie files.
