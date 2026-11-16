@@ -515,6 +515,8 @@ struct Values {
     lyrics_presets: Vec<LyricsPreset>,
     adaptive_menu: bool,
     check_updates: bool,
+    /// Whether GitHub is asked, at most once a day, how many stars the repository has.
+    github_stars: bool,
     /// The release channel chosen in settings, by its id. Empty follows the running build's own
     /// channel, and a copy a package manager installed ignores it.
     update_channel: String,
@@ -752,6 +754,7 @@ impl Default for Values {
             adaptive_menu: false,
             check_updates: crate::updates::RELEASE_REPO.is_some()
                 && (cfg!(target_os = "windows") || updates_itself()),
+            github_stars: true,
             update_channel: String::new(),
             close_to_tray: true,
             tray_icon: true,
@@ -1309,6 +1312,10 @@ impl AppSettings {
 
     pub fn check_updates(&self) -> bool {
         self.values.check_updates
+    }
+
+    pub fn github_stars(&self) -> bool {
+        self.values.github_stars
     }
 
     pub fn close_to_tray(&self) -> bool {
@@ -1973,6 +1980,11 @@ impl AppSettings {
 
     pub fn set_check_updates(&mut self, check_updates: bool, cx: &mut Context<Self>) {
         self.values.check_updates = check_updates;
+        self.schedule_save(cx);
+    }
+
+    pub fn set_github_stars(&mut self, github_stars: bool, cx: &mut Context<Self>) {
+        self.values.github_stars = github_stars;
         self.schedule_save(cx);
     }
 

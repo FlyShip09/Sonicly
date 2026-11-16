@@ -9,14 +9,15 @@ use gpui::{
 };
 use ui::TrafficLightControls;
 use ui::WindowControls;
-use ui::{ActiveTheme as _, Button, MenuItem, Picker, Popovers, Spin};
+use ui::{ActiveTheme as _, Button, MenuItem, Picker, Popovers, Room, Spin};
 
+use crate::chrome::Chrome;
 use crate::chrome::SidebarRight;
 use crate::chrome::downloads::DownloadsButton;
 use i18n::t;
 use input::Refresh;
 use router::{Destination, Navigation, SettingsPage, navigate, open_settings};
-use state::{AppSettings, Sonicly};
+use state::{AppSettings, Sonicly, Stars};
 
 const SYSTEM_ZOOMS: bool = cfg!(target_os = "windows");
 /// The rule between the current screen's controls and the account and sidebar segment.
@@ -101,6 +102,11 @@ impl TitleBar {
         cx.observe(&settings, |_, _, cx| cx.notify()).detach();
         cx.observe(&Sonicly::global(cx).session.clone(), |_, _, cx| cx.notify())
             .detach();
+        cx.observe(&Stars::global(cx), |_, _, cx| cx.notify())
+            .detach();
+        // the star button drops its words when the window is narrow
+        let chrome = Chrome::entity(cx);
+        cx.observe(&chrome, |_, _, cx| cx.notify()).detach();
         Self {
             navigation,
             settings,
@@ -223,6 +229,35 @@ impl TitleBar {
                     .on_click(
                         cx.listener(|_, _, _, cx| cx.emit(TitleBarEvent::ToggleSidebarRight)),
                     ),
+            )
+    }
+
+    /// The link to Sonicly's repository: a star and, once GitHub has answered, how many it has.
+    /// Without a count it says what it does instead, and a narrow window keeps only the star.
+    fn star(&self, window: &Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let count = Stars::global(cx).read(cx).label();
+        let wide = Chrome::room(window, cx).fits(Room::Wide);
+
+        div()
+            .flex()
+            .flex_none()
+            .items_center()
+            .occlude()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(
+                Button::new("github-star")
+                    .ghost()
+                    .small()
+                    .icon("icons/star.svg")
+                    .map(|button| match (count, wide) {
+                        (Some(count), _) => button
+                            .label(count)
+                            .name(t!("github-star"))
+                            .tooltip("github-star"),
+                        (None, true) => button.label(t!("github-star")),
+                        (None, false) => button.tooltip("github-star"),
+                    })
+                    .on_click(|_, _, cx| cx.open_url(state::REPO_URL)),
             )
     }
 
@@ -460,7 +495,9 @@ impl Render for TitleBar {
                         .items_center()
                         .gap_1()
                         .pr_3()
-                        .when(navigation, |this| this.child(self.account(cx)))
+                        .when(navigation, |this| {
+                            this.child(self.star(window, cx)).child(self.account(cx))
+                        })
                         .when_some(sidebar_right, |this, open| {
                             this.child(self.lyrics_toggle(open, cx))
                         }),

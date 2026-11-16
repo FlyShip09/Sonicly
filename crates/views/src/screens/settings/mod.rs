@@ -191,6 +191,8 @@ enum Slot {
     License,
     Licenses,
     Source,
+    Star,
+    StarCount,
 }
 
 /// What a tab scrolls to once it is laid out.
@@ -1119,6 +1121,8 @@ impl SettingsView {
             Slot::License => (t!("settings-license"), t!("settings-license-detail")),
             Slot::Licenses => (t!("settings-licenses"), t!("settings-licenses-detail")),
             Slot::Source => (t!("settings-source"), t!("settings-source-detail")),
+            Slot::Star => (t!("github-star"), t!("settings-star-detail")),
+            Slot::StarCount => (t!("settings-star-count"), t!("settings-star-count-detail")),
         };
         Some(meta)
     }
@@ -1247,6 +1251,8 @@ impl SettingsView {
             Slot::License => self.license_row(cx),
             Slot::Licenses => self.licenses_row(cx),
             Slot::Source => self.source_row(cx),
+            Slot::Star => self.star_row(cx),
+            Slot::StarCount => self.star_count_row(cx),
         }
     }
 

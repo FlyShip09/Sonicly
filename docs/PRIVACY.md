@@ -1,7 +1,9 @@
 # Privacy
 
 What Sonicly contacts and what it keeps on your computer. It has no telemetry,
-no update pings, no account of its own, and no server of its own. This page is
+no update pings, no account of its own, and no server of its own. The one
+request it makes without being asked reads a public number from GitHub, and it
+can be switched off; see "The star count" below. This page is
 written from the source and kept by hand; `docs/UPSTREAM.md` lists what was
 removed from the code Sonicly started from.
 
@@ -18,9 +20,29 @@ Only services you use, and only while you use them.
 | Scrobbling is set up | Last.fm, Libre.fm, ListenBrainz, or your Maloja server | What you played and when |
 | You join a shared listening session | The session server whose address you typed | What the room is playing |
 | You download from a link | See below | |
+| Sonicly starts and "Show the star count" is on, at most once a day | GitHub, at `api.github.com` | See below |
 
 Local files are never uploaded. Looking up lyrics for them, which sends their
 title and artist to the lyrics sources, can be switched off under Settings.
+
+## The star count
+
+The star button in the title bar and under Settings, About shows how many stars
+Sonicly's repository has. To know that number Sonicly asks GitHub.
+
+- **What is sent.** One request, `GET https://api.github.com/repos/FlyShip09/Sonicly`,
+  with no sign-in, no cookie and no identifier. Its only description of the
+  sender is the user agent `sonicly/<version>`. GitHub sees the IP address the
+  request comes from, as any site you connect to does.
+- **When.** At startup, and only if the last request was at least 24 hours ago.
+  The answer and the time of the request are kept in `cache.sqlite`. A request
+  that failed counts too, so a network that keeps failing is tried once a day,
+  not over and over. Nothing is asked in offline mode or while the connection
+  is known to be gone.
+- **How to turn it off.** Settings, About, "Show the star count". With it off
+  no request is made and the button stays, without a number. Pressing the
+  button opens the repository in your browser, which is your browser's
+  business, not Sonicly's.
 
 ## Downloads from links
 
