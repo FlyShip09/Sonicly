@@ -10,6 +10,7 @@ mod dropdown;
 mod explicit;
 mod filters;
 mod flight;
+mod fluid;
 mod form;
 mod glass;
 mod glide;
@@ -62,6 +63,7 @@ mod traffic_light_controls;
 mod unfold;
 mod vacancy;
 mod veil;
+mod video;
 mod view;
 mod visualizer;
 mod waves;
@@ -85,6 +87,7 @@ pub use filters::{
     Filter, FilterChange, FlagAxis, RangeAxis, RangeScrubber, RangeState, SortAxis, Unit,
 };
 pub use flight::{Flight, Zoom};
+pub use fluid::Fluid;
 pub use form::{FORM_CONTEXT, Field, Form, NextField, PreviousField, Submit, step_focus};
 pub use glass::{
     GLASS_BLUR, GLASS_FILL, bar_surface, blurring, frost, glass, popover_fill, popover_surface,
@@ -165,6 +168,7 @@ pub use traffic_light_controls::TrafficLightControls;
 pub use unfold::{Cascade, Unfold};
 pub use vacancy::Vacancy;
 pub use veil::{VeilEdge, effects, veil};
+pub use video::{Picture, VideoFrames, VideoProblem, legible_dim, picture_luma};
 pub use view::Mode;
 pub use visualizer::{Levels, Visualizer, VisualizerStyle};
 pub use waves::Waves;
