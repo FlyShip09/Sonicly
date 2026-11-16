@@ -499,3 +499,37 @@ Newest last. One entry per decision: what was chosen, and why.
     primitive, the seek bar's time bubble, the volume wheel, covers fading in over their
     skeleton, shelves surfacing once, menus growing from their anchor, the cover flying into Now
     Playing and the adaptive colour cross-fade.
+43. **The page tells the title bar where it stands (M10).** Finishes items left out in 42. A
+    page's own scroller (`Scroller::page`, or `Scroller::headed` with the page's title and cover)
+    publishes one small `ui::PageEdge` while it draws: whether anything has scrolled under the
+    title bar, and whether the page's large header has. Only a change wakes anyone, and the
+    workspace clears it whenever a new page is shown, so a page that does not scroll never
+    inherits a line. The title bar draws a 10% hairline under its page part while the page is
+    scrolled, fading in over the quick span and out over the hover dim. Album, playlist and
+    artist pages also pass their title and cover, which come into the bar's empty middle as a
+    20 px cover and a semibold line, rising 4 px and fading over the quick span once the header
+    has scrolled out of sight (the cover's foot on an album or playlist, the name under the
+    banner on an artist), and leave the same way. It lives in the space between the history
+    buttons and the screen's controls, so nothing in the bar moves. Search and Settings are left
+    out: their content passes under their own field and header band, not the bar.
+44. **More motion that answers the pointer (M10).**
+    - The seek bar swells under the pointer (`Scrubber::swells`): the track grows half again as
+      thick and the knob, hidden at rest, appears, over the quick span, easing back over the
+      hover dim. A scrub keeps it swollen wherever the pointer goes. It is the player bar's one
+      seek element in every layout; Now Playing and the mini player draw their progress
+      themselves and are unchanged.
+    - A title or artist line too long for the player bar is clipped with a soft fade instead of
+      an ellipsis, and once the pointer has rested on it for `MARQUEE_DELAY` (600 ms) it scrolls
+      once to its end at `MARQUEE_SPEED` (40 px a second, a reading pace), waits
+      `MARQUEE_PAUSE` (1.2 s) and comes back (`ui::Marquee`). A line that fits never moves,
+      leaving puts it back at once, and nothing runs without a pointer on it. The mini player's
+      title is its own element and was left alone.
+    - A song removed from the queue with its remove button leaves a gap the songs below slide up
+      into on `Springs::RESIZE`. The queue is a uniform list, so no row changes height: the rows
+      from the gap down are drawn a row lower and spring back, and only rows on screen do any
+      work. Removing through the context menu or the Delete key, and from a playlist (a table,
+      not this list), still closes at once.
+    - Cost, Home at 1080x1080 on `.targets/media`, debug, against integration at `3e42681`
+      built the same way: idle 123 MB and 0.1 s of CPU from 12 s to 42 s (122 MB and 0.1 s
+      before); with a song playing 128 MB and 0.5 s (133 MB and 0.7 s before). Home now draws
+      its full local feed, which is why both sit above the 114 MB of 41.
