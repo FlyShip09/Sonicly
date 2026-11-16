@@ -12,6 +12,12 @@ Read this first in a new session.
   deleted rather than gated. Spotify search and genre hashes are read from the
   web player's own lazily loaded chunks. `fmt`, `check`, `clippy -D warnings` and
   `cargo build -p sonicly` pass. `docs/UPSTREAM.md` is the provenance record.
+- **M2 identity (`m2/identity`):** frame and page with the frame on Mica /
+  vibrancy, one type scale, edged covers, cover washes on album, playlist and
+  song pages, shelf reveal, sidebar shortcuts; `docs/DESIGN.md` 14-21, captures
+  in `docs/screenshots/m2/`. Debug builds take `--screen`, `--theme` and
+  `--size` for `scripts/shot.ps1` captures (`crates/sonicly/src/staging.rs`).
+  Not seen on macOS or Linux.
 - **In progress:** nothing in the engine. The uncommitted ownership pass waits
   for review and a commit.
 - **Not verified:** the app has not been launched since the pass, and no test
