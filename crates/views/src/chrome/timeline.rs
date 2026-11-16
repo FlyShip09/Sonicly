@@ -186,6 +186,7 @@ impl Render for Timeline {
                             theme.foreground.opacity(0.4),
                         )
                         .enabled(seekable)
+                        .swells(self.pending.is_some())
                         .when_some(bubble, |this, (at, text)| this.bubble(at, text))
                         .on_move(cx.listener(|this, fraction: &f32, _, cx| {
                             this.pending = Some(*fraction);
