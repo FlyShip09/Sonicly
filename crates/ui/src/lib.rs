@@ -25,6 +25,7 @@ mod layout;
 mod lazy;
 mod level_meter;
 mod linger;
+mod marquee;
 mod menu;
 mod metrics;
 mod modal;
@@ -113,6 +114,7 @@ pub use layout::{ALWAYS, MIN_CONTENT, ROOMY, Room, SNUG, VAST, WIDE};
 pub use lazy::Lazy;
 pub use level_meter::LevelMeter;
 pub use linger::{Linger, lingers};
+pub use marquee::Marquee;
 pub use menu::{MENU_CONTEXT, Menu, MenuItem, MenuSearch, SubmenuState, close_menu};
 pub use metrics::{LEADING, Metrics, Rounding, Text, snapped, tucked};
 pub use modal::{Modal, corners};
@@ -142,7 +144,7 @@ pub use scrollbar::{
     Scrollbar, cancel_middle_scroll, quantize, release_middle_scroll, scrolled,
     update_middle_scroll,
 };
-pub use scroller::{Scroller, middle_scroll, perch_room, perched, return_to, return_top};
+pub use scroller::{PageEdge, Scroller, middle_scroll, perch_room, perched, return_to, return_top};
 pub use scrubber::{Scrubber, ScrubberState};
 pub use separator::Separator;
 pub use shield::Shield;

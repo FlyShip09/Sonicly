@@ -89,7 +89,10 @@ impl ConnectName {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum DiscordName {
+    // builds from before the app had its own name wrote the old one, and a value serde cannot
+    // read fails the whole settings file
     #[default]
+    #[serde(alias = "sonora")]
     Sonicly,
     Provider,
     Music,

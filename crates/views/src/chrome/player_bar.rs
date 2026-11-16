@@ -14,7 +14,7 @@ use i18n::t;
 use input::{ShowMembers, ToggleFullscreen, ToggleLyrics, ToggleMiniPlayer, ToggleQueue};
 use state::{AppSettings, Playback, PlayerBarLayout, Queue, SideTab, Sonicly};
 use ui::{
-    Artwork, Badge, Button, Flight, InlineLink, InlineLinks, Perch, Pinnable, Popup, Room,
+    Artwork, Badge, Button, Flight, InlineLink, InlineLinks, Marquee, Perch, Pinnable, Popup, Room,
     Scrollbar, Scrubber, ScrubberState, Springs, Sprung,
 };
 
@@ -443,10 +443,11 @@ impl PlayerBar {
                             this.open_playing_menu(event.position, cx);
                         }),
                     )
-                    .child(text)
+                    // a title too long for the bar scrolls to its end under a resting pointer
+                    .child(Marquee::new("now-playing-title-run", text))
                     .tip_clipped(name, layout, Perch::Above)
                     .min_w_0()
-                    .truncate()
+                    .overflow_hidden()
                     .tails()
             }
             None => div()
@@ -526,20 +527,26 @@ impl PlayerBar {
             .child(headline)
             .when_some(track, |this, track| {
                 this.child(
-                    InlineLinks::new(
-                        "now-playing-artist",
-                        track.artist_refs.iter().map(|artist| {
-                            InlineLink::new(artist.name.clone(), artist.id.clone().map(Into::into))
+                    Marquee::new(
+                        "now-playing-artist-run",
+                        InlineLinks::new(
+                            "now-playing-artist",
+                            track.artist_refs.iter().map(|artist| {
+                                InlineLink::new(
+                                    artist.name.clone(),
+                                    artist.id.clone().map(Into::into),
+                                )
+                            }),
+                            track.artists.clone(),
+                            muted,
+                        )
+                        .text_size(artists)
+                        .on_click(|id, cx| {
+                            navigate(Destination::Artist(id), cx);
                         }),
-                        track.artists.clone(),
-                        muted,
                     )
-                    .text_size(artists)
-                    .when(centered, |this| this.justify_center())
-                    .truncate()
-                    .on_click(|id, cx| {
-                        navigate(Destination::Artist(id), cx);
-                    }),
+                    .max_w_full()
+                    .when(centered, |this| this.justify_center()),
                 )
             })
     }

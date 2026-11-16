@@ -102,6 +102,8 @@ impl Workspace {
         self.content = content;
         self.header = header;
         self.cached = cached;
+        // the new page reports where it stands once it draws; until then nothing is beneath
+        ui::PageEdge::reset(cx);
         cx.notify();
     }
 

@@ -23,8 +23,8 @@ use state::{
 use ui::{
     ActiveTheme as _, Avatar, Button, Card, DraggedPin, Edge, Glowing as _, Initials, Motion,
     Motioned as _, PREFETCH_REACH, Pin, Pinnable as _, Popup, Scrollbar, Scroller, Spot, Springs,
-    Tails as _, Text, Vacancy, drop_gap, drop_marker, ease_out_cubic, ease_out_expo, eyebrow,
-    faint, mix, prefetch, snapped, vacant,
+    Sprung, Tails as _, Text, Vacancy, drop_gap, drop_marker, ease_out_cubic, ease_out_expo,
+    eyebrow, faint, mix, prefetch, snapped, vacant,
 };
 use unicode_bidi::{BidiClass, Direction};
 
@@ -41,6 +41,8 @@ const FADE: f32 = 96.;
 const REST: f32 = FADE * 0.75;
 /// Blank rows after the last queued song, on top of the ones that clear the player bar.
 const TAIL_ROWS: usize = 1;
+/// How little of a row a closing gap may have left and count as closed.
+const CLOSE_REST: f32 = 0.005;
 const BLUR: f32 = 0.13;
 const BACKGROUND_SINGING_BLUR: Pixels = px(0.75);
 const VEIL: f32 = 0.3;
@@ -304,6 +306,9 @@ pub(crate) struct Aside {
     flew: bool,
     slid: std::time::Instant,
     drifts: HashMap<usize, SpringState>,
+    /// The gap a song removed from the queue left: the list slot it stood in, and how much of a
+    /// row the songs below it still stand down by as they slide up into it, from 1 to 0.
+    closing: Option<(usize, Sprung)>,
     pinning: Option<usize>,
     held: Option<Warm>,
     rising: Option<Warm>,
@@ -413,6 +418,7 @@ impl Aside {
             flew: true,
             slid: std::time::Instant::now(),
             drifts: HashMap::new(),
+            closing: None,
             pinning: None,
             held: None,
             rising: None,
@@ -872,13 +878,16 @@ impl Aside {
                     .tint(theme.muted_foreground)
                     .on_click(cx.listener(move |this, _, _, cx| {
                         cx.stop_propagation();
-                        this.queue.update(cx, |queue, cx| {
-                            if let Some(position) =
-                                uid.as_deref().and_then(|uid| queue.position(uid))
-                            {
-                                queue.remove(position, cx);
-                            }
+                        let removed = this.queue.update(cx, |queue, cx| {
+                            let position = uid.as_deref().and_then(|uid| queue.position(uid))?;
+                            queue.remove(position, cx);
+                            Some(())
                         });
+                        // the songs below stand down a row and slide up into the gap
+                        if removed.is_some() && !cx.reduce_motion() {
+                            this.closing = Some((index, Sprung::at(1.)));
+                            cx.notify();
+                        }
                     })),
             )
         })
@@ -2047,12 +2056,27 @@ impl Aside {
         Some((name, place))
     }
 
+    /// Steps the gap a removed song left as the songs below it slide up into it, and answers
+    /// where the gap is and how much of a row is left to close, while it closes.
+    fn closing(&mut self, window: &Window, cx: &App) -> Option<(usize, f32)> {
+        let (slot, left) = self.closing.as_mut()?;
+        let left = left.follow(0., Springs::RESIZE, CLOSE_REST, window, cx);
+        if left <= 0. {
+            self.closing = None;
+            return None;
+        }
+        Some((*slot, left))
+    }
+
     fn rows(
         &self,
         listing: QueueView,
         sections: Sections,
+        closing: Option<(usize, f32)>,
+        window: &Window,
         cx: &mut Context<Self>,
     ) -> gpui::UniformList {
+        let row_height = snapped(cx.theme().metrics.list_row, window);
         let remote = !listing.editable();
         let from = listing
             .origin(cx)
@@ -2119,7 +2143,22 @@ impl Aside {
                             .into_any_element()
                     }
                 };
-                let rows = range.map(|index| row(index, cx)).collect();
+                let rows = range
+                    .map(|index| match closing {
+                        // the list places each row's own root where it belongs, so the offset
+                        // goes on a layer inside it
+                        Some((slot, left)) if index >= slot => div()
+                            .w_full()
+                            .child(
+                                div()
+                                    .relative()
+                                    .top(row_height * left)
+                                    .child(row(index, cx)),
+                            )
+                            .into_any_element(),
+                        _ => row(index, cx),
+                    })
+                    .collect();
                 for index in near {
                     prefetch(row(index, cx), window, cx);
                 }
@@ -2132,6 +2171,7 @@ impl Aside {
 impl Render for Aside {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.scrollbar.read(cx).sync();
+        let closing = self.closing(window, cx);
         let listing = self.playback.read(cx).shown_queue(cx);
         let sections = listing.sections.clone();
         let remote = !listing.editable();
@@ -2226,7 +2266,7 @@ impl Render for Aside {
                                         this.fade_edges(px(FADE * 0.5), under)
                                     })
                                     .child(
-                                        self.rows(listing, sections.clone(), cx)
+                                        self.rows(listing, sections.clone(), closing, window, cx)
                                             .px_2()
                                             .pt(px(FADE * 0.5))
                                             .track_scroll(&self.scroll)
