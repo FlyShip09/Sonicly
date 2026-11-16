@@ -573,6 +573,10 @@ release-podcast = Podcast
 release-meta = { $year } • { $kind }
 
 # home page
+home-continue = Continue listening
+home-now-playing = Now playing
+home-resume-time = { $position } of { $length }
+home-recently-played = Recently played
 home-quick-picks = Quick picks
 home-quick-picks-empty = Like a few songs and they will show up here
 home-recently-added = Recently added

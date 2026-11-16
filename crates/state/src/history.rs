@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context as _, Result};
 use gpui::{App, Context, Entity, Task};
-use music::{ArtistRef, Track};
+use music::{Album, ArtistRef, GenreItem, Track};
 use rusqlite::types::Value;
 use rusqlite::{Connection, params, params_from_iter};
 use storage::Database;
@@ -309,6 +309,12 @@ impl History {
 
     pub fn tracks(&self) -> &[Track] {
         &self.tracks
+    }
+
+    /// What was played lately as shelf items, newest first and at most `limit` of them: each
+    /// album once, as the album its songs were played from, and a song with no album as itself.
+    pub fn recent_items(&self, limit: usize) -> Vec<GenreItem> {
+        recent_items(&self.tracks, limit)
     }
 
     /// Removes one play and offers to put it back. A play no longer in the list, such as one
@@ -692,4 +698,81 @@ fn dedupe(plays: &mut Vec<Track>) {
     };
     let mut first = first.into_iter();
     plays.retain(|_| first.next().unwrap_or(true));
+}
+
+/// See [`History::recent_items`]. The album is built from what the play recorded: its id, name
+/// and cover, credited to the song's artists, since a play does not keep the album's own credit.
+fn recent_items(plays: &[Track], limit: usize) -> Vec<GenreItem> {
+    let mut seen = HashSet::new();
+    let mut items = Vec::new();
+    for track in plays {
+        if items.len() >= limit {
+            break;
+        }
+        let album = track
+            .album_id
+            .as_deref()
+            .filter(|id| !id.is_empty() && !track.album.is_empty());
+        let fresh = match (album, track.id.as_deref()) {
+            (Some(id), _) => seen.insert(("album", id)),
+            (None, Some(id)) => seen.insert(("track", id)),
+            (None, None) => false,
+        };
+        if !fresh {
+            continue;
+        }
+        items.push(match album {
+            Some(id) => GenreItem::Album(Album {
+                id: id.to_owned(),
+                name: track.album.clone(),
+                artists: track.artists.clone(),
+                artist_refs: track.artist_refs.clone(),
+                cover: track.cover.clone(),
+                ..Default::default()
+            }),
+            None => GenreItem::Track(track.clone()),
+        });
+    }
+    items
+}
+
+#[cfg(test)]
+mod tests {
+    use music::{GenreItem, Track};
+
+    use super::recent_items;
+
+    fn play(id: &str, album: Option<&str>) -> Track {
+        Track {
+            id: Some(id.to_owned()),
+            name: id.to_owned(),
+            album: album.unwrap_or_default().to_owned(),
+            album_id: album.map(str::to_owned),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn recent_items_list_each_album_once_newest_first() {
+        let plays = [
+            play("a1", Some("A")),
+            play("loose", None),
+            play("a2", Some("A")),
+            play("b1", Some("B")),
+            play("loose", None),
+        ];
+
+        let items = recent_items(&plays, 10);
+        let names: Vec<&str> = items
+            .iter()
+            .map(|item| match item {
+                GenreItem::Album(album) => album.id.as_str(),
+                GenreItem::Track(track) => track.name.as_str(),
+                _ => "",
+            })
+            .collect();
+
+        assert_eq!(names, ["A", "loose", "B"]);
+        assert_eq!(recent_items(&plays, 2).len(), 2);
+    }
 }
