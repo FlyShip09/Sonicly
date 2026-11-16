@@ -423,6 +423,7 @@ impl Engine {
                 true => Normalisation::Limited,
                 false => Normalisation::Off,
             },
+            direct: false,
         };
         let id = track_id.to_owned();
         self.signals.send(PlaybackEvent::Signal { id, track }).ok();
