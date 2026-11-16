@@ -75,7 +75,9 @@ impl RenderOnce for Row {
             .when(disabled, |this| this.text_color(theme.muted_foreground))
             .child(
                 div()
-                    .map(|this| match yielding {
+                    // A yielding row keeps its label whole, unless an explanation under it would
+                    // then take the whole width: the two halves share it and the text wraps.
+                    .map(|this| match yielding && detail.is_none() {
                         true => this.flex_none(),
                         false => this.flex_1().min_w_0(),
                     })
