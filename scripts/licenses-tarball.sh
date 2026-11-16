@@ -14,7 +14,7 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
 cd "$ROOT"
-cp COPYING "$STAGE/LICENSE"
+cp LICENSE "$STAGE/LICENSE"
 cp THIRD-PARTY.md "$STAGE/THIRD-PARTY.md"
 cp assets/fonts/LICENSE.txt "$STAGE/LICENSE.Inter"
 mkdir -p "$STAGE/icons"

@@ -39,6 +39,7 @@ mod signal;
 mod snapshot;
 mod song;
 mod sponsorblock;
+mod stars;
 mod tags;
 mod toast;
 mod updates;
@@ -99,6 +100,7 @@ pub use settings::{
 pub use signal::{Change, Equalizing, FLOAT_BITS, Following, Signal, SignalPath};
 pub use song::SongDetail;
 pub use sponsorblock::SponsorBlock;
+pub use stars::{REPO_URL, Stars};
 pub use tags::{TagState, Tags};
 pub use toast::{Outcome, Target, Toast, ToastAction, Toasts};
 pub use updates::{
@@ -249,6 +251,7 @@ pub struct Sonicly {
     pub pins: Entity<Pins>,
     pub playback: Entity<Playback>,
     pub sponsorblock: Entity<SponsorBlock>,
+    pub stars: Entity<Stars>,
     /// The window that mints YouTube's proof-of-origin token. Nothing reads it; it is held so
     /// that it keeps ticking.
     pub potoken: Entity<potoken::PoToken>,
@@ -311,6 +314,7 @@ pub fn init(
     })
     .detach();
     let cache = storage::Cache::standard();
+    let stars = cx.new(|cx| Stars::new(settings.clone(), io.clone(), cache.clone(), cx));
     let library = cx.new(|cx| Library::new(session.clone(), io.clone(), cache, cx));
     let queue = cx.new(|cx| Queue::new(session.clone(), settings.clone(), cx));
     // Playback starts no engine until a provider is up, so the saved device is handed over
@@ -453,6 +457,7 @@ pub fn init(
         scrobbling,
         settings,
         signal,
+        stars,
         updates,
         wake,
     });

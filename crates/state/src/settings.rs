@@ -8,6 +8,7 @@
 mod equalizer;
 mod lyrics_style;
 mod themes;
+mod version;
 
 pub use self::equalizer::equalizer_profile_label;
 pub use self::lyrics_style::{
@@ -399,10 +400,13 @@ struct Picked {
 }
 
 /// Everything `settings.json` holds. Preferences a user sets on purpose, safe to edit by hand.
-/// Missing keys take their defaults, unknown keys are ignored.
+/// Missing keys take their defaults, unknown keys are ignored. A key is renamed or retyped only
+/// together with a step in [`version`], so files saved before the change still load.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct Values {
+    /// The shape the file is written in, which is always this build's own.
+    version: u32,
     /// The provider to select on startup. Omit to restore the last-used provider.
     #[serde(skip_serializing_if = "Option::is_none")]
     provider: Option<String>,
@@ -515,6 +519,8 @@ struct Values {
     lyrics_presets: Vec<LyricsPreset>,
     adaptive_menu: bool,
     check_updates: bool,
+    /// Whether GitHub is asked, at most once a day, how many stars the repository has.
+    github_stars: bool,
     /// The release channel chosen in settings, by its id. Empty follows the running build's own
     /// channel, and a copy a package manager installed ignores it.
     update_channel: String,
@@ -691,6 +697,7 @@ enum SettingsSave {
 impl Default for Values {
     fn default() -> Self {
         Self {
+            version: version::CURRENT,
             provider: None,
             normalisation: false,
             gapless: true,
@@ -752,6 +759,7 @@ impl Default for Values {
             adaptive_menu: false,
             check_updates: crate::updates::RELEASE_REPO.is_some()
                 && (cfg!(target_os = "windows") || updates_itself()),
+            github_stars: true,
             update_channel: String::new(),
             close_to_tray: true,
             tray_icon: true,
@@ -1018,10 +1026,13 @@ impl AppSettings {
                 (None, false)
             }
         };
-        let parsed = bytes.map(|bytes| (serde_json::from_slice::<Values>(json(&bytes)), bytes));
+        let parsed = bytes.map(|bytes| (version::parse(&bytes), bytes));
         let parsed = parsed.map(|(values, bytes)| (values.map(offer_new_lyrics), bytes));
         let (values, writable, disk, broken) = match parsed {
-            Some((Ok(values), bytes)) => (values.settled(), writable, Some(bytes), None),
+            Some((Ok(values), bytes)) => {
+                version::keep_newer(&path, &bytes);
+                (values.settled(), writable, Some(bytes), None)
+            }
             Some((Err(_), bytes)) if empty_settings(&bytes) => {
                 (Values::default().settled(), writable, Some(bytes), None)
             }
@@ -1309,6 +1320,10 @@ impl AppSettings {
 
     pub fn check_updates(&self) -> bool {
         self.values.check_updates
+    }
+
+    pub fn github_stars(&self) -> bool {
+        self.values.github_stars
     }
 
     pub fn close_to_tray(&self) -> bool {
@@ -1973,6 +1988,11 @@ impl AppSettings {
 
     pub fn set_check_updates(&mut self, check_updates: bool, cx: &mut Context<Self>) {
         self.values.check_updates = check_updates;
+        self.schedule_save(cx);
+    }
+
+    pub fn set_github_stars(&mut self, github_stars: bool, cx: &mut Context<Self>) {
+        self.values.github_stars = github_stars;
         self.schedule_save(cx);
     }
 
@@ -2935,7 +2955,7 @@ impl AppSettings {
             self.broken = None;
             return SettingsReload::Unchanged;
         }
-        let values = match serde_json::from_slice::<Values>(json(&bytes)) {
+        let values = match version::parse(&bytes) {
             Ok(values) => offer_new_lyrics(values).settled(),
             Err(error) => {
                 log::warn!("settings: cannot parse {}: {error}", self.path.display());
@@ -3020,7 +3040,7 @@ pub fn remember_mini_player(window: &mut Window, cx: &mut App) {
 /// Whether reloading `current` from disk would replace the values that serialize to `ours`. A
 /// file that does not parse is left to the broken-file toast, since the reload keeps our values.
 fn overrides(current: &[u8], ours: &[u8]) -> bool {
-    serde_json::from_slice::<Values>(json(current))
+    version::parse(current)
         .ok()
         .and_then(|theirs| serde_json::to_vec_pretty(&theirs).ok())
         .is_some_and(|theirs| theirs != ours)
@@ -3171,9 +3191,7 @@ fn save_settings(path: &Path, bytes: &[u8], previous: Option<&[u8]>) -> Result<(
     if previous == Some(bytes) {
         return Ok(());
     }
-    if let Some(previous) =
-        previous.filter(|previous| serde_json::from_slice::<Values>(json(previous)).is_ok())
-    {
+    if let Some(previous) = previous.filter(|previous| version::parse(previous).is_ok()) {
         write_settings(&path.with_file_name("sonicly.backup.json"), previous)
             .context("cannot back up settings")?;
     }

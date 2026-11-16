@@ -1356,6 +1356,10 @@ settings-licenses = Open-source licenses
 settings-licenses-detail = The licenses of the libraries, fonts and icons this build includes
 settings-source = Source code
 settings-source-detail = The corresponding source for this build
+github-star = Star on GitHub
+settings-star-detail = Opens Sonicly's repository in your browser
+settings-star-count = Show the star count
+settings-star-count-detail = Ask GitHub at most once a day how many stars Sonicly has. Only the app's name and version are sent
 settings-notice = Copyright © 2026 Sonicly Contributors. Sonicly comes with absolutely no warranty. It is free software, and you are welcome to redistribute it under the terms of the GNU General Public License version 3 or later. Sonicly is unofficial and is not affiliated with Spotify AB.
 
 # themes
