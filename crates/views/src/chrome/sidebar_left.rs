@@ -799,7 +799,7 @@ impl SidebarLeft {
             return None;
         }
         let Some((origin, size)) = measured else {
-            let selection = self.selection.get_or_insert(Selection {
+            let selection = self.selection.get_or_insert_with(|| Selection {
                 top: Sprung::at(0.),
                 asked: false,
             });
@@ -809,7 +809,7 @@ impl SidebarLeft {
             return None;
         };
         let target = f32::from(origin.y);
-        let selection = self.selection.get_or_insert(Selection {
+        let selection = self.selection.get_or_insert_with(|| Selection {
             top: Sprung::at(target),
             asked: false,
         });

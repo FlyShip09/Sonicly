@@ -144,7 +144,7 @@ impl PlayerBar {
             .playback
             .read(cx)
             .shown_track(cx)
-            .and_then(|track| track.id.clone());
+            .and_then(|track| track.id);
         let (shown, rise) = &mut self.arrival;
         if *shown != id {
             if shown.is_some() && id.is_some() {
