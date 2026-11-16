@@ -500,7 +500,12 @@ impl DetailView {
             strip = strip.text(owner_name);
         }
         if track_count > 0 {
-            strip = strip.text(t!("count-songs", count = track_count));
+            // a playlist that gains or loses songs runs its count to the new one
+            strip = strip.item(ui::Ticker::new(
+                "detail-song-count",
+                u64::from(track_count),
+                |count| t!("count-songs", count = count),
+            ));
         }
         if !duration.is_zero() {
             strip = strip.text(runtime(duration));

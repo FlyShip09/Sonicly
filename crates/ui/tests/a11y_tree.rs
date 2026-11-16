@@ -41,7 +41,7 @@ use gpui::{
 use ui::{
     Button, Card, Checkbox, DraggedPin, Field, Form, GeneratedCover, Glowing as _,
     HoverCarded as _, Input, Marquee, OptionCard, OtpInput, Pin, PinKind, Pinnable as _, Radio,
-    RangeScrubber, RangeState, Scrubber, ScrubberState, Spot, Theme, Toast,
+    RangeScrubber, RangeState, Scrubber, ScrubberState, Spot, Theme, Ticker, Toast,
 };
 
 /// Formats what the frame builder would put in the tree for `element`.
@@ -928,5 +928,22 @@ async fn hover_card_leaves_its_host_announced(cx: &mut TestAppContext) {
             .iter()
             .any(|line| line.contains("role=Link") && line.contains("Vela North")),
         "a name with a hover card stops being announced as its link: {lines:?}"
+    );
+}
+
+#[gpui::test]
+async fn ticker_is_heard_at_the_count_it_lands_on(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |window, cx| {
+        let element = Ticker::new("song-count", 40, |count| format!("{count} songs").into())
+            .render(window, cx)
+            .into_element();
+        snapshot("ticker", &element)
+    });
+    let lines = rendered(&lines, "ticker");
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("role=Label") && line.contains("40 songs")),
+        "a running count is not announced as the count it lands on: {lines:?}"
     );
 }

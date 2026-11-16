@@ -12,8 +12,8 @@ use music::{AccountChoices, SignIn, SignInPrompt};
 use router::{Destination, SettingsPage, navigate};
 use state::{Failure, Outcome, Placement, Scan, SessionState, Sonicly, Toast, Toasts};
 use ui::{
-    ActiveTheme as _, Avatar, Button, HoverFade, Initials, LEADING, MenuItem, Modal, Picker, Radio,
-    Skeleton, Text, Theme, mix,
+    ActiveTheme as _, ArrowRing, Avatar, Button, HoverFade, Initials, LEADING, MenuItem, Modal,
+    Picker, Radio, Skeleton, Text, Theme, mix,
 };
 
 use super::rows::drill;
@@ -525,6 +525,15 @@ impl SettingsView {
                     .child(add)
                     .children(rescan)
                     .child(div().flex_1())
+                    // the ring fills as the files are read, and turns while the walk has no total
+                    .children(scanning.map(|progress| {
+                        ArrowRing::new(
+                            "local-folders-scan-ring",
+                            progress.percent().map(|percent| f32::from(percent) / 100.),
+                        )
+                        .plain()
+                        .color(theme.primary)
+                    }))
                     .children(note.map(|note| {
                         ui::spoken("local-folders-scan", note)
                             .flex_none()

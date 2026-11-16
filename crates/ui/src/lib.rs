@@ -58,6 +58,7 @@ mod switch;
 mod table;
 mod tabs;
 mod theme;
+mod ticker;
 mod time;
 mod toast;
 mod tooltip;
@@ -166,6 +167,7 @@ pub use theme::{
     MAX_TRANSPARENCY, MIN_FONT, MIN_LYRICS_SCALE, Theme, ThemeKind, ThemeOverrides, WindowBlur,
     WindowMaterial, backdrop,
 };
+pub use ticker::Ticker;
 pub use time::{clock, runtime, tabular};
 pub use toast::Toast;
 pub use tooltip::{Perch, Tipped, Tooltip};
