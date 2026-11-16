@@ -566,6 +566,7 @@ impl ArtistView {
 
         let heart = Button::new("artist-toggle-library")
             .outline()
+            .bounce(saved)
             .icon(match saved {
                 true => "icons/heart-filled.svg",
                 false => "icons/heart.svg",

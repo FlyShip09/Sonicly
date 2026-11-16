@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::f32::consts::TAU;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
 use gpui::{
@@ -39,6 +40,9 @@ const ICON: Pixels = px(16.);
 const BORDER: Pixels = px(1.);
 /// How small a swapped icon starts as it pops in.
 const POP_FROM: f32 = 0.6;
+/// How small a bouncing icon starts, lower so the spring's overshoot carries it a little past
+/// its size before it settles.
+const BOUNCE_FROM: f32 = 0.5;
 /// How far an icon on a belt travels between its place and where it has faded out.
 const BELT_TRAVEL: Pixels = px(14.);
 /// How close to the next icon the belt comes before it counts as there. A spring spends a
@@ -47,6 +51,9 @@ const BELT_REST: f32 = 0.01;
 /// How close, in pixels and in scale, a resize and a pop come before they count as landed.
 const RESIZE_REST: f32 = 0.02;
 const POP_REST: f32 = 1e-3;
+/// How long after a click on a bouncing button its next icon swap still counts as the answer
+/// to that click. A library toggle lands in a frame or two; anything later came from elsewhere.
+const BOUNCE_WINDOW: Duration = Duration::from_millis(1500);
 /// How far the drawn width may sit from the width the content asks for, borders included, and
 /// still count as the content's. Further off, something else sizes the button.
 const FIT_SLACK: f32 = 3.;
@@ -108,6 +115,10 @@ struct Shape {
     inset: Option<Sprung>,
     /// The hover fill, which outlasts the pointer by a short fade.
     glow: Glow,
+    /// When the button was last clicked, so only a swap that answers a click bounces.
+    clicked: Option<Instant>,
+    /// Whether the icon swap under way bounces.
+    bouncing: bool,
 }
 
 #[derive(IntoElement)]
@@ -149,6 +160,8 @@ pub struct Button {
     turn: f32,
     /// Whether a swapped icon fades into the one it replaces in place, with no pop.
     blend: bool,
+    /// Whether a swapped-in icon overshoots and settles, when the swap answers a click here.
+    bounce: bool,
     /// The side the icon leaves towards on a click, for a button whose icon rides a belt.
     belt: Option<Side>,
     hovered: Option<StyleRefinement>,
@@ -193,6 +206,7 @@ impl Button {
             steady: false,
             turn: 0.,
             blend: false,
+            bounce: false,
             belt: None,
             hovered: None,
             fill: None,
@@ -415,6 +429,14 @@ impl Button {
         self
     }
 
+    /// Lets a swapped-in icon grow a little past its size and settle back, while `bounce` holds,
+    /// for a toggle turning on such as a like. Only a swap that follows a click on this button
+    /// bounces, so a like made elsewhere swaps the plain way, and so does turning off.
+    pub fn bounce(mut self, bounce: bool) -> Self {
+        self.bounce = bounce;
+        self
+    }
+
     /// Puts the icon on a belt. Each click slides it out towards `side`, shrinking and fading,
     /// while a copy comes in from the other side, and clicks in a row keep the belt running.
     pub fn belt(mut self, side: Side) -> Self {
@@ -517,6 +539,7 @@ impl RenderOnce for Button {
             steady,
             turn,
             blend,
+            bounce,
             belt,
             hovered,
             fill,
@@ -543,6 +566,8 @@ impl RenderOnce for Button {
                     belt: Sprung::at(0.),
                     inset: None,
                     glow: Glow::default(),
+                    clicked: None,
+                    bouncing: false,
                 })
             },
         );
@@ -710,7 +735,7 @@ impl RenderOnce for Button {
                 + parts.iter().flatten().copied().sum::<Pixels>()
                 + gap * (count - 1.)
         });
-        let (resizing, pop, leaving, inset, belted, glow) = {
+        let (resizing, pop, leaving, inset, belted, glow, bounce) = {
             let mut shape = shape.read(cx).borrow_mut();
             if !tracked {
                 shape.glow.hover(false);
@@ -741,8 +766,18 @@ impl RenderOnce for Button {
                     shape.leaving = Some((old, Sprung::at(1.)));
                 }
                 shape.icon = icon.clone();
+                shape.bouncing = bounce
+                    && shape
+                        .clicked
+                        .take()
+                        .is_some_and(|at| at.elapsed() < BOUNCE_WINDOW);
             }
-            let pop = shape.pop.follow(1., Springs::SWAP_IN, POP_REST, window, cx);
+            let bounce = shape.bouncing;
+            let swap = match bounce {
+                true => Springs::POP,
+                false => Springs::SWAP_IN,
+            };
+            let pop = shape.pop.follow(1., swap, POP_REST, window, cx);
             // A blend keeps the old icon for as long as the new one is coming in, so the two
             // always add up to solid strokes where they agree.
             let leaving = shape.leaving.as_mut().map(|(path, left)| {
@@ -779,7 +814,7 @@ impl RenderOnce for Button {
                 }
                 (side, at.fract())
             });
-            (resizing, pop, leaving, inset, belted, glow)
+            (resizing, pop, leaving, inset, belted, glow, bounce)
         };
         // A node reaches the tree only with a role, and an icon-only button has
         // no label of its own, so its tooltip key doubles as the accessible
@@ -916,7 +951,16 @@ impl RenderOnce for Button {
                                 }),
                             ),
                             false => (
-                                glyph(path, tinted(pop), turn, popped(pop), still),
+                                glyph(
+                                    path,
+                                    tinted(pop),
+                                    turn,
+                                    match bounce {
+                                        true => BOUNCE_FROM + (1. - BOUNCE_FROM) * pop,
+                                        false => popped(pop),
+                                    },
+                                    still,
+                                ),
                                 leaving.map(|(old, left)| {
                                     glyph(old, tinted(left), turn, popped(left), still)
                                 }),
@@ -1032,6 +1076,9 @@ impl RenderOnce for Button {
                                     cx.notify();
                                 });
                             }
+                            shape.update(cx, |shape, _| {
+                                shape.get_mut().clicked = Some(Instant::now());
+                            });
                             handler(event, window, cx)
                         })
                 })

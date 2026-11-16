@@ -71,6 +71,9 @@ impl Springs {
     pub const RESIZE: SpringConfig = spring(0.18, 0.);
     /// A swapped icon growing into place.
     pub const SWAP_IN: SpringConfig = spring(0.3, 0.);
+    /// A swapped icon growing a little past its size and settling, for a toggle turning on that
+    /// deserves a moment of its own, such as a like. One swing, never a wobble.
+    pub const POP: SpringConfig = spring(0.4, 0.55);
     /// A belt of icons moving on by one icon.
     pub const BELT: SpringConfig = spring(0.4, 0.);
     /// The icon it replaced shrinking away, a little quicker.
