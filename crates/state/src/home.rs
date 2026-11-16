@@ -160,6 +160,16 @@ impl Home {
         self.shelf(cx) == Shelf::Local
     }
 
+    /// The Fluent key of what an empty Quick picks deck says. A guest with no files of their
+    /// own has nothing they could like, so the line names the two ways to get there instead.
+    pub fn vacancy(&self, cx: &App) -> &'static str {
+        let session = self.session.read(cx);
+        match session.guest() && session.local_client().is_none() {
+            true => "home-quick-picks-guest",
+            false => "home-quick-picks-empty",
+        }
+    }
+
     fn clear(&mut self) {
         self.task = None;
         self.naming = None;

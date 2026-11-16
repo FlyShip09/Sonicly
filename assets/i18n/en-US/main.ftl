@@ -575,6 +575,7 @@ release-meta = { $year } • { $kind }
 # home page
 home-quick-picks = Quick picks
 home-quick-picks-empty = Like a few songs and they will show up here
+home-quick-picks-guest = Sign in or add a music folder, and the songs you like will show up here
 home-recently-added = Recently added
 home-most-played = Most played
 home-playlists = Playlists
