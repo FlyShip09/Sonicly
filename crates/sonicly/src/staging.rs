@@ -63,19 +63,25 @@ impl Staging {
             .unwrap_or(start)
     }
 
-    /// Opens what `--screen` names that needs the window: the quick search, a context menu, or
-    /// the first album, artist or playlist Home lists.
+    /// Sizes the window again once it exists, since a window asked for more room than its
+    /// display has opens at the display's default instead. Then opens what `--screen` names that
+    /// needs the window: the quick search, a context menu, or the first album, artist or
+    /// playlist Home lists.
     pub fn stage(&self, cx: &mut App) {
-        let Some(what) = self.screen.clone() else {
-            return;
-        };
-        if destination(&what).is_some() {
-            return;
-        }
         let Some(window) = cx
             .windows()
             .first()
             .and_then(|window| window.downcast::<Root>())
+        else {
+            return;
+        };
+        if let Some(size) = window_size() {
+            window.update(cx, |_, window, _| window.resize(size)).ok();
+        }
+        let Some(what) = self
+            .screen
+            .clone()
+            .filter(|what| destination(what).is_none())
         else {
             return;
         };

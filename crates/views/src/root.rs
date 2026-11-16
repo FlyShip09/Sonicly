@@ -1095,7 +1095,7 @@ impl Root {
     /// context menu once its feed lands.
     pub fn stage(&mut self, what: &str, window: &mut Window, cx: &mut Context<Self>) {
         match what {
-            "powerbar" => window.defer(cx, |window, cx| Powerbar::toggle(window, cx)),
+            "powerbar" => window.defer(cx, Powerbar::toggle),
             _ => self
                 .screens
                 .home
