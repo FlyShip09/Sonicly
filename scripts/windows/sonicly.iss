@@ -1,13 +1,14 @@
 #define AppName "Sonicly"
 #define AppPublisher "Sonicly"
 #define AppExeName "sonicly.exe"
+#define AppUrl "https://github.com/FlyShip09/Sonicly"
 #define AppVersion GetEnv("SONICLY_VERSION")
 #define SourceExe GetEnv("SONICLY_EXE")
 #define OutputDir GetEnv("SONICLY_DIST")
 #define BuildMetadata GetEnv("SONICLY_BUILD_METADATA")
 ; x64compatible for the x64 build, arm64 for the ARM one
 #define Arch GetEnv("SONICLY_ARCH")
-; Sonicly-Setup for the x64 build, Sonicly-Setup-arm64 for the ARM one
+; the installer's file name without .exe, which build-installer.ps1 fills in for a local x64 build
 #define SetupName GetEnv("SONICLY_SETUP")
 
 [Setup]
@@ -15,6 +16,8 @@ AppId={{4EC1FC22-9007-4B9B-9D0A-6ACDABC0A96E}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
+AppPublisherURL={#AppUrl}
+AppSupportURL={#AppUrl}/issues
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -40,6 +43,7 @@ Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "{#AppExeName}"; Flags: igno
 Source: "{#BuildMetadata}"; DestDir: "{app}"; DestName: "sonicly-build.json"; Flags: ignoreversion
 #endif
 Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\..\NOTICE.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\THIRD-PARTY.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [InstallDelete]
@@ -57,7 +61,7 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 Root: HKA; Subkey: "Software\Sonicly"; Flags: uninsdeletekeyifempty
 Root: HKA; Subkey: "Software\Sonicly\Capabilities"; Flags: uninsdeletekey
 Root: HKA; Subkey: "Software\Sonicly\Capabilities"; ValueType: string; ValueName: "ApplicationName"; ValueData: "{#AppName}"; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Sonicly\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "A native, familiar music streaming client"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Sonicly\Capabilities"; ValueType: string; ValueName: "ApplicationDescription"; ValueData: "A music player for local files and streaming services"; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Sonicly\Capabilities"; ValueType: string; ValueName: "ApplicationIcon"; ValueData: "{app}\{#AppExeName},0"; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "{#AppName}"; ValueData: "Software\Sonicly\Capabilities"; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\Applications\{#AppExeName}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#AppName}"; Flags: uninsdeletekey
