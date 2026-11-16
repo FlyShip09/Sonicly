@@ -1274,8 +1274,8 @@ impl SettingsView {
         }
     }
 
-    /// One group: the eyebrow with its icon, its option cards, then its rows, all on the page
-    /// itself with no surface around them and nothing between the rows.
+    /// One group: the eyebrow with its icon and its option cards on the page, then its rows as
+    /// one grouped list, a rounded inset sheet with a hairline between each row and the next.
     fn group(&self, group: Group, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let Group {
             title,
@@ -1303,12 +1303,24 @@ impl SettingsView {
                 self.revealing(Reveal::Slot(slot), row, cx)
             })
             .collect::<Vec<_>>();
+        let theme = *cx.theme();
         let rows = (!rows.is_empty()).then(|| {
             div()
                 .flex()
                 .flex_col()
                 .when(carded, |rows| rows.mt_3())
-                .children(rows)
+                .px_3()
+                .rounded(ui::rim(theme.radius))
+                .bg(theme.secondary)
+                .border_1()
+                .border_color(theme.border)
+                .children(rows.into_iter().enumerate().map(|(place, row)| {
+                    div()
+                        .when(place > 0, |this| {
+                            this.border_t_1().border_color(theme.table_row_border)
+                        })
+                        .child(row)
+                }))
         });
 
         div()
