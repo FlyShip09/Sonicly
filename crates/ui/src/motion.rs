@@ -521,6 +521,8 @@ pub struct HoverFade {
     from: f32,
     since: Option<Instant>,
     span: Duration,
+    /// How long the way back takes once the pointer leaves.
+    exit: Duration,
 }
 
 impl HoverFade {
@@ -530,7 +532,14 @@ impl HoverFade {
             from: 0.,
             since: None,
             span,
+            exit: span,
         }
+    }
+
+    /// Fades back over `exit` once the pointer leaves, rather than over the span it came in on.
+    pub fn leaving(mut self, exit: Duration) -> Self {
+        self.exit = exit;
+        self
     }
 
     /// Turns the fade towards `hovered`, starting from wherever it stands now.
@@ -568,7 +577,11 @@ impl HoverFade {
         let Some(since) = self.since else {
             return self.from;
         };
-        let travelled = since.elapsed().as_secs_f32() / self.span.as_secs_f32().max(f32::EPSILON);
+        let span = match self.hovered {
+            true => self.span,
+            false => self.exit,
+        };
+        let travelled = since.elapsed().as_secs_f32() / span.as_secs_f32().max(f32::EPSILON);
         match self.hovered {
             true => (self.from + travelled).min(target),
             false => (self.from - travelled).max(target),
@@ -587,6 +600,8 @@ pub struct Glow {
     lit: f32,
     /// When the light went off and the level it fades from, while the fade still runs.
     dimming: Option<(Instant, f32)>,
+    /// What the pointer brings up over the element, kept once [`risen`](Self::risen) is read.
+    rise: Option<HoverFade>,
 }
 
 impl Glow {
@@ -600,6 +615,23 @@ impl Glow {
     /// Tells the glow whether the pointer is over its element.
     pub fn hover(&mut self, hovered: bool) {
         self.hovered = hovered;
+        if let Some(rise) = self.rise.as_mut() {
+            rise.set(hovered);
+        }
+    }
+
+    /// How far something the pointer brings up over the element has come, from 0 to 1: eased in
+    /// over `span` as the pointer arrives and out over the quicker hover dim as it leaves, from
+    /// wherever it stands. For a card's play button, read on every frame the card draws.
+    pub fn risen(&mut self, span: Duration, window: &mut Window, cx: &App) -> f32 {
+        let hovered = self.hovered;
+        self.rise
+            .get_or_insert_with(|| {
+                let mut rise = HoverFade::new(span).leaving(dim_span());
+                rise.set(hovered);
+                rise
+            })
+            .level(window, cx)
     }
 
     /// How lit the element is, from 0 to 1, counting it lit while `on` as well as under the

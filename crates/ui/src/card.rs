@@ -15,7 +15,9 @@ use crate::button::Button;
 use crate::glass::{GLASS_BLUR, blurring};
 use crate::label::Tails as _;
 use crate::metrics::{LEADING, Text, snapped};
-use crate::motion::{PRESS_SCALE, PRESS_SCALE_CARD, glow_fill, glowing, pressing, solid_fill};
+use crate::motion::{
+    Glow, Motion, PRESS_SCALE, PRESS_SCALE_CARD, glow_fill, glowing, pressing, solid_fill,
+};
 use crate::skeleton::Skeleton;
 use crate::theme::ActiveTheme as _;
 use crate::tooltip::{Perch, Tipped as _};
@@ -26,6 +28,8 @@ const PLAY_RATIO: f32 = 0.24;
 const PLAY_MIN: Pixels = px(20.);
 const PLAY_MAX: Pixels = px(40.);
 const PLAY_INSET: Pixels = px(8.);
+/// How far below its place a tile's play button starts as the pointer brings it up.
+const PLAY_LIFT: Pixels = px(6.);
 /// How much of the accent colour the play button keeps over the artwork it blurs.
 const PLAY_FILL: f32 = 0.55;
 const SCRIM_RATIO: f32 = 0.45;
@@ -456,6 +460,14 @@ impl RenderOnce for Card {
                 .when(accent, Artwork::accent)
                 .into_any_element(),
         };
+        let plays = play.is_some();
+        // The play button comes up with the pointer and goes back quicker, and stays up while
+        // what it plays is playing.
+        let shown = match (plays, playing) {
+            (true, false) => Glow::keyed(&id, window, cx)
+                .update(cx, |glow, cx| glow.risen(Motion::Quick.span(), window, cx)),
+            _ => 1.,
+        };
         let leading = match play {
             None => leading,
             Some(play) => {
@@ -476,7 +488,7 @@ impl RenderOnce for Card {
                             .id("card-play")
                             .absolute()
                             .right(PLAY_INSET)
-                            .bottom(PLAY_INSET)
+                            .bottom(PLAY_INSET - PLAY_LIFT * (1. - shown))
                             .when_some(warm.clone(), |this, warm| {
                                 this.on_hover(move |hovered, window, cx| {
                                     if *hovered {
@@ -484,10 +496,8 @@ impl RenderOnce for Card {
                                     }
                                 })
                             })
-                            .when(!playing, |this| {
-                                this.invisible()
-                                    .group_hover(CARD_GROUP, |style| style.visible())
-                            })
+                            .when(shown <= 0., |this| this.invisible())
+                            .when(shown < 1., |this| this.opacity(shown))
                             .child(
                                 Button::new("card-play-button")
                                     .primary()
@@ -521,10 +531,8 @@ impl RenderOnce for Card {
                             .id("card-scrim")
                             .absolute()
                             .inset_0()
-                            .when(!playing, |this| {
-                                this.invisible()
-                                    .group_hover(CARD_GROUP, |style| style.visible())
-                            })
+                            .when(shown <= 0., |this| this.invisible())
+                            .when(shown < 1., |this| this.opacity(shown))
                             .child(
                                 div()
                                     .id("card-play")
@@ -781,13 +789,15 @@ impl RenderOnce for Card {
             false => card,
         };
         card.style().refine(&overrides);
-        let Some(fill) = glow_color else {
+        // the glow also hears the pointer for the play button, so a card with one keeps it
+        // even where it paints no hover fill
+        if glow_color.is_none() && !plays {
             return card;
-        };
+        }
         let rest = solid_fill(&overrides);
         let lit = lit.is_some_and(|(lit, _)| lit);
         let (card, level) = glowing(card, &id, lit, 1., window, cx);
-        match glow_fill(rest, fill, level) {
+        match glow_color.and_then(|fill| glow_fill(rest, fill, level)) {
             Some(color) => card.bg(color),
             None => card,
         }
