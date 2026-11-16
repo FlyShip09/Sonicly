@@ -9,6 +9,8 @@ use gpui::{
 use crate::theme::ActiveTheme as _;
 
 const PULSE: Duration = Duration::from_millis(1400);
+/// The opacity a placeholder holds with motion reduced, the middle of its pulse.
+const STILL: f32 = 0.55;
 
 #[derive(IntoElement)]
 pub struct Skeleton {
@@ -62,14 +64,20 @@ impl RenderOnce for Skeleton {
         );
         skeleton.style().refine(&overrides);
 
-        skeleton.with_animation(
-            "skeleton",
-            Animation::new(PULSE).repeat().with_easing(ease_in_out),
-            |this, delta| {
-                let fade = 1. - (delta * std::f32::consts::TAU).cos().abs() * 0.5;
-                this.opacity(0.4 + fade * 0.3)
-            },
-        )
+        // With motion reduced the placeholder holds still at the middle of its pulse.
+        if cx.reduce_motion() {
+            return skeleton.opacity(STILL).into_any_element();
+        }
+        skeleton
+            .with_animation(
+                "skeleton",
+                Animation::new(PULSE).repeat().with_easing(ease_in_out),
+                |this, delta| {
+                    let fade = 1. - (delta * std::f32::consts::TAU).cos().abs() * 0.5;
+                    this.opacity(0.4 + fade * 0.3)
+                },
+            )
+            .into_any_element()
     }
 }
 

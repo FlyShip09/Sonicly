@@ -33,6 +33,10 @@ const NEUTRAL_PIVOT: f32 = 0.5;
 /// The least lightness gap `legible` leaves between a tint and the surface under it.
 const LEGIBLE_DISTANCE: f32 = 0.34;
 const SYSTEM_FILLS: bool = cfg!(target_os = "windows");
+/// The lightness and strength of a page's header wash on a dark theme and on a light one: dim
+/// on dark and pale on light, so the theme's own text keeps its contrast over the wash's top.
+const HEADER_WASH_DARK: (f32, f32) = (0.34, 0.5);
+const HEADER_WASH_LIGHT: (f32, f32) = (0.8, 0.6);
 
 /// What a fill keeps of itself once the window is fully see-through. The page
 /// background has no floor — a clear window is the point — but everything drawn
@@ -77,13 +81,46 @@ impl WindowBlur {
     }
 }
 
+/// Whether the window can carry the platform's own material behind its frame, the title bar and
+/// the sidebar: Mica on Windows 11, the vibrancy view on macOS, a compositor's blur on Linux and
+/// FreeBSD. Windows answers once the window exists, from whether DWM took a backdrop; the other
+/// platforms answer through `WindowBlur`.
+#[derive(Clone, Copy)]
+pub struct WindowMaterial(bool);
+
+impl Global for WindowMaterial {}
+
+impl WindowMaterial {
+    pub fn supported(cx: &App) -> bool {
+        match SYSTEM_FILLS {
+            true => cx.try_global::<Self>().is_some_and(|material| material.0),
+            false => WindowBlur::supported(cx),
+        }
+    }
+
+    /// Records whether the platform took the material when the window probed it on opening.
+    pub fn set(supported: bool, cx: &mut App) {
+        cx.set_global(Self(supported));
+    }
+}
+
 /// The window background a look asks the platform for. Blur needs something to show through,
 /// so only a see-through window gets it, and only an opaque one can take the platform's own
-/// fill. A platform that cannot blur draws a blurred background as a plain see-through one.
-pub fn backdrop(blur_window: bool, transparent: bool) -> WindowBackgroundAppearance {
-    match blur_window && transparent {
-        true => WindowBackgroundAppearance::Blurred,
-        false => match SYSTEM_FILLS && !transparent {
+/// fill. An opaque window whose frame sits on the platform's `material` asks for Mica on
+/// Windows and the blurred backdrop elsewhere; the page paints over it. A platform that cannot
+/// blur draws a blurred background as a plain see-through one.
+pub fn backdrop(
+    blur_window: bool,
+    transparent: bool,
+    material: bool,
+) -> WindowBackgroundAppearance {
+    match (blur_window && transparent, material && !transparent) {
+        (true, _) => WindowBackgroundAppearance::Blurred,
+        (false, true) => match SYSTEM_FILLS {
+            true => WindowBackgroundAppearance::MicaBackdrop,
+            false => WindowBackgroundAppearance::Blurred,
+        },
+        (false, false) => match SYSTEM_FILLS && !transparent {
             true => WindowBackgroundAppearance::Opaque,
             false => WindowBackgroundAppearance::Transparent,
         },
@@ -407,10 +444,15 @@ pub struct Theme {
     pub popover_foreground: Hsla,
     pub progress_bar: Hsla,
     pub selection: Hsla,
+    /// The frame around the page: the title bar and the sidebar, one surface with no rule
+    /// between them, a step off `background`. The adaptive tint leaves it neutral, so a cover's
+    /// colour reaches the page and never the window's frame.
     pub sidebar: Hsla,
-    /// The fill under the sidebar entry of the page that is open, thinned the way
-    /// `secondary_hover` is and for the same reason.
+    /// The fill under the sidebar entry of the page that is open. A white or black veil rather
+    /// than a grey, so it reads the same over the solid frame and over the platform's material.
     pub sidebar_accent: Hsla,
+    /// The hairline where the page meets the frame, a veil for the same reason. Covers wear it
+    /// too, so a sleeve as light or as dark as the page keeps its edge.
     pub sidebar_border: Hsla,
     pub title_bar_border: Hsla,
     pub table_head: Hsla,
@@ -469,17 +511,17 @@ impl Theme {
             popover: rgb(0x141414).into(),
             popover_foreground: rgb(0xfafafa).into(),
             progress_bar: rgb(0xf5f5f5).into(),
-            selection: rgb(0x1d4ed8).into(),
-            sidebar: rgb(0x0a0a0a).into(),
-            sidebar_accent: rgba(0x50505066).into(),
-            sidebar_border: rgb(0x262626).into(),
+            selection: rgb(0x737373).into(),
+            sidebar: rgb(0x161616).into(),
+            sidebar_accent: rgba(0xffffff14).into(),
+            sidebar_border: rgba(0xffffff12).into(),
             title_bar_border: rgb(0x262626).into(),
             table_head: rgba(0x171717cc).into(),
             table_head_foreground: rgb(0x8a8a8a).into(),
             table_row_border: rgba(0x262626b3).into(),
             table_hover: rgba(0x50505033).into(),
-            table_active: rgba(0x1e40af33).into(),
-            table_active_border: rgb(0x1d4ed8).into(),
+            table_active: rgba(0xffffff17).into(),
+            table_active_border: rgb(0xa3a3a3).into(),
             radius: px(6.),
             font_size: px(14.),
             metrics: Metrics::default(),
@@ -512,17 +554,17 @@ impl Theme {
             popover: rgb(0xffffff).into(),
             popover_foreground: rgb(0x171717).into(),
             progress_bar: rgb(0x262626).into(),
-            selection: rgb(0x2563eb).into(),
-            sidebar: rgb(0xf5f5f5).into(),
-            sidebar_accent: rgba(0xcdcdcd66).into(),
-            sidebar_border: rgb(0xd4d4d4).into(),
+            selection: rgb(0xa3a3a3).into(),
+            sidebar: rgb(0xefefef).into(),
+            sidebar_accent: rgba(0x0000000f).into(),
+            sidebar_border: rgba(0x00000017).into(),
             title_bar_border: rgb(0xd4d4d4).into(),
             table_head: rgba(0xf5f5f5e6).into(),
             table_head_foreground: rgb(0x666666).into(),
             table_row_border: rgba(0xd4d4d4b3).into(),
             table_hover: rgba(0xcdcdcd33).into(),
-            table_active: rgba(0x2563eb1f).into(),
-            table_active_border: rgb(0x2563eb).into(),
+            table_active: rgba(0x00000012).into(),
+            table_active_border: rgb(0x525252).into(),
             radius: px(6.),
             font_size: px(14.),
             metrics: Metrics::default(),
@@ -558,18 +600,10 @@ impl Theme {
             secondary_active,
             muted,
             popover,
-            sidebar,
-            sidebar_accent,
             table_head,
             table_hover,
         );
-        wash!(
-            BORDER_TINT,
-            border,
-            sidebar_border,
-            title_bar_border,
-            table_row_border,
-        );
+        wash!(BORDER_TINT, border, title_bar_border, table_row_border,);
         wash!(
             TEXT_TINT,
             foreground,
@@ -661,6 +695,21 @@ impl Theme {
                 },
                 ..self.primary_of(tint)
             },
+        }
+    }
+
+    /// The colour a page washes the top of its header with when its cover names `tint`, at its
+    /// strongest. It fades to nothing down the header, and the text over it stays the theme's.
+    pub fn header_wash(&self, tint: Hsla) -> Hsla {
+        let (l, a) = match self.background.l < 0.5 {
+            true => HEADER_WASH_DARK,
+            false => HEADER_WASH_LIGHT,
+        };
+        Hsla {
+            h: tint.h,
+            s: tint.s.min(MAX_WASH_SATURATION),
+            l,
+            a,
         }
     }
 

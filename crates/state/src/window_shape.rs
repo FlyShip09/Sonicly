@@ -26,3 +26,23 @@ pub fn apply_window_rounding(window: &Window, rounding: Rounding, cx: &App) {
         (hook.0)(window, rounding);
     }
 }
+
+type Polarity = Box<dyn Fn(&Window, bool)>;
+
+struct PolarityHook(Polarity);
+
+impl Global for PolarityHook {}
+
+/// Registers the hook that tells the platform whether the window's frame is dark. On Windows it
+/// picks the Mica DWM draws under the frame, which otherwise follows the system's theme rather
+/// than Sonicly's. A no-op until this is called.
+pub fn install_window_polarity_hook(apply: impl Fn(&Window, bool) + 'static, cx: &mut App) {
+    cx.set_global(PolarityHook(Box::new(apply)));
+}
+
+/// Tells the live window whether its frame is dark, if a hook is installed.
+pub fn apply_window_polarity(window: &Window, dark: bool, cx: &App) {
+    if let Some(hook) = cx.try_global::<PolarityHook>() {
+        (hook.0)(window, dark);
+    }
+}

@@ -9,7 +9,8 @@ use std::rc::Rc;
 use music::{GenreItem, GenreSection};
 use state::Playback;
 use ui::{
-    ActiveTheme as _, Button, Card, Deck, Glide, Hold, Mode, Skeleton, Text, heading, snapped,
+    ActiveTheme as _, Button, Card, Cascade, Deck, Glide, Hold, Mode, Skeleton, Text,
+    section_heading, snapped,
 };
 
 use crate::shared::album_grid::CardGrid;
@@ -21,10 +22,8 @@ const ROWS: usize = 3;
 const STEADY: Pixels = px(0.5);
 const PENDING: usize = 3;
 const RAIL_GAP: Pixels = px(16.);
-const STACK_GAP: Pixels = px(32.);
 const LANE_GAP: Pixels = px(8.);
 const HEADING_GAP: Pixels = px(12.);
-const LEADING: f32 = 1.4;
 const HEADING: Pixels = px(140.);
 
 pub(crate) struct Shelves {
@@ -32,6 +31,9 @@ pub(crate) struct Shelves {
     host: EntityId,
     playback: Entity<Playback>,
     rails: Vec<(ScrollHandle, Glide)>,
+    /// The shelves surfacing one after another as a feed lands in place of its skeletons. A
+    /// shelf it has shown keeps its place, so coming back to the page or scrolling plays nothing.
+    cascade: Cascade,
 }
 
 impl Shelves {
@@ -41,6 +43,7 @@ impl Shelves {
             host,
             playback,
             rails: Vec::new(),
+            cascade: Cascade::default(),
         }
     }
 
@@ -109,12 +112,16 @@ impl Shelves {
             .iter()
             .map(|section| self.height(section, mode, width, window, cx))
             .collect();
+        // Every shelf is named here, not only the ones on screen, so a shelf scrolled back into
+        // view is one the cascade has already shown.
+        self.cascade
+            .show((0..sections.len()).map(|place| surfacing(&sections, place)));
         let me = cx.entity().downgrade();
 
         let stack = Deck::new(self.tag("stack", 0))
             .hold()
             .rows(heights)
-            .gap(STACK_GAP)
+            .gap(cx.theme().metrics.section)
             .draw(move |place, window, cx| {
                 let Some(view) = me.upgrade() else {
                     return div().into_any_element();
@@ -124,11 +131,14 @@ impl Shelves {
                 };
                 let holder = view.downgrade();
                 let shelves = view.read(cx);
-
-                match mode {
+                let level = shelves
+                    .cascade
+                    .level(&surfacing(&sections, place), window, cx);
+                let shelf = match mode {
                     Mode::Grid => shelves.rail(place, &sections, width, &holder, window, cx),
                     Mode::List => shelves.lane(place, section, width, window, cx),
-                }
+                };
+                Cascade::surface(shelf, level).w_full().into_any_element()
             });
 
         // Sections span the page so the deck's row clips do not cut off sideways cards.
@@ -343,7 +353,7 @@ impl Shelves {
 
         Button::new(id)
             .small()
-            .outline()
+            .ghost()
             .icon(match forward {
                 true => "icons/chevron-right.svg",
                 false => "icons/chevron-left.svg",
@@ -432,10 +442,20 @@ fn spread(cards: Vec<AnyElement>, lanes: usize) -> Div {
         }))
 }
 
+/// The key a shelf surfaces under: its place and its title, so a refreshed feed whose shelves
+/// changed surfaces the new ones.
+fn surfacing(sections: &[GenreSection], place: usize) -> SharedString {
+    let title = sections
+        .get(place)
+        .map_or("", |section| section.title.as_str());
+    SharedString::from(format!("{place}-{title}"))
+}
+
 fn head(window: &Window, cx: &App) -> Pixels {
     let theme = *cx.theme();
 
-    snapped(theme.text(Text::Title) * LEADING, window).max(theme.metrics.control_small)
+    snapped(theme.text(Text::Large) * Text::Large.leading(), window)
+        .max(theme.metrics.control_small)
 }
 
 fn dressed(card: Card, tile: Option<Pixels>, cx: &App) -> Card {
@@ -679,7 +699,7 @@ fn arrow(
 
     Button::new(id)
         .small()
-        .outline()
+        .ghost()
         .icon(match forward {
             true => "icons/chevron-right.svg",
             false => "icons/chevron-left.svg",
@@ -707,7 +727,7 @@ fn sideways(event: &ScrollWheelEvent) -> bool {
 /// A shelf or rail title as a level two heading, so screen readers can jump from one shelf to
 /// the next. `id` has to be unique on the page.
 fn shelf_heading(id: impl Into<ElementId>, title: SharedString, cx: &App) -> Stateful<Div> {
-    heading(title.clone(), cx)
+    section_heading(title.clone(), cx)
         .id(id)
         .role(Role::Heading)
         .aria_level(2)

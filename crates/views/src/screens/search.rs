@@ -917,7 +917,7 @@ impl SearchView {
             .when(matches!(kind, Kind::Artist), Card::circle)
             .eyebrow(noun(kind))
             .size(Text::Title)
-            .weight(FontWeight::BOLD)
+            .weight(FontWeight::SEMIBOLD)
             .bare_meta(
                 cells::artist_links(
                     "best-artist-link",

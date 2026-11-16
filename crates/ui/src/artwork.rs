@@ -24,6 +24,10 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::time::{Duration, Instant};
 
+/// How much of the muted foreground a missing cover's tile is filled with.
+const PLACEHOLDER_FILL: f32 = 0.12;
+/// How much of a missing cover's tile its glyph spans.
+const PLACEHOLDER_GLYPH: f32 = 0.36;
 const FILE_PREFIX: &str = "file://";
 
 const FALLBACK_ICON: &str = "icons/music.svg";
@@ -958,6 +962,7 @@ pub struct Artwork {
     fit: ObjectFit,
     /// The size the image is decoded for, when it differs from the size it is drawn at.
     sample: Option<Pixels>,
+    edged: bool,
     interactivity: Interactivity,
 }
 
@@ -976,8 +981,16 @@ impl Artwork {
             accent: false,
             fit: ObjectFit::Cover,
             sample: None,
+            edged: false,
             interactivity: Interactivity::new(),
         }
+    }
+
+    /// Rings the cover with the theme's hairline, so a sleeve as light or as dark as the page
+    /// under it keeps its edge. The ring lies inside the cover and follows its corners.
+    pub fn edged(mut self) -> Self {
+        self.edged = true;
+        self
     }
 
     pub fn size(mut self, size: Pixels) -> Self {
@@ -1083,9 +1096,11 @@ impl RenderOnce for Artwork {
             overlay,
             fit,
             sample,
+            edged,
             interactivity,
         } = self;
         let theme = *cx.theme();
+        let ring = edged.then_some(theme.sidebar_border);
         let muted = theme.muted_foreground;
         let glyph = match accent {
             true => legible(theme.tint.unwrap_or(theme.primary), theme.background),
@@ -1103,9 +1118,8 @@ impl RenderOnce for Artwork {
             let fallback = fallback.clone();
             move || match overlay {
                 true => div().w(size).h(tall).into_any_element(),
-                false => {
-                    blank(size, tall, rounded, muted, glyph, fallback.clone()).into_any_element()
-                }
+                false => blank(size, tall, rounded, muted, glyph, fallback.clone(), None)
+                    .into_any_element(),
             }
         };
 
@@ -1175,13 +1189,23 @@ impl RenderOnce for Artwork {
                                 .object_fit(fit)
                                 .rounded(rounded)
                                 .with_fallback(placeholder),
-                        ),
+                        )
+                        .when_some(ring, |this, ring| {
+                            this.child(
+                                div()
+                                    .absolute()
+                                    .inset_0()
+                                    .rounded(rounded)
+                                    .border_1()
+                                    .border_color(ring),
+                            )
+                        }),
                     interactivity,
                 )
                 .into_any_element()
             }
             None => refined(
-                blank(size, tall, rounded, muted, glyph, fallback),
+                blank(size, tall, rounded, muted, glyph, fallback, ring),
                 interactivity,
             )
             .into_any_element(),
@@ -1197,6 +1221,8 @@ fn refined<T: Styled + InteractiveElement>(mut element: T, mut caller: Interacti
     element
 }
 
+/// The placeholder a missing cover shows: a quiet tile with the glyph of what the cover would
+/// be, a third of the tile across, so it reads as a sleeve still to come rather than an icon.
 fn blank(
     size: Pixels,
     tall: Pixels,
@@ -1204,19 +1230,21 @@ fn blank(
     muted: Hsla,
     glyph: Hsla,
     fallback: SharedString,
+    edge: Option<Hsla>,
 ) -> Div {
     div()
         .w(size)
         .h(tall)
         .rounded(rounded)
-        .bg(muted.opacity(0.12))
+        .bg(muted.opacity(PLACEHOLDER_FILL))
+        .when_some(edge, |this, edge| this.border_1().border_color(edge))
         .flex()
         .items_center()
         .justify_center()
         .child(
             svg()
                 .path(icons::path(fallback))
-                .size(size.min(tall) * 0.46)
+                .size(size.min(tall) * PLACEHOLDER_GLYPH)
                 .text_color(glyph),
         )
 }

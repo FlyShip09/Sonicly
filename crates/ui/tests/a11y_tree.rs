@@ -675,6 +675,49 @@ async fn spoken_heading_lists_among_headings(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+async fn page_title_heading_is_level_one(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |_, cx| {
+        let element = ui::spoken_heading("appearance", "Appearance", 1, cx).into_element();
+        snapshot("page-heading", &element)
+    });
+    let lines = rendered(&lines, "page-heading");
+    assert!(
+        lines.iter().any(|line| line.contains("role=Heading")),
+        "page title exposes no Role::Heading: {lines:?}"
+    );
+    assert!(
+        lines.iter().any(|line| line.contains("level=Some(1)")),
+        "page title is not a level one heading: {lines:?}"
+    );
+}
+
+#[gpui::test]
+async fn section_heading_is_text_until_spoken(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |_, cx| {
+        let element = ui::section_heading("Releases", cx).into_element();
+        snapshot("section-heading", &element)
+    });
+    let lines = rendered(&lines, "section-heading");
+    assert!(
+        lines.iter().any(|line| line.contains("NO NODE")),
+        "a bare section heading is plain text; spoken_heading gives it its node: {lines:?}"
+    );
+}
+
+#[gpui::test]
+async fn edged_artwork_adds_no_node(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |_, _| {
+        let element = ui::Artwork::new(None::<&str>).edged().into_element();
+        snapshot("edged-artwork", &element)
+    });
+    let lines = rendered(&lines, "edged-artwork");
+    assert!(
+        lines.iter().any(|line| line.contains("NO NODE")),
+        "a cover's hairline must not reach the accessibility tree: {lines:?}"
+    );
+}
+
+#[gpui::test]
 async fn spoken_eyebrow_reads_as_written(cx: &mut TestAppContext) {
     let lines = open_probe(cx, |_, cx| {
         let element = ui::spoken_eyebrow("pinned", "Pinned", cx).into_element();

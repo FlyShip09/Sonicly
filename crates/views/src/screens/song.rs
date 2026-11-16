@@ -143,6 +143,7 @@ impl SongView {
         let view = self.me.clone();
 
         PageHero::new("song-hero", track.name.clone())
+            .washed()
             .pin(pin)
             .cover(cover)
             .eyebrow(t!("song-eyebrow"))

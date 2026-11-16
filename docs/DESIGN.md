@@ -111,3 +111,78 @@ Newest last. One entry per decision: what was chosen, and why.
     minute (or until the next launch after a crash) in which rotated cookies
     are on disk unsealed. It is documented in `docs/PRIVACY.md`; closing it
     needs a load/save hook in `ytmusic`.
+17. **Sonicly's own look, after an audit of the port (M2).** The ported shell
+    read as its source: one flat near-black (or near-white) sheet, a rule under
+    the title bar and another beside the sidebar, 24 px bold shelf titles, Quick
+    picks boxed in a bordered card, and a fixed blue for selected rows and text
+    selection. The audit covered `crates/ui` (theme, metrics, glass, motion) and
+    captures of Home, Search, Library, an album, an artist, Settings, the quick
+    search and a context menu in both themes (`docs/screenshots/m2/before-*`).
+    - **Kept:** neutral, hue-free greys; colour only from covers (adaptive tint,
+      cover-coloured play buttons); Inter as the one face; the `Room` ladder and
+      metrics derived from the base size; the motion system (springs, the page
+      entrance, presses, reduced motion, no frames while idle); the frosted
+      player bar as the one glass layer over the page; the error states, which
+      already say what happened and offer one retry.
+    - **Changed, and why:** listed in 18-23.
+18. **Frame and page.** The title bar and the sidebar are one surface, the
+    frame (`Theme::sidebar`, a step off the page: `#161616` on dark, `#efefef`
+    on light), with no rule between them. The page is a single opaque surface
+    set into it, edged by one hairline (`sidebar_border`, now a 7-9% white or
+    black veil) along the sides it shares with the frame. Depth comes from value,
+    not borders. The adaptive tint leaves the frame alone, so a cover's colour
+    reaches the page and never the window's chrome. The untinted selection and
+    active row are neutral greys; blue was a fixed accent the brand rules out.
+19. **The frame sits on the platform's material.** With the Blur setting on
+    and an opaque window, the frame paints its colour thin (`ui::frame_fill`)
+    over the system material and the page paints over it, so it is never glass
+    on glass:
+    - Windows 11 (22H2, build 22621+): Mica (`WindowBackgroundAppearance::
+      MicaBackdrop`). Sonicly probes DWM for a system backdrop when the window
+      opens (`ui::WindowMaterial`) and sets `DWMWA_USE_IMMERSIVE_DARK_MODE` from
+      its own theme after every system change, since GPUI follows the system's.
+      Older Windows keeps the solid frame. An inactive window shows Mica's flat
+      fallback, which is also what the off-screen captures show.
+    - macOS: the window's blurred backdrop (GPUI's `NSVisualEffectView`) under a
+      thicker fill, since a raw blur can show any wallpaper. Not verified.
+    - Linux and FreeBSD: the compositor's blur when `WindowBlur` reports it,
+      solid otherwise. Not verified.
+    A sidebar laid over the page in a narrow window stays solid with its own
+    edge, since a thin fill there would show the page and not the material.
+20. **One type scale.** `ui::Text` is 11, 12, 13, 14, 16, 19, 24 and 32 px at
+    the default 14 (Display moved from 30 to 32), with steps that widen as they
+    climb so a page title, a section and a row never read as neighbours. Every
+    title is semibold; bold is gone from headings. Large steps set tighter
+    leading (`Text::leading`: 1.1 for Display, 1.15 for Title, 1.2 for Large).
+    `ui::heading` is a page title, `ui::section_heading` a section, and
+    `spoken_heading` picks between them by its level. Shelves, Quick picks,
+    library groups and an artist's Popular and Releases moved from 24 px bold to
+    19 px semibold, so the artwork leads. The space between page sections is a
+    metric (`Metrics::section`). Inter stays: it is OFL and already bundled.
+    Inter Display would suit the 24 and 32 px titles, but adding it means
+    downloading a file, which waits on the owner.
+21. **Artwork is the hero.** Covers in cards, rows, tables and page heroes wear
+    a hairline (`Artwork::edged`) so a white sleeve keeps its edge on a light
+    page and a black one on a dark page. The placeholder is a quiet tile with
+    the kind's glyph at a third of its width. Hover shows the play button and
+    nothing grows. Quick picks lost its bordered box and stands like a shelf,
+    its rows reaching into the margin so their covers line up with the heading;
+    shelf arrows are ghost buttons. Album, playlist and song pages wash the top
+    of the page with the cover's own hue (`Theme::header_wash`: dim on dark,
+    pale on light, so the theme's text keeps its contrast), fading to nothing
+    at the hero's foot. A cover with no hue leaves the page neutral.
+22. **Motion with a cause.** The page entrance stays as it was. The header wash
+    fades in over the slow span when its colour arrives, keyed by its cover.
+    Home's shelves surface one after another (`ui::Cascade`) when the feed
+    replaces its skeletons; a shelf already shown never plays again, scrolled
+    back or revisited. With motion reduced both appear at once, and loading
+    skeletons hold still instead of pulsing.
+23. **The sidebar from the keyboard.** Ctrl+1 to Ctrl+5 (Cmd on macOS) open
+    Home, Songs, Albums, Artists and Playlists, and Ctrl+Alt+S (Ctrl+Cmd+S on
+    macOS) shows or hides the sidebar. All six are rebindable under Settings,
+    Keybinds. Buttons are not Tab stops anywhere in the app yet, the sidebar
+    included.
+24. **Empty and error copy.** States keep one action each and say what to do:
+    an unset local library reads "Add a folder of music to start your library"
+    over Choose folder, and a page that failed reads "This page didn't load"
+    over the reason and Try again.

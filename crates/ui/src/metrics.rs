@@ -65,6 +65,8 @@ pub struct Metrics {
     pub title_bar: Pixels,
     pub player_bar: Pixels,
     pub list_row: Pixels,
+    /// The room between one section of a page and the next, such as two shelves on Home.
+    pub section: Pixels,
     pub thumb: Pixels,
     pub cover: Pixels,
     /// The widest a page grows, its side insets included. A wider content area centres the
@@ -95,6 +97,7 @@ impl Metrics {
             title_bar: roomy(36., 2.4),
             player_bar: roomy(76., 5.),
             list_row: roomy(52., 3.2),
+            section: roomy(32., 2.3),
             thumb: px(34.),
             cover: px(140.),
             page: px(1280.),
@@ -102,16 +105,26 @@ impl Metrics {
     }
 }
 
+/// Sonicly's type scale, as steps of the listener's base size: 11, 12, 13, 14, 16, 19, 24 and
+/// 32 at the default 14. The steps widen as they climb, so a page title, a section and a row
+/// never read as near neighbours, and the artwork between them leads.
 #[derive(Clone, Copy)]
 pub enum Text {
+    /// Badges and the smallest counts.
     Tiny,
+    /// Meta lines under a title, eyebrows and captions.
     Small,
+    /// Secondary labels beside controls.
     Label,
+    /// Reading text and row titles.
     Body,
     /// A dialog's title.
     Heading,
+    /// A section of a page, such as a shelf on Home or a group in Settings.
     Large,
+    /// A page's own title.
     Title,
+    /// The name an album, playlist, artist or genre page is about.
     Display,
 }
 
@@ -125,7 +138,18 @@ impl Text {
             Self::Heading => 1.15,
             Self::Large => 1.38,
             Self::Title => 1.69,
-            Self::Display => 2.15,
+            Self::Display => 2.29,
+        }
+    }
+
+    /// The line height this step sets, as a share of its size. Large type sits tighter, since
+    /// the room a body line needs reads as a gap between the lines of a title.
+    pub fn leading(self) -> f32 {
+        match self {
+            Self::Display => 1.1,
+            Self::Title => 1.15,
+            Self::Large => 1.2,
+            _ => LEADING,
         }
     }
 }

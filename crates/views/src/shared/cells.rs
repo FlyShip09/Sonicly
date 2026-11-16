@@ -67,6 +67,7 @@ impl RenderOnce for Thumb {
         let theme = cx.theme();
 
         Artwork::new(self.url)
+            .edged()
             .id(("artwork", self.row))
             .size(theme.metrics.thumb)
     }

@@ -434,6 +434,7 @@ impl RenderOnce for Card {
                 .into_any_element(),
             false if circle => Avatar::new(cover).size(art).into_any_element(),
             false => Artwork::new(cover)
+                .edged()
                 .size(art)
                 .when_some(art_radius, Artwork::corner_radius)
                 .when_some(fallback, Artwork::fallback)

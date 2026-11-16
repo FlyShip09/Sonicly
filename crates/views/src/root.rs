@@ -2,11 +2,12 @@ use gpui::{AnyView, Context, Entity, MouseButton, NavigationDirection, Render, T
 use gpui::{App, Font, FontFallbacks, SharedString, StyleRefinement, font, prelude::*};
 use gpui::{Window, deferred, div};
 use input::{
-    CloseWindow, DownloadFromLink, MinimizeWindow, NavigateBack, NavigateForward, OpenFilter,
-    OpenSearch, OpenSettings, Refresh, ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar,
-    ToggleQueue, ToggleWindowFullscreen, ZoomWindow,
+    CloseWindow, DownloadFromLink, MinimizeWindow, NavigateBack, NavigateForward, OpenAlbums,
+    OpenArtists, OpenFilter, OpenHome, OpenPlaylists, OpenSearch, OpenSettings, OpenSongs, Refresh,
+    ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar, ToggleQueue, ToggleSidebar,
+    ToggleWindowFullscreen, ZoomWindow,
 };
-use router::{Destination, NavigationEvent, back, forward, navigate};
+use router::{Destination, LibraryTab, NavigationEvent, back, forward, navigate};
 use state::{
     ArtistDetail, Detail, GenreDetails, Genres, HistoryState, Home, Io, Library, LibraryState,
     Network, Playback, Profile, Queue, Reconnected, SYSTEM_FONT, Scan, Search, Session,
@@ -197,6 +198,9 @@ pub struct Root {
     font: Option<(String, Font)>,
     #[cfg(target_os = "windows")]
     rounded: Option<ui::Rounding>,
+    /// Whether DWM was last told the frame is dark, so the Mica under it matches the theme.
+    #[cfg(target_os = "windows")]
+    dark_frame: Option<bool>,
     /// The corners and traffic-light position last handed to AppKit.
     #[cfg(target_os = "macos")]
     framed: Option<(ui::Rounding, gpui::Point<gpui::Pixels>)>,
@@ -343,6 +347,15 @@ impl Root {
         })
         .detach();
 
+        // GPUI hands DWM the system's polarity on every system change, after this runs, so the
+        // next frame hands it Sonicly's again.
+        #[cfg(target_os = "windows")]
+        cx.observe_window_appearance(window, |this, _, cx| {
+            this.dark_frame = None;
+            cx.notify();
+        })
+        .detach();
+
         cx.observe_window_activation(window, |_, window, cx| update_focus_for_wake(window, cx))
             .detach();
         update_focus_for_wake(window, cx);
@@ -428,6 +441,8 @@ impl Root {
             font: None,
             #[cfg(target_os = "windows")]
             rounded: None,
+            #[cfg(target_os = "windows")]
+            dark_frame: None,
             #[cfg(target_os = "macos")]
             framed: None,
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
@@ -1077,6 +1092,22 @@ impl Root {
     }
 }
 
+#[cfg(debug_assertions)]
+impl Root {
+    /// Debug builds only, for capture runs: opens the quick search for `powerbar`, and leaves
+    /// anything else to Home, which opens the first album, artist or playlist it lists or a
+    /// context menu once its feed lands.
+    pub fn stage(&mut self, what: &str, window: &mut Window, cx: &mut Context<Self>) {
+        match what {
+            "powerbar" => window.defer(cx, Powerbar::toggle),
+            _ => self
+                .screens
+                .home
+                .update(cx, |home, cx| home.stage(what, cx)),
+        }
+    }
+}
+
 const UI_FONT: &str = "Inter";
 
 const SCRIPTS: [&str; 18] = [
@@ -1176,7 +1207,7 @@ impl Render for Root {
 
         let theme = *cx.theme();
         window.set_rem_size(theme.font_size);
-        let appearance = ui::backdrop(theme.blur_window, theme.transparent);
+        let appearance = ui::backdrop(theme.blur_window, theme.transparent, ui::material(cx));
         if self.background != Some(appearance) {
             self.background = Some(appearance);
             window.set_background_appearance(appearance);
@@ -1185,6 +1216,15 @@ impl Render for Root {
         // Windows can only round a window's corners while it's opaque (DWM never rounds a
         // per-pixel-alpha window), so this only takes effect once `backdrop` above lands on
         // `Opaque`; Linux/FreeBSD round their own chrome directly instead, below.
+        #[cfg(target_os = "windows")]
+        {
+            let dark = theme.background.l < 0.5;
+            if self.dark_frame != Some(dark) {
+                self.dark_frame = Some(dark);
+                state::apply_window_polarity(window, dark, cx);
+            }
+        }
+
         #[cfg(target_os = "windows")]
         {
             let rounding = match window.is_fullscreen() {
@@ -1255,6 +1295,7 @@ impl Render for Root {
         // the page colour under it would only stack a second alpha beneath that and leave a
         // see-through fullscreen reading nearly solid.
         let ambient = matches!(self.view, RootView::Fullscreen) && ambient::shown(cx);
+        let framed = matches!(self.view, RootView::Workspace) && !show_sign_in && ui::material(cx);
 
         // The shell enters the way a page enters the workspace. An opaque window fades it
         // under a scrim of the page colour, which leaves the workspace's cached views alone,
@@ -1376,7 +1417,9 @@ impl Render for Root {
             .when_some(radius, |this, radius| {
                 this.rounded(radius).overflow_hidden()
             })
-            .when(!ambient, |this| this.bg(theme.background))
+            // On the platform's material the workspace paints its own page and frame, and the
+            // window behind them stays clear for the material to show through.
+            .when(!ambient && !framed, |this| this.bg(theme.background))
             .text_color(theme.foreground)
             .capture_any_mouse_down(|_, window, cx| {
                 if ui::cancel_middle_scroll(cx) {
@@ -1421,6 +1464,22 @@ impl Render for Root {
             .on_action(|_: &DownloadFromLink, window, cx| {
                 LinkDownloadDialog::open(None, window, cx)
             })
+            .on_action(|_: &OpenHome, _, cx| navigate(Destination::Home, cx))
+            .on_action(|_: &OpenSongs, _, cx| navigate(Destination::Library(LibraryTab::Songs), cx))
+            .on_action(|_: &OpenAlbums, _, cx| {
+                navigate(Destination::Library(LibraryTab::Albums), cx)
+            })
+            .on_action(|_: &OpenArtists, _, cx| {
+                navigate(Destination::Library(LibraryTab::Artists), cx)
+            })
+            .on_action(|_: &OpenPlaylists, _, cx| {
+                navigate(Destination::Library(LibraryTab::Playlists), cx)
+            })
+            .on_action(cx.listener(|this, _: &ToggleSidebar, _, cx| {
+                this.shells
+                    .workspace
+                    .update(cx, |workspace, cx| workspace.toggle_sidebar(cx))
+            }))
             .on_action(cx.listener(|this, _: &Refresh, _, cx| this.refresh(cx)))
             .on_action(cx.listener(|this, _: &ToggleFullscreen, _, cx| this.toggle_fullscreen(cx)))
             .on_action(|_: &CloseWindow, window, _| window.remove_window())

@@ -64,7 +64,7 @@ library-scanning = Looking through your folders…
 library-scanning-found = Looking through your folders… { $found } so far
 library-scanning-progress = Reading your music… { $read } of { $found }
 library-part-not-loaded = This part of your library did not load
-library-local-unconfigured = Configure your local library
+library-local-unconfigured = Add a folder of music to start your library
 
 # download from a link, through the listener's own yt-dlp
 link-download-title = Download from a link
@@ -714,12 +714,18 @@ keybind-toggle-repeat = Repeat
 keybind-navigate-back = Go back
 keybind-navigate-forward = Go forward
 keybind-open-search = Search
+keybind-open-home = Go to Home
+keybind-open-songs = Go to Songs
+keybind-open-albums = Go to Albums
+keybind-open-artists = Go to Artists
+keybind-open-playlists = Go to Playlists
 keybind-toggle-powerbar = Quick search
 keybind-open-filter = Filter the page
 keybind-open-settings = Open settings
 keybind-refresh = Refresh
 keybind-download-from-link = Download from a link
 keybind-toggle-fullscreen = Now playing
+keybind-toggle-sidebar = Show or hide the sidebar
 keybind-toggle-queue = Show the queue
 keybind-toggle-lyrics = Show lyrics
 keybind-toggle-window-fullscreen = Full screen window
@@ -1502,7 +1508,7 @@ nav-return-top = Back to top
 # trouble
 trouble-offline = No connection
 trouble-offline-detail = Check your internet connection and try again.
-trouble-not-loaded = Could not load
+trouble-not-loaded = This page didn't load
 trouble-retry = Try again
 trouble-busy = Service is busy
 trouble-busy-detail = Too many requests went out at once. Wait a minute and try again.
