@@ -5,6 +5,7 @@ mod actions;
 mod app_icon;
 mod assets;
 mod console;
+mod debug;
 mod dock;
 #[cfg(target_os = "macos")]
 mod gestures;
@@ -56,6 +57,7 @@ fn main() -> ExitCode {
     let args = std::env::args_os()
         .filter(|arg| !arg.to_string_lossy().starts_with("-psn_"))
         .collect();
+    let (args, debug) = debug::take(args);
     let command = cli::parse(args, state::version());
     if !matches!(command, Ok(CommandType::Launch(_))) {
         console::attach();
@@ -190,6 +192,7 @@ fn main() -> ExitCode {
         memory::watch(cx);
 
         open_window(cx);
+        debug.apply(cx);
         let session = Sonicly::global(cx).session.clone();
         session.update(cx, |session, cx| session.restore(cx));
 
