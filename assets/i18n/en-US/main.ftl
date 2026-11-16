@@ -66,6 +66,34 @@ library-scanning-progress = Reading your music… { $read } of { $found }
 library-part-not-loaded = This part of your library did not load
 library-local-unconfigured = Configure your local library
 
+# download from a link, through the listener's own yt-dlp
+link-download-title = Download from a link
+link-download-detail = Sonicly runs your own yt-dlp and keeps the audio as the site serves it, in one of your music folders.
+link-download-hint = https://…
+link-download-link = Link
+link-download-invalid = That is not a web link. Paste one that starts with http:// or https://.
+link-download-folder = Save to
+link-download-playlist = Download the whole playlist the link belongs to
+link-download-starting = Asking the site…
+link-download-percent = { $percent }%
+link-download-speed-mb = { $speed } MB/s
+link-download-speed-kb = { $speed } KB/s
+link-download-left = { $time } left
+link-download-start = Start
+link-download-stop = Stop download
+link-download-hide = Hide
+link-download-open-settings = Open storage settings
+link-download-no-folder = A download goes into one of your music folders, and none is set up yet. Choose one first.
+link-download-folder-gone = That music folder is not there. Check that its drive is connected, or pick another folder.
+link-download-missing-windows = yt-dlp was not found. Install it by running “winget install yt-dlp” in a terminal, or get yt-dlp.exe from github.com/yt-dlp/yt-dlp/releases and choose it under Settings, Storage. Sonicly never downloads or updates it for you.
+link-download-missing = yt-dlp was not found. Install it with your package manager, or get it from github.com/yt-dlp/yt-dlp/releases and choose it under Settings, Storage. Sonicly never downloads or updates it for you.
+link-download-unsupported = yt-dlp does not know this site. Check the link, or update yt-dlp if the site is one it supports.
+link-download-protected = This media is DRM-protected. yt-dlp does not download protected media, and neither does Sonicly.
+link-download-no-audio = The site has no separate audio for this link, only video with sound. Sonicly keeps audio as the site serves it and does not convert.
+link-download-network = The site could not be reached. Check your connection and try again.
+link-download-unavailable = The site says this is not available. It may be private, removed, limited to signed-in accounts or blocked in your country.
+link-download-failed = yt-dlp could not download this. Updating yt-dlp often helps, since sites change.
+
 # app menu
 app-refresh = Refresh
 downloads-active = Downloading
@@ -520,6 +548,7 @@ powerbar-title = Quick search
 powerbar-placeholder = What do you want to listen to?
 powerbar-open = Open
 powerbar-song = Go to song
+powerbar-download-link = Download from this link
 
 # search page
 search-placeholder = What do you want to listen to?
@@ -689,6 +718,7 @@ keybind-toggle-powerbar = Quick search
 keybind-open-filter = Filter the page
 keybind-open-settings = Open settings
 keybind-refresh = Refresh
+keybind-download-from-link = Download from a link
 keybind-toggle-fullscreen = Now playing
 keybind-toggle-queue = Show the queue
 keybind-toggle-lyrics = Show lyrics
@@ -706,6 +736,7 @@ settings-group-lyrics-order = Priority
 settings-group-playing = Playing
 settings-group-cache = Played tracks
 settings-group-downloads = Downloads
+settings-group-link-downloads = Downloads from links
 settings-group-output = Output
 settings-group-status = Status
 settings-group-startup = Startup
@@ -884,6 +915,11 @@ settings-offline-mode-detail = Show and play only what you downloaded
 settings-downloads-open = Open downloads
 settings-downloads-open-detail = Show the folder your downloads are saved in as audio files any player opens
 settings-downloads-remove = Remove all
+settings-ytdlp = yt-dlp
+settings-ytdlp-detail = The program that downloads from a link. Sonicly runs the one you installed and never fetches it for you
+settings-ytdlp-found = Using { $path }
+settings-ytdlp-choose = Choose program…
+settings-ytdlp-reset = Use the one on PATH
 settings-size-gb = { $size } GB
 settings-size-mb = { $size } MB
 settings-size-measuring = Measuring…
@@ -1276,6 +1312,12 @@ toast-playlist-imported-partly = Imported { $name }, leaving out { $count ->
     } not in your library
 toast-playlist-import-empty = None of the songs in { $name } are in your library
 toast-playlist-exported = Playlist exported
+toast-link-downloaded = { $count ->
+        [0] Downloaded { $name }
+        [one] Downloaded { $name } and one more
+       *[other] Downloaded { $name } and { $count } more
+    }
+toast-link-downloaded-untagged = A file in a format Sonicly cannot tag keeps the name the site gave it
 toast-file-dialog-failed = Could not open the file dialog
 toast-queued-track = { $name } added to the queue
 toast-next-track = { $name } plays next

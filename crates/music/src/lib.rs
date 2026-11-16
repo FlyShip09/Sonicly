@@ -39,6 +39,7 @@ mod trim;
 pub mod trouble;
 pub mod vault;
 pub mod youtube;
+pub mod ytdlp;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};

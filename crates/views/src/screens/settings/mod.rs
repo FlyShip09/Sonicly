@@ -108,6 +108,8 @@ enum Slot {
     DownloadsUsage,
     OfflineMode,
     OpenDownloads,
+    /// The yt-dlp program that downloads from a link.
+    YtDlp,
     Sleep,
     StayAwake,
     StreamQuality,
@@ -336,6 +338,9 @@ impl SettingsView {
             .detach();
         cx.observe(&scrobbling, |this, _, cx| this.remeasure(cx))
             .detach();
+        let link_download = Sonicly::global(cx).link_download.clone();
+        cx.observe(&link_download, |this, _, cx| this.remeasure(cx))
+            .detach();
         cx.observe(&settings, |this, _, cx| {
             this.show_filter_shortcut(cx);
             this.remeasure(cx);
@@ -534,7 +539,12 @@ impl SettingsView {
     /// closing stops what they keep running.
     pub(crate) fn set_open(&mut self, open: bool, cx: &mut Context<Self>) {
         match open {
-            true => self.previews.opened(),
+            true => {
+                self.previews.opened();
+                // yt-dlp may have been installed since settings were last open.
+                let link_download = Sonicly::global(cx).link_download.clone();
+                link_download.update(cx, |downloads, cx| downloads.look(cx));
+            }
             false => {
                 self.previews.closed();
                 self.stop_recording(cx);
@@ -880,6 +890,7 @@ impl SettingsView {
                 t!("settings-downloads-open"),
                 t!("settings-downloads-open-detail"),
             ),
+            Slot::YtDlp => (t!("settings-ytdlp"), t!("settings-ytdlp-detail")),
             Slot::StreamQuality => (
                 t!("settings-stream-quality"),
                 t!("settings-stream-quality-detail"),
@@ -1080,6 +1091,7 @@ impl SettingsView {
             Slot::DownloadsUsage => self.downloads_usage_row(cx),
             Slot::OfflineMode => self.offline_mode_row(cx),
             Slot::OpenDownloads => self.open_downloads_row(cx),
+            Slot::YtDlp => self.ytdlp_row(cx),
             Slot::StreamQuality => self.stream_quality_row(cx),
             Slot::StreamFormat => self.stream_format_row(cx),
             Slot::StreamBitrate => self.stream_bitrate_row(cx),

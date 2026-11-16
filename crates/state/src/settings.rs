@@ -434,6 +434,10 @@ struct Values {
     sessions_button: bool,
     /// The WebSocket address of the Sonicly Sessions server to use.
     sessions_server: String,
+    /// The yt-dlp program that downloads from a link, when it is not the one on `PATH`. Sonicly
+    /// only ever runs the file named here and never fetches one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ytdlp_path: Option<PathBuf>,
     discord_presence: bool,
     discord_name: DiscordName,
     discord_show_paused: bool,
@@ -682,6 +686,7 @@ impl Default for Values {
             spotify_connect_custom_name: String::new(),
             sessions_button: true,
             sessions_server: String::new(),
+            ytdlp_path: None,
             discord_presence: false,
             discord_name: DiscordName::Sonicly,
             discord_show_paused: false,
@@ -1099,6 +1104,11 @@ impl AppSettings {
     /// The address of the server to use, as typed.
     pub fn sessions_server(&self) -> &str {
         &self.values.sessions_server
+    }
+
+    /// The yt-dlp program the listener chose, or `None` to use the one on `PATH`.
+    pub fn ytdlp_path(&self) -> Option<&Path> {
+        self.values.ytdlp_path.as_deref()
     }
 
     /// Whether the playing track is published to a local Discord client.
@@ -1738,6 +1748,11 @@ impl AppSettings {
             return;
         }
         self.values.sessions_server = server;
+        self.schedule_save(cx);
+    }
+
+    pub fn set_ytdlp_path(&mut self, path: Option<PathBuf>, cx: &mut Context<Self>) {
+        self.values.ytdlp_path = path;
         self.schedule_save(cx);
     }
 

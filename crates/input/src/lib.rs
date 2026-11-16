@@ -35,6 +35,7 @@ actions!(
         OpenFilter,
         OpenSearch,
         OpenSettings,
+        DownloadFromLink,
         ToggleFullscreen,
         ToggleQueue,
         ToggleLyrics,

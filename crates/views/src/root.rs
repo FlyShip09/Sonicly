@@ -2,8 +2,8 @@ use gpui::{AnyView, Context, Entity, MouseButton, NavigationDirection, Render, T
 use gpui::{App, Font, FontFallbacks, SharedString, StyleRefinement, font, prelude::*};
 use gpui::{Window, deferred, div};
 use input::{
-    CloseWindow, MinimizeWindow, NavigateBack, NavigateForward, OpenFilter, OpenSearch,
-    OpenSettings, Refresh, ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar,
+    CloseWindow, DownloadFromLink, MinimizeWindow, NavigateBack, NavigateForward, OpenFilter,
+    OpenSearch, OpenSettings, Refresh, ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar,
     ToggleQueue, ToggleWindowFullscreen, ZoomWindow,
 };
 use router::{Destination, NavigationEvent, back, forward, navigate};
@@ -27,6 +27,7 @@ use crate::screens::search::SearchView;
 use crate::screens::settings::SettingsHeader;
 use crate::shared::ambient::{self, Ambient};
 use crate::shared::confirm::Confirm;
+use crate::shared::link_download::LinkDownloadDialog;
 use crate::shared::playlist_editor::PlaylistEditor;
 use crate::shared::powerbar::{Powerbar, PowerbarEvent};
 use crate::shared::smart_playlist::SmartPlaylistEditor;
@@ -88,6 +89,7 @@ struct Dialogs {
     playlist_editor: Entity<PlaylistEditor>,
     smart_playlist_editor: Entity<SmartPlaylistEditor>,
     tag_editor: Entity<TagEditor>,
+    link_download: Entity<LinkDownloadDialog>,
     confirm: Entity<Confirm>,
     jam_join: Entity<JamJoin>,
     jam_code: Entity<JamCode>,
@@ -101,6 +103,7 @@ impl Dialogs {
             playlist_editor: PlaylistEditor::entity(cx),
             smart_playlist_editor: SmartPlaylistEditor::entity(cx),
             tag_editor: TagEditor::entity(cx),
+            link_download: LinkDownloadDialog::entity(cx),
             confirm: Confirm::entity(cx),
             jam_join: cx.new(JamJoin::new),
             jam_code: cx.new(JamCode::new),
@@ -109,11 +112,12 @@ impl Dialogs {
         }
     }
 
-    fn views(&self) -> [AnyView; 8] {
+    fn views(&self) -> [AnyView; 9] {
         [
             self.playlist_editor.clone().into(),
             self.smart_playlist_editor.clone().into(),
             self.tag_editor.clone().into(),
+            self.link_download.clone().into(),
             self.confirm.clone().into(),
             self.jam_join.clone().into(),
             self.jam_code.clone().into(),
@@ -1414,6 +1418,9 @@ impl Render for Root {
             .on_action(cx.listener(|this, _: &OpenFilter, window, cx| this.open_filter(window, cx)))
             .on_action(cx.listener(|this, _: &OpenSearch, _, cx| this.open_search(cx)))
             .on_action(cx.listener(|this, _: &OpenSettings, _, cx| this.open_settings(cx)))
+            .on_action(|_: &DownloadFromLink, window, cx| {
+                LinkDownloadDialog::open(None, window, cx)
+            })
             .on_action(cx.listener(|this, _: &Refresh, _, cx| this.refresh(cx)))
             .on_action(cx.listener(|this, _: &ToggleFullscreen, _, cx| this.toggle_fullscreen(cx)))
             .on_action(|_: &CloseWindow, window, _| window.remove_window())

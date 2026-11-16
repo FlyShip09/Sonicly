@@ -12,6 +12,7 @@ mod genre;
 mod history;
 mod home;
 mod library;
+mod link_download;
 mod links;
 mod listening;
 mod logging;
@@ -60,6 +61,7 @@ pub use library::{
     Addition, CoverEdit, Leaving, Library, LibraryEvent, LibraryPart, LibraryState, Problem, Ready,
     Shelf, cover_problem,
 };
+pub use link_download::{LinkDownload, LinkState};
 pub use links::{Links, Opened};
 pub use listening::{CODE_LENGTH as SESSION_CODE_LENGTH, Listening, Member as RoomMember, Room};
 pub use logging::log_file;
@@ -227,6 +229,8 @@ pub struct Sonicly {
     pub downloads: Entity<Downloads>,
     pub equalizer: Entity<Equalizer>,
     pub library: Entity<Library>,
+    /// The download from a link through the listener's own yt-dlp.
+    pub link_download: Entity<LinkDownload>,
     pub links: Entity<Links>,
     pub listening: Entity<Listening>,
     pub history: Entity<History>,
@@ -402,6 +406,8 @@ pub fn init(
         )
     });
     let links = cx.new(|cx| Links::new(session.clone(), devices.clone(), settings.clone(), cx));
+    let link_download =
+        cx.new(|cx| LinkDownload::new(settings.clone(), session.clone(), io.clone(), cx));
     let control = cx.new(|cx| Control::new(session.clone(), playback.clone(), library.clone(), cx));
     discord::attach(
         playback.clone(),
@@ -422,6 +428,7 @@ pub fn init(
         downloads,
         equalizer,
         library,
+        link_download,
         links,
         listening,
         history,

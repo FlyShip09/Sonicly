@@ -9,6 +9,7 @@ use std::time::Duration;
 use crate::chrome::tools::{self, Sliders};
 use crate::chrome::{Chrome, Searchable, Toolbar, Tooled};
 use crate::shared::confirm::{Confirm, Kind};
+use crate::shared::link_download::LinkDownloadDialog;
 use crate::shared::menus::{ItemMenu, liked_menu, new_playlist_menu};
 use crate::shared::playlist_editor::{Edit, PlaylistEditor};
 
@@ -1426,7 +1427,19 @@ impl Tooled for LibraryView {
                 .into_any_element()
         });
 
+        // Local Music is where a download from a link ends up, so its pages offer one.
+        let download = self.lead(cx).local().then(|| {
+            Button::new("download-from-link")
+                .icon("icons/link.svg")
+                .tooltip("link-download-title")
+                .small()
+                .ghost()
+                .on_click(|_, window, cx| LinkDownloadDialog::open(None, window, cx))
+                .into_any_element()
+        });
+
         let mut tools = Vec::new();
+        tools.extend(download);
         tools.extend(create);
         let switchable = !self.section.listing();
         tools.extend(switchable.then(|| {
