@@ -39,7 +39,7 @@ Source: "{#SourceExe}"; DestDir: "{app}"; DestName: "{#AppExeName}"; Flags: igno
 #if BuildMetadata != ""
 Source: "{#BuildMetadata}"; DestDir: "{app}"; DestName: "sonicly-build.json"; Flags: ignoreversion
 #endif
-Source: "..\..\COPYING"; DestDir: "{app}"; DestName: "LICENSE"; Flags: ignoreversion
+Source: "..\..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\THIRD-PARTY.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [InstallDelete]

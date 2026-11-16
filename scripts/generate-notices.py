@@ -15,7 +15,7 @@ COPYRIGHT = re.compile(r"^\s*(?:#\s*)?Copyright\b.*$", re.MULTILINE)
 PREAMBLE = """# Third-party licenses
 
 Sonicly is licensed under the GNU General Public License v3.0 or later; the full
-text is in `COPYING`. The complete corresponding source is the tagged commit of
+text is in `LICENSE`. The complete corresponding source is the tagged commit of
 <https://github.com/FlyShip09/Sonicly> together with the dependency revisions
 pinned in `Cargo.lock`.
 

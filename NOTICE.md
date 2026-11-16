@@ -1,7 +1,7 @@
 # Notice
 
 Sonicly is free software under the GNU General Public License, version 3 or
-later (see `COPYING`).
+later (see `LICENSE`).
 
 Sonicly is built on [Sonora](https://github.com/sonorahq/sonora), copyright its
 contributors and licensed GPL-3.0-or-later. The crates in `crates/` were ported
