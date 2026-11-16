@@ -451,7 +451,8 @@ impl Search {
                 Hit::Artist(_) => None,
                 Hit::Song(_) | Hit::Album(_) | Hit::Playlist(_) => None,
             })
-            .filter(|id| !self.portraits.contains_key(id))
+            // an artist of the local files is nobody the streaming provider has a picture of
+            .filter(|id| !music::is_local_id(id) && !self.portraits.contains_key(id))
             .collect();
 
         if wanted.is_empty() {
@@ -491,11 +492,14 @@ impl Search {
 
         self.hits = {
             let held = self.library.read(cx);
-            let state = held.state(Shelf::Streaming);
-            rank(
-                state.tracks(),
-                state.albums(),
-                state.playlists(),
+            let (streaming, local) = (held.state(Shelf::Streaming), held.state(Shelf::Local));
+            rank_shelves(
+                (
+                    streaming.tracks(),
+                    streaming.albums(),
+                    streaming.playlists(),
+                ),
+                (local.tracks(), local.albums(), local.playlists()),
                 &self.catalog,
                 &self.portraits,
                 query,
@@ -583,13 +587,58 @@ pub(crate) fn rank(
         return Vec::new();
     }
 
-    let mut all = songs(library, &catalog.tracks, &query);
-    all.extend(artists(library, catalog, albums, portraits, &query));
-    all.extend(albums_of(albums, library, catalog, &query));
-    all.extend(playlists_of(playlists, &catalog.playlists, &query));
+    let mut all = scored(library, albums, playlists, catalog, portraits, &query);
     order(&mut all);
 
     all.into_iter().map(|scored| scored.hit).collect()
+}
+
+/// A shelf's own songs, albums and playlists, as [`rank_shelves`] takes them.
+type Shelved<'a> = (&'a [Track], &'a [Album], &'a [Playlist]);
+
+/// The hits for `asked` over both shelves, best first: what [`rank`] finds in the streaming
+/// library and the provider's `catalog`, and what the listener's own files hold that fits. The
+/// local files are searched whether or not a streaming provider is signed in, so a library of
+/// files alone is still found by the search page and the quick search.
+pub(crate) fn rank_shelves(
+    streaming: Shelved,
+    local: Shelved,
+    catalog: &Catalog,
+    portraits: &HashMap<String, String>,
+    asked: &str,
+) -> Vec<Hit> {
+    let query = Query::new(asked);
+    if query.terms.is_empty() {
+        return Vec::new();
+    }
+
+    let (tracks, albums, playlists) = streaming;
+    let mut all = scored(tracks, albums, playlists, catalog, portraits, &query);
+    let (tracks, albums, playlists) = local;
+    let nothing = Catalog::default();
+    all.extend(scored(
+        tracks, albums, playlists, &nothing, portraits, &query,
+    ));
+    order(&mut all);
+
+    all.into_iter().map(|scored| scored.hit).collect()
+}
+
+/// Every hit for `query` in one library and one catalog with its score, at most `LIMIT` of
+/// each kind and in no order across kinds.
+fn scored(
+    library: &[Track],
+    albums: &[Album],
+    playlists: &[Playlist],
+    catalog: &Catalog,
+    portraits: &HashMap<String, String>,
+    query: &Query,
+) -> Vec<Scored> {
+    let mut all = songs(library, &catalog.tracks, query);
+    all.extend(artists(library, catalog, albums, portraits, query));
+    all.extend(albums_of(albums, library, catalog, query));
+    all.extend(playlists_of(playlists, &catalog.playlists, query));
+    all
 }
 
 /// The hits of `kind` for `asked` in the local library alone, best first and at most `take` of
@@ -1191,6 +1240,19 @@ mod tests {
         ];
         let hits = matching(&library, &[], &[], "night", Kind::Song, 1);
         assert_eq!(hits.len(), 1);
+    }
+
+    #[test]
+    fn the_local_files_are_found_with_no_provider_answering() {
+        let files = [track("Harbor Road", "Marlowe Finch", "Paper Lanterns")];
+        let hits = rank_shelves(
+            (&[], &[], &[]),
+            (&files, &[], &[]),
+            &Catalog::default(),
+            &HashMap::new(),
+            "harbor",
+        );
+        assert_eq!(titles(&hits), ["Harbor Road"]);
     }
 
     #[test]

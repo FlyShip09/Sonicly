@@ -333,8 +333,8 @@ impl Launch {
 /// Does one `--debug-at` step on the main window.
 fn perform(step: &str, window: gpui::WindowHandle<Root>, cx: &mut App) {
     use gpui::{
-        Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent,
-        MouseUpEvent, PlatformInput, ScrollDelta, ScrollWheelEvent, point,
+        Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+        PlatformInput, ScrollDelta, ScrollWheelEvent, point,
     };
 
     let (kind, value) = step.split_once(':').unwrap_or((step, ""));
