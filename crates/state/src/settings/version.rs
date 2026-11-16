@@ -190,6 +190,13 @@ mod tests {
     }
 
     #[test]
+    fn a_file_from_before_the_app_had_its_own_name_still_loads() {
+        let values = parse(br#"{ "discord_name": "sonora", "gapless": false }"#).unwrap();
+        assert_eq!(values.discord_name, crate::settings::DiscordName::Sonicly);
+        assert!(!values.gapless);
+    }
+
+    #[test]
     fn the_version_is_the_first_key_written() {
         let written = serde_json::to_string(&Values::default()).unwrap();
         assert!(written.starts_with(&format!("{{\"version\":{CURRENT},")));
