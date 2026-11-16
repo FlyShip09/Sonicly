@@ -11,7 +11,7 @@ running Sonicly.
 | Playback | OS media controls (SMTC, MPRIS, Now Playing) | Ported |
 | Sound | Parametric equalizer, presets, import/export | Ported |
 | Sound | Spectrum and analyzer | Ported |
-| Sources | Local files, tags, embedded art, `.lrc`/`.ttml` | Ported |
+| Sources | Local files, tags, embedded art, `.lrc`/`.ttml` | Ported; a folder dropped on the welcome screen scanned and listed, playback from it not yet heard |
 | Sources | Local playlists: M3U | Ported |
 | Sources | Local playlists: PLS, XSPF | Not in upstream; built, imported like M3U; not yet seen |
 | Sources | CUE sheets: one file shown and played as its tracks | Not in upstream; built; not yet seen or heard |
@@ -27,10 +27,10 @@ running Sonicly.
 | Offline | Download from a link via the user's yt-dlp | Not in upstream; built; never run against a real yt-dlp |
 | Accounts | Sign-ins sealed at rest on Windows | Spotify and YouTube now sealed too; YouTube's rotating cookies can be unsealed for up to a minute (`docs/PRIVACY.md`); not yet seen |
 | Integrations | Last.fm, ListenBrainz, Maloja scrobbling | Ported |
-| Integrations | Discord Rich Presence | Ported, disabled until Sonicly has an application id |
-| Integrations | Shared listening sessions | Ported; needs a user-supplied server |
-| App | Themes, theme files, adaptive tint | Ported |
-| App | Keyboard shortcuts, quick search, CLI control | Ported |
+| Integrations | Discord Rich Presence | Ported, disabled until Sonicly has an application id; its settings page says so in one row, seen |
+| Integrations | Shared listening sessions | Ported; needs a user-supplied server, which the settings row now explains on screen |
+| App | Themes, theme files, adaptive tint | Ported; theme previews redrawn as frame, page and player bar, seen |
+| App | Keyboard shortcuts, quick search, CLI control | Ported; Tab walks buttons, switches and option cards (built, not yet driven from a keyboard); quick search dims instead of blurring |
 | App | Tray, single instance, deep links (`sonicly://`) | Ported |
 | App | Auto-update | Disabled (no releases yet) |
 | App | Install counter | Removed |
@@ -39,3 +39,5 @@ running Sonicly.
 | UI | Floating mini player | Built; seen on Windows in captures, macOS and Linux not run |
 | UI | Drag files onto the window to import | Built; drag-over state and question seen through debug launch flags, a real system drag not yet tried |
 | UI | Drawn covers for Favorites, Local Music, Recents | Built; seen in captures |
+| UI | Welcome screen with three ways in (this computer, a service, no account) | Not in upstream; first run, the drop sheet over it and the landing in the library seen in captures; the folder picker not opened |
+| UI | Quiet coloured covers for albums, artists and songs without art | Not in upstream; built; seen in captures, real embedded art still wins |
