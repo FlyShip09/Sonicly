@@ -1,0 +1,81 @@
+use gpui::prelude::*;
+use gpui::{AnyElement, App, Context, div};
+use i18n::t;
+use state::Sonicly;
+use ui::{Button, Field, Form, Picker, Switch};
+
+use super::{Group, SettingsView, Slot};
+
+impl SettingsView {
+    /// The Sessions group: whether the player bar shows the Sessions button, and which server
+    /// Sonicly Sessions go through. Sonicly has no official server, so the address is required.
+    pub(super) fn sessions_groups(&self, _: &App) -> Vec<Group> {
+        vec![
+            Group::new(
+                "settings-group-sessions",
+                "icons/users-round-collaboration.svg",
+            )
+            .rows([Slot::SessionsButton, Slot::SessionsServer]),
+        ]
+    }
+
+    pub(super) fn sessions_button_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let on = self.settings.read(cx).sessions_button();
+        self.row(
+            t!("settings-sessions-button"),
+            Switch::new("sessions-button", on)
+                .name(t!("settings-sessions-button"))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.settings
+                        .update(cx, |settings, cx| settings.set_sessions_button(!on, cx));
+                }))
+                .into_any_element(),
+        )
+    }
+
+    /// The address of the listener's own server and the button that saves it. Saving checks the
+    /// server first and keeps it only once it answers, and a toast says how it went. The field is
+    /// compact and the button small, so the two stand the same height. On a narrow page the field
+    /// narrows and the label stays whole.
+    pub(super) fn sessions_server_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let saving = Sonicly::global(cx).listening.read(cx).saving();
+        let save = Button::new("sessions-server-save")
+            .flex_none()
+            .secondary()
+            .small()
+            .label(t!("settings-sessions-save"))
+            .disabled(saving)
+            .on_click(cx.listener(|this, _, _, cx| this.save_sessions_server(cx)));
+
+        self.yielding_row(
+            t!("settings-sessions-server"),
+            div()
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .justify_end()
+                .child(
+                    Form::new("settings-sessions-server-form")
+                        .flex_1()
+                        .min_w_0()
+                        .max_w(Picker::WIDE)
+                        .field(Field::new(&self.sessions_server, cx).end(save))
+                        .on_submit(cx.listener(move |this, _, _, cx| {
+                            if !saving {
+                                this.save_sessions_server(cx);
+                            }
+                        })),
+                )
+                .into_any_element(),
+        )
+    }
+
+    /// Checks that the server typed in the field answers and keeps it once it does.
+    fn save_sessions_server(&mut self, cx: &mut Context<Self>) {
+        let typed = self.sessions_server.read(cx).text().to_owned();
+        Sonicly::global(cx)
+            .listening
+            .clone()
+            .update(cx, |listening, cx| listening.save_server(&typed, cx));
+    }
+}

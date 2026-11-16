@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Sonicly
+GenericName=Music Player
+Comment=A native, familiar music streaming client
+Icon=sonicly
+Exec=sonicly %U
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+Keywords=music;spotify;audio;player;
+MimeType=x-scheme-handler/sonicly;x-scheme-handler/spotify;x-scheme-handler/tidal;audio/mpeg;audio/flac;audio/mp4;audio/aac;audio/ogg;audio/opus;audio/x-wav;audio/x-aiff;audio/webm;audio/x-matroska;audio/x-wavpack;audio/x-ape;
+StartupWMClass=sonicly
+StartupNotify=true
