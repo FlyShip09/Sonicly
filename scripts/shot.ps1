@@ -41,6 +41,8 @@ public static class SonShot {
 $env:SONICLY_SHOT = "1"
 # A separate profile: captures never read or change the user's own library, settings or logins.
 $env:SONICLY_PROFILE = $Profile
+# Time from starting the process to its main window existing, to the loop's 40 ms. Blank for -ProcId.
+$clock = [System.Diagnostics.Stopwatch]::StartNew(); $window = ""
 if ($Exe) {
   $p = if ($ExeArgs) { Start-Process -FilePath $Exe -ArgumentList $ExeArgs -PassThru } else { Start-Process -FilePath $Exe -PassThru }
 } else { $p = Get-Process -Id $ProcId }
@@ -62,6 +64,7 @@ while ((Get-Date) -lt $deadline) {
       [void][SonShot]::SetWindowPos($p.MainWindowHandle, [IntPtr]::Zero, -25000, 100, [int]$Matches[1], [int]$Matches[2], 0x14)
     }
     $moved = $true
+    if ($Exe) { $window = " window=$($clock.ElapsedMilliseconds)ms" }
   }
   Start-Sleep -Milliseconds 40
 }
@@ -86,6 +89,6 @@ $dc = $g.GetHdc()
 [void][SonShot]::PrintWindow($h, $dc, 2)
 $g.ReleaseHdc($dc); $g.Dispose()
 $bmp.Save((Join-Path (Get-Location) $Out), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
-$mem = "ws=$([math]::Round($p.WorkingSet64/1MB))MB private=$([math]::Round($p.PrivateMemorySize64/1MB))MB cpu=$([math]::Round($p.TotalProcessorTime.TotalSeconds,1))s"
+$mem = "ws=$([math]::Round($p.WorkingSet64/1MB))MB private=$([math]::Round($p.PrivateMemorySize64/1MB))MB cpu=$([math]::Round($p.TotalProcessorTime.TotalSeconds,1))s$window"
 Write-Output "OK $mem pid=$($p.Id) title='$($p.MainWindowTitle)' size=${w}x${ht} at=$($r.L),$($r.T) out=$Out"
 if (-not $Keep) { $p.Kill() }
