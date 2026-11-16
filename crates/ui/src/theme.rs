@@ -451,7 +451,8 @@ pub struct Theme {
     /// The fill under the sidebar entry of the page that is open. A white or black veil rather
     /// than a grey, so it reads the same over the solid frame and over the platform's material.
     pub sidebar_accent: Hsla,
-    /// The hairline where the page meets the frame, a veil for the same reason.
+    /// The hairline where the page meets the frame, a veil for the same reason. Covers wear it
+    /// too, so a sleeve as light or as dark as the page keeps its edge.
     pub sidebar_border: Hsla,
     pub title_bar_border: Hsla,
     pub table_head: Hsla,

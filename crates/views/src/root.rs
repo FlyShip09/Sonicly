@@ -2,11 +2,12 @@ use gpui::{AnyView, Context, Entity, MouseButton, NavigationDirection, Render, T
 use gpui::{App, Font, FontFallbacks, SharedString, StyleRefinement, font, prelude::*};
 use gpui::{Window, deferred, div};
 use input::{
-    CloseWindow, MinimizeWindow, NavigateBack, NavigateForward, OpenFilter, OpenSearch,
-    OpenSettings, Refresh, ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar,
-    ToggleQueue, ToggleWindowFullscreen, ZoomWindow,
+    CloseWindow, MinimizeWindow, NavigateBack, NavigateForward, OpenAlbums, OpenArtists,
+    OpenFilter, OpenHome, OpenPlaylists, OpenSearch, OpenSettings, OpenSongs, Refresh, ShowMembers,
+    ToggleFullscreen, ToggleLyrics, TogglePowerbar, ToggleQueue, ToggleSidebar,
+    ToggleWindowFullscreen, ZoomWindow,
 };
-use router::{Destination, NavigationEvent, back, forward, navigate};
+use router::{Destination, LibraryTab, NavigationEvent, back, forward, navigate};
 use state::{
     ArtistDetail, Detail, GenreDetails, Genres, HistoryState, Home, Io, Library, LibraryState,
     Network, Playback, Profile, Queue, Reconnected, SYSTEM_FONT, Scan, Search, Session,
@@ -1456,6 +1457,22 @@ impl Render for Root {
             .on_action(cx.listener(|this, _: &OpenFilter, window, cx| this.open_filter(window, cx)))
             .on_action(cx.listener(|this, _: &OpenSearch, _, cx| this.open_search(cx)))
             .on_action(cx.listener(|this, _: &OpenSettings, _, cx| this.open_settings(cx)))
+            .on_action(|_: &OpenHome, _, cx| navigate(Destination::Home, cx))
+            .on_action(|_: &OpenSongs, _, cx| navigate(Destination::Library(LibraryTab::Songs), cx))
+            .on_action(|_: &OpenAlbums, _, cx| {
+                navigate(Destination::Library(LibraryTab::Albums), cx)
+            })
+            .on_action(|_: &OpenArtists, _, cx| {
+                navigate(Destination::Library(LibraryTab::Artists), cx)
+            })
+            .on_action(|_: &OpenPlaylists, _, cx| {
+                navigate(Destination::Library(LibraryTab::Playlists), cx)
+            })
+            .on_action(cx.listener(|this, _: &ToggleSidebar, _, cx| {
+                this.shells
+                    .workspace
+                    .update(cx, |workspace, cx| workspace.toggle_sidebar(cx))
+            }))
             .on_action(cx.listener(|this, _: &Refresh, _, cx| this.refresh(cx)))
             .on_action(cx.listener(|this, _: &ToggleFullscreen, _, cx| this.toggle_fullscreen(cx)))
             .on_action(|_: &CloseWindow, window, _| window.remove_window())

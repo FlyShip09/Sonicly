@@ -570,6 +570,7 @@ impl RenderOnce for PageHero {
             .children(wash)
             .child({
                 let artwork = Artwork::new(self.cover)
+                    .edged()
                     .size(art)
                     .corner_radius(Self::cover_radius(&theme))
                     .when(self.circle, Artwork::circle)

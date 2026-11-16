@@ -9,8 +9,8 @@ use std::rc::Rc;
 use music::{GenreItem, GenreSection};
 use state::Playback;
 use ui::{
-    ActiveTheme as _, Button, Card, Deck, Glide, Hold, Mode, Skeleton, Text, section_heading,
-    snapped,
+    ActiveTheme as _, Button, Card, Cascade, Deck, Glide, Hold, Mode, Skeleton, Text,
+    section_heading, snapped,
 };
 
 use crate::shared::album_grid::CardGrid;
@@ -31,6 +31,9 @@ pub(crate) struct Shelves {
     host: EntityId,
     playback: Entity<Playback>,
     rails: Vec<(ScrollHandle, Glide)>,
+    /// The shelves surfacing one after another as a feed lands in place of its skeletons. A
+    /// shelf it has shown keeps its place, so coming back to the page or scrolling plays nothing.
+    cascade: Cascade,
 }
 
 impl Shelves {
@@ -40,6 +43,7 @@ impl Shelves {
             host,
             playback,
             rails: Vec::new(),
+            cascade: Cascade::default(),
         }
     }
 
@@ -108,6 +112,10 @@ impl Shelves {
             .iter()
             .map(|section| self.height(section, mode, width, window, cx))
             .collect();
+        // Every shelf is named here, not only the ones on screen, so a shelf scrolled back into
+        // view is one the cascade has already shown.
+        self.cascade
+            .show((0..sections.len()).map(|place| surfacing(&sections, place)));
         let me = cx.entity().downgrade();
 
         let stack = Deck::new(self.tag("stack", 0))
@@ -123,11 +131,14 @@ impl Shelves {
                 };
                 let holder = view.downgrade();
                 let shelves = view.read(cx);
-
-                match mode {
+                let level = shelves
+                    .cascade
+                    .level(&surfacing(&sections, place), window, cx);
+                let shelf = match mode {
                     Mode::Grid => shelves.rail(place, &sections, width, &holder, window, cx),
                     Mode::List => shelves.lane(place, section, width, window, cx),
-                }
+                };
+                Cascade::surface(shelf, level).w_full().into_any_element()
             });
 
         // Sections span the page so the deck's row clips do not cut off sideways cards.
@@ -429,6 +440,15 @@ fn spread(cards: Vec<AnyElement>, lanes: usize) -> Div {
                 .gap_2()
                 .children(column)
         }))
+}
+
+/// The key a shelf surfaces under: its place and its title, so a refreshed feed whose shelves
+/// changed surfaces the new ones.
+fn surfacing(sections: &[GenreSection], place: usize) -> SharedString {
+    let title = sections
+        .get(place)
+        .map_or("", |section| section.title.as_str());
+    SharedString::from(format!("{place}-{title}"))
 }
 
 fn head(window: &Window, cx: &App) -> Pixels {
