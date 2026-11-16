@@ -10,11 +10,11 @@ use std::time::Instant;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Bounds, Deferred, Element, ElementId, Global, GlobalElementId,
-    InspectorElementId, LayerFilter, LayoutId, Pixels, Position, SpanId, Style, Window, WindowId,
-    deferred, px,
+    InspectorElementId, LayerFilter, LayoutId, Pixels, Point, Position, SpanId, Style, Window,
+    WindowId, deferred, px,
 };
 
-use crate::motion::{ENTRANCE_BLUR, ENTRANCE_ZOOM, ease_out_expo, entrance_span};
+use crate::motion::{CENTRE, ENTRANCE_BLUR, POP_ZOOM, ease_out_expo, exit_span};
 
 /// How far past its bounds a leaving surface may paint, which is room for its drop shadow.
 const REACH: Pixels = px(32.);
@@ -24,8 +24,9 @@ const REACH: Pixels = px(32.);
 enum Leave {
     /// It fades where it stands, for a scrim that fills the window.
     Fade,
-    /// It fades, shrinks and blurs by as much as [`Rising`](crate::Rising) undid on the way in.
-    Recede,
+    /// It fades, shrinks towards this point of its bounds and blurs by as much as
+    /// [`Rising`](crate::Rising) undid on the way in.
+    Recede(Point<f32>),
 }
 
 /// A surface the host watches, and how far through leaving it is.
@@ -60,14 +61,22 @@ pub struct Linger {
 
 impl Linger {
     /// A surface that leaves the way [`Rising`](crate::Rising) brought it in, played backwards
-    /// over the same span and curve.
+    /// on the same curve and quicker.
     pub fn new(id: impl Into<ElementId>, child: impl IntoElement) -> Self {
         Self {
             id: id.into(),
             child: child.into_any_element(),
-            leave: Leave::Recede,
+            leave: Leave::Recede(CENTRE),
             turn: 0,
         }
+    }
+
+    /// Shrinks towards `origin` as it leaves, the point [`Rising::rising_from`] grew it from.
+    ///
+    /// [`Rising::rising_from`]: crate::Rising::rising_from
+    pub fn towards(mut self, origin: Point<f32>) -> Self {
+        self.leave = Leave::Recede(origin);
+        self
     }
 
     /// Leaves by fading alone, for a surface too large to shrink without showing its edges.
@@ -220,7 +229,7 @@ impl Element for Host {
     ) {
         let here = window.window_handle().window_id();
         let still = cx.reduce_motion();
-        let span = entrance_span().as_secs_f32().max(f32::EPSILON);
+        let span = exit_span().as_secs_f32().max(f32::EPSILON);
         let lingers = cx.default_global::<Lingers>();
         lingers.hosted.insert(here);
         let mut watched = std::mem::take(&mut lingers.watched);
@@ -251,9 +260,10 @@ impl Element for Host {
                 Leave::Fade => {
                     window.replay_span(*id, fade);
                 }
-                Leave::Recede => {
+                Leave::Recede(origin) => {
                     let filter = LayerFilter {
-                        scale: Some(1. - ENTRANCE_ZOOM * gone),
+                        scale: Some(1. - POP_ZOOM * gone),
+                        scale_origin: Some(origin),
                         blur: Some(ENTRANCE_BLUR * gone),
                         ..LayerFilter::default()
                     };

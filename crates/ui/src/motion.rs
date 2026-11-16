@@ -7,9 +7,9 @@ use std::time::{Duration, Instant};
 
 use gpui::{
     Animation, AnimationElement, AnimationExt as _, App, ElementId, Entity, HoverListenerMode,
-    Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
-    SharedString, SpringConfig, SpringState, StatefulInteractiveElement, StyleRefinement, Styled,
-    Window, canvas, ease_in_out, ease_out_quint, px,
+    Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point, RenderOnce,
+    Rgba, SharedString, SpringConfig, SpringState, StatefulInteractiveElement, StyleRefinement,
+    Styled, Window, canvas, ease_in_out, ease_out_quint, px,
 };
 use i18n::t;
 
@@ -21,6 +21,12 @@ const SLOW: Duration = Duration::from_millis(320);
 const ENTRANCE_EXTRA: Duration = Duration::from_millis(50);
 pub(crate) const ENTRANCE_BLUR: Pixels = px(1.5);
 pub(crate) const ENTRANCE_ZOOM: f32 = 0.01;
+/// How far a menu, popover or dialog is shrunk as it starts to open and once it has left. More
+/// than a page's entrance, since a 1% change on something this small does not read.
+pub(crate) const POP_ZOOM: f32 = 0.04;
+/// How long an overlay takes to leave: quicker than it came, since the listener has already
+/// moved on.
+const EXIT: Duration = Duration::from_millis(150);
 
 /// How long a hover highlight takes to fade out, before the listener's pace stretches it.
 const DIM: Duration = Duration::from_millis(100);
@@ -228,6 +234,11 @@ pub fn entrance_span() -> Duration {
     Motion::Base.span() + ENTRANCE_EXTRA
 }
 
+/// How long a menu, popover or dialog takes to leave, at the listener's pace.
+pub fn exit_span() -> Duration {
+    paced(EXIT)
+}
+
 /// One run of the entrance a screen makes as it appears. The renderer reads how much of the
 /// screen is still hidden on every frame and asks for another frame while it runs.
 #[derive(Clone, Copy, Debug)]
@@ -301,16 +312,38 @@ impl<E: Styled + IntoElement + 'static> Fading for E {
     }
 }
 
+/// The way a menu, popover or dialog opens: it fades in and grows from a little smaller, out of
+/// its middle or, with [`rising_from`](Rising::rising_from), out of the point it is anchored to.
+/// [`Linger`](crate::Linger) plays it backwards, quicker, as the surface leaves.
 pub trait Rising: Sized {
-    fn rising(self, id: impl Into<ElementId>) -> AnimationElement<Self>;
+    fn rising(self, id: impl Into<ElementId>) -> AnimationElement<Self> {
+        self.rising_from(id, CENTRE)
+    }
+
+    /// Grows from `origin`, a fraction of the surface's own bounds: `(0., 1.)` is its bottom
+    /// left corner, for a menu that opens up and to the right of what it came from.
+    fn rising_from(self, id: impl Into<ElementId>, origin: Point<f32>) -> AnimationElement<Self>;
 }
 
 impl<E: Styled + IntoElement + 'static> Rising for E {
-    fn rising(self, id: impl Into<ElementId>) -> AnimationElement<Self> {
-        self.with_animation(id, entrance(), |element, delta| {
-            entering(element, 1. - delta)
+    fn rising_from(self, id: impl Into<ElementId>, origin: Point<f32>) -> AnimationElement<Self> {
+        self.with_animation(id, entrance(), move |element, delta| {
+            popped(element, 1. - delta, origin)
         })
     }
+}
+
+/// The middle of a surface, where a dialog grows from.
+pub(crate) const CENTRE: Point<f32> = Point { x: 0.5, y: 0.5 };
+
+/// An overlay `hidden` of the way from open, as [`Rising`] draws it.
+fn popped<E: Styled>(element: E, hidden: f32, origin: Point<f32>) -> E {
+    let hidden = hidden.clamp(0., 1.);
+    element
+        .layer_scale(1. - POP_ZOOM * hidden)
+        .layer_scale_origin(origin)
+        .blur(ENTRANCE_BLUR * hidden)
+        .opacity(1. - hidden)
 }
 
 pub fn mix(from: Hsla, to: Hsla, t: f32) -> Hsla {

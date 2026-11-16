@@ -1291,7 +1291,26 @@ impl RenderOnce for Menu {
             arm(dismiss, cx);
         }
 
-        let rising = panel_looks.rising("menu-rise");
+        // The panel grows out of the corner nearest what opened it. A trigger with more room
+        // above than below is taken to have its menu opened upwards, as the anchor would do.
+        let upwards = match trigger.as_ref().and_then(Trigger::bounds) {
+            Some(bounds) if beside.is_none() => {
+                window.viewport_size().height - bounds.bottom() < bounds.top()
+            }
+            Some(_) => false,
+            None => matches!(corner, Anchor::BottomLeft | Anchor::BottomRight),
+        };
+        let origin = point(
+            match right {
+                true => 1.,
+                false => 0.,
+            },
+            match upwards {
+                true => 1.,
+                false => 0.,
+            },
+        );
+        let rising = panel_looks.rising_from("menu-rise", origin);
         // The renderer drops a backdrop while a paint filter is open and the entrance is one,
         // so the panel cannot carry its own frost on the way in: it would arrive only once the
         // rise was over, which reads as a blink. The frost is a sibling underneath instead,
@@ -1317,6 +1336,7 @@ impl RenderOnce for Menu {
                 })
                 .child(rising),
         )
+        .towards(origin)
         .turn(turn);
         let surface = match should_defer {
             true => {

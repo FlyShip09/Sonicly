@@ -14,7 +14,7 @@ use crate::button::Button;
 use crate::linger::Linger;
 use crate::menu::{ESCAPE_KEY, menu_open};
 use crate::metrics::{Rounding, Text, snapped};
-use crate::motion::Rising as _;
+use crate::motion::{Fading as _, Rising as _};
 use crate::scrollbar::Scrollbar;
 use crate::scroller::middle_scroll;
 use crate::shield::Shield;
@@ -262,7 +262,8 @@ impl RenderOnce for Modal {
                             if let Some(outside) = &outside {
                                 outside(&(), window, cx);
                             }
-                        }),
+                        })
+                        .fading(ElementId::NamedChild(Arc::new(id.clone()), "dim".into())),
                 )
                 .fading(),
             )
