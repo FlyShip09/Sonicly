@@ -9,8 +9,8 @@ use gpui::{App, AppContext as _, Context, Entity, EventEmitter, SharedString, Ta
 use music::connect::{self, Command, Repeat};
 use music::vault::Vault;
 use music::{
-    Analyzer, Meter, MusicApi, PlaybackConfig, PlaybackEvent as BackendEvent, PlaybackEvents,
-    PlaybackFactory, Player, Quality, Spectrum, Track, TrackSignal, Transcode,
+    Analyzer, Barrier, Meter, MusicApi, PlaybackConfig, PlaybackEvent as BackendEvent,
+    PlaybackEvents, PlaybackFactory, Player, Quality, Spectrum, Track, TrackSignal, Transcode,
 };
 use ui::{Pin, PinKind};
 
@@ -3356,6 +3356,10 @@ impl Playback {
                 self.gate(cx);
                 cx.emit(PlaybackEvent::EndedPlayback);
             }
+            BackendEvent::Barred(barrier) => {
+                self.bar(barrier, cx);
+                cx.emit(PlaybackEvent::EndedPlayback);
+            }
         }
         cx.notify();
     }
@@ -3503,6 +3507,35 @@ impl Playback {
             provider.to_owned(),
             cx,
         );
+        cx.notify();
+    }
+
+    /// Stops because the provider's own player will not play here, and says what would change
+    /// that: a subscription, or a system whose web view can run the player. Nothing is
+    /// remembered, so the next track the listener picks asks the player again.
+    fn bar(&mut self, barrier: Barrier, cx: &mut Context<Self>) {
+        self.track = None;
+        self.blocked_until = None;
+        self.position = Duration::ZERO;
+        self.clock.reset(Duration::ZERO, false);
+        let provider = self
+            .session
+            .read(cx)
+            .provider_name()
+            .unwrap_or("this provider");
+        let (key, why) = match barrier {
+            Barrier::Subscription => (
+                "toast-needs-subscription",
+                "plays whole tracks only with an active subscription",
+            ),
+            Barrier::Player => (
+                "toast-web-player-unavailable",
+                "plays through its web player, which this system's web view cannot run",
+            ),
+        };
+        log::warn!("playback: {provider} {why}");
+        self.state = PlaybackState::Failed(format!("{provider} {why}"));
+        Toasts::about(Outcome::Failed, key, provider.to_owned(), cx);
         cx.notify();
     }
 
