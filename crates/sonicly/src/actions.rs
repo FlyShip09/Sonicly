@@ -7,7 +7,7 @@ use input::{
     VolumeUp, ZoomWindow,
 };
 use router::Destination;
-use state::{AppSettings, Equalizer, Shelf, Sonora};
+use state::{AppSettings, Equalizer, Shelf, Sonicly};
 use ui::{ActiveTheme as _, Copy, Cut, Look, Paste, SelectAll, Theme};
 
 /// How far one font size shortcut moves the size, the same step as the buttons in Settings.
@@ -25,7 +25,7 @@ pub fn register(lingers: bool, cx: &mut App) {
         if !cx.windows().is_empty() {
             return;
         }
-        let close_to_tray = Sonora::global(cx).settings.read(cx).close_to_tray();
+        let close_to_tray = Sonicly::global(cx).settings.read(cx).close_to_tray();
         match lingers && close_to_tray {
             true => crate::dock::show(false),
             false => cx.quit(),
@@ -34,7 +34,7 @@ pub fn register(lingers: bool, cx: &mut App) {
     .detach();
 
     cx.on_action(|_: &SignOut, cx: &mut App| {
-        let session = Sonora::global(cx).session.clone();
+        let session = Sonicly::global(cx).session.clone();
         session.update(cx, |session, cx| session.sign_out(cx));
     });
 
@@ -42,12 +42,12 @@ pub fn register(lingers: bool, cx: &mut App) {
     cx.on_action(
         |_: &Refresh, cx: &mut App| match router::trail(cx).read(cx).current() {
             Destination::History => {
-                let history = Sonora::global(cx).history.clone();
+                let history = Sonicly::global(cx).history.clone();
                 history.update(cx, |history, cx| history.refresh(cx));
             }
             at if !at.refreshes() => {}
             at => {
-                let library = Sonora::global(cx).library.clone();
+                let library = Sonicly::global(cx).library.clone();
                 library.update(cx, |library, cx| match at {
                     Destination::Album(id) | Destination::Playlist(id) => {
                         library.refresh(Shelf::of(&id), cx)
@@ -63,17 +63,17 @@ pub fn register(lingers: bool, cx: &mut App) {
     );
 
     cx.on_action(|_: &TogglePlayback, cx: &mut App| {
-        let playback = Sonora::global(cx).playback.clone();
+        let playback = Sonicly::global(cx).playback.clone();
         playback.update(cx, |playback, cx| playback.toggle_play(cx));
     });
 
     cx.on_action(|_: &SongPrevious, cx: &mut App| {
-        let playback = Sonora::global(cx).playback.clone();
+        let playback = Sonicly::global(cx).playback.clone();
         playback.update(cx, |playback, cx| playback.previous(cx));
     });
 
     cx.on_action(|_: &SongNext, cx: &mut App| {
-        let playback = Sonora::global(cx).playback.clone();
+        let playback = Sonicly::global(cx).playback.clone();
         playback.update(cx, |playback, cx| playback.next(cx));
     });
 
@@ -83,12 +83,12 @@ pub fn register(lingers: bool, cx: &mut App) {
     cx.on_action(|_: &SeekForward, cx: &mut App| skip(cx, true));
 
     cx.on_action(|_: &ToggleShuffle, cx: &mut App| {
-        let playback = Sonora::global(cx).playback.clone();
+        let playback = Sonicly::global(cx).playback.clone();
         playback.update(cx, |playback, cx| playback.toggle_shuffle(cx));
     });
 
     cx.on_action(|_: &ToggleRepeat, cx: &mut App| {
-        let playback = Sonora::global(cx).playback.clone();
+        let playback = Sonicly::global(cx).playback.clone();
         playback.update(cx, |playback, cx| playback.toggle_repeat(cx));
     });
 
@@ -118,7 +118,7 @@ pub fn register(lingers: bool, cx: &mut App) {
 /// those choices change, from settings or from a hand edit of `settings.json`. The observer
 /// clears every binding first, so it rebuilds the fixed ones too.
 fn bind_keys(cx: &mut App) {
-    let settings = Sonora::global(cx).settings.clone();
+    let settings = Sonicly::global(cx).settings.clone();
     let mut bound = settings.read(cx).keybinds().clone();
     cx.bind_keys(input::bindings(&bound));
     cx.observe(&settings, move |settings, cx| {
@@ -136,7 +136,7 @@ fn bind_keys(cx: &mut App) {
 }
 
 /// The menu bar. Only macOS draws one, so only macOS gets the Edit and Window menus and the
-/// application-menu items Cocoa users expect; the other platforms keep the one Sonora menu.
+/// application-menu items Cocoa users expect; the other platforms keep the one Sonicly menu.
 fn menus() -> Vec<Menu> {
     let app = match cfg!(target_os = "macos") {
         true => vec![
@@ -189,20 +189,20 @@ fn menus() -> Vec<Menu> {
 
 /// Turns the volume by `steps` notches, the same step the volume wheel takes.
 fn nudge_volume(cx: &mut App, steps: i8) {
-    let playback = Sonora::global(cx).playback.clone();
+    let playback = Sonicly::global(cx).playback.clone();
     playback.update(cx, |playback, cx| playback.nudge_volume(steps, cx));
 }
 
 /// Moves 5 seconds forward or back through the track, the same step as the media keys.
 fn skip(cx: &mut App, forward: bool) {
-    let playback = Sonora::global(cx).playback.clone();
+    let playback = Sonicly::global(cx).playback.clone();
     playback.update(cx, |playback, cx| playback.skip(forward, cx));
 }
 
 /// Runs `edit` on the equalizer while its screen is the one shown, the only place undo applies.
 fn edit_equalizer(cx: &mut App, edit: fn(&mut Equalizer, &mut Context<Equalizer>)) {
     if router::trail(cx).read(cx).current() == Destination::Equalizer {
-        let equalizer = Sonora::global(cx).equalizer.clone();
+        let equalizer = Sonicly::global(cx).equalizer.clone();
         equalizer.update(cx, edit);
     }
 }
@@ -213,7 +213,7 @@ fn change_font_size(
     cx: &mut App,
     change: impl FnOnce(&mut AppSettings, &mut Context<AppSettings>),
 ) {
-    let settings = Sonora::global(cx).settings.clone();
+    let settings = Sonicly::global(cx).settings.clone();
     settings.update(cx, change);
     let (tint, tint_secondary) = (cx.theme().tint, cx.theme().tint_secondary);
     let (look, overrides) = {

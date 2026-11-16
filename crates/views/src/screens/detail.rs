@@ -12,7 +12,7 @@ use music::{Album, AlbumDetail, Arrival, Playlist, ReleaseType, Track};
 use router::{Destination, navigate};
 use state::{
     AppSettings, Collection, Detail, DownloadsChanged, LibraryEvent, Origin, Outcome, Playback,
-    Progress, Reorder, Shelf, Sonora, Toasts,
+    Progress, Reorder, Shelf, Sonicly, Toasts,
 };
 use ui::{
     ActiveTheme as _, ArrowRing, Button, InlineLink, InlineLinks, Menu, Picker, Popovers, Popup,
@@ -106,7 +106,7 @@ impl Tracks for DetailTracks {
             return None;
         }
         let shelf = Shelf::of(detail.id()?);
-        Sonora::global(cx)
+        Sonicly::global(cx)
             .session
             .read(cx)
             .capabilities_of(shelf)
@@ -148,7 +148,7 @@ impl DetailView {
         section: &'static str,
         cx: &mut Context<Self>,
     ) -> Self {
-        let settings = Sonora::global(cx).settings.clone();
+        let settings = Sonicly::global(cx).settings.clone();
         let saved = settings.read(cx).table(section);
         let width = MIN_CONTENT;
 
@@ -167,7 +167,7 @@ impl DetailView {
                 cx,
             );
             let source = match show_liked {
-                true => source.with_liked(Sonora::global(cx).library.clone()),
+                true => source.with_liked(Sonicly::global(cx).library.clone()),
                 false => source,
             };
             let source = match section == "playlist" {
@@ -221,7 +221,7 @@ impl DetailView {
         })
         .detach();
 
-        let library = Sonora::global(cx).library.clone();
+        let library = Sonicly::global(cx).library.clone();
         cx.observe(&library, move |this, _, cx| {
             if show_liked {
                 this.table.update(cx, |table, cx| table.refresh(cx));
@@ -231,7 +231,7 @@ impl DetailView {
         .detach();
 
         if section == "playlist" {
-            let library = Sonora::global(cx).library.clone();
+            let library = Sonicly::global(cx).library.clone();
             cx.subscribe(&library, |_, _, event, cx| {
                 let LibraryEvent::PlaylistGone(id) = event else {
                     return;
@@ -265,7 +265,7 @@ impl DetailView {
 
         // Progress only redraws the download button. A filtered table rebuilds when what it
         // shows may have changed, since a rebuild drops the open menu and the selection.
-        let downloads = Sonora::global(cx).downloads.clone();
+        let downloads = Sonicly::global(cx).downloads.clone();
         cx.observe(&downloads, |_, _, cx| cx.notify()).detach();
         cx.subscribe(&downloads, |this, _, _: &DownloadsChanged, cx| {
             if this.table.narrowed(cx) {
@@ -599,7 +599,7 @@ impl DetailView {
 
     fn library_button(&self, cx: &App) -> Option<Button> {
         let theme = *cx.theme();
-        let library = Sonora::global(cx).library.clone();
+        let library = Sonicly::global(cx).library.clone();
         let detail = self.detail.read(cx);
         let id = detail.id()?.to_owned();
 
@@ -660,8 +660,8 @@ impl DetailView {
     /// downloaded.
     fn download_button(&self, cx: &App) -> Option<Button> {
         let theme = *cx.theme();
-        let sonora = Sonora::global(cx);
-        let downloads = sonora.downloads.clone();
+        let sonicly = Sonicly::global(cx);
+        let downloads = sonicly.downloads.clone();
         let detail = self.detail.read(cx);
         let id = detail.id()?.to_owned();
         if music::is_local_id(&id) {
@@ -669,7 +669,7 @@ impl DetailView {
         }
         let kind = detail.header()?.kind;
         let progress = downloads.read(cx).set(kind, &id);
-        if progress.is_none() && !sonora.session.read(cx).capabilities().downloads {
+        if progress.is_none() && !sonicly.session.read(cx).capabilities().downloads {
             return None;
         }
         let album = detail.album().cloned();
@@ -881,7 +881,7 @@ impl DetailView {
                 album_menu(detail.album()?.clone(), self.playback.clone(), menus, cx)
             }
             Collection::Playlist => {
-                let saved = Sonora::global(cx).library.read(cx).playlist(&id).cloned();
+                let saved = Sonicly::global(cx).library.read(cx).playlist(&id).cloned();
                 let playlist = saved.or_else(|| detail.playlist().cloned())?;
                 playlist_menu(playlist, self.playback.clone(), cx)
             }
@@ -976,7 +976,7 @@ impl DetailView {
         let detail = self.detail.read(cx);
         let id = detail.id()?.to_owned();
         let kept = detail.kind().is_some_and(|kind| {
-            Sonora::global(cx)
+            Sonicly::global(cx)
                 .downloads
                 .read(cx)
                 .set(kind, &id)

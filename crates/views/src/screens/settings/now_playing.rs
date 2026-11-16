@@ -1,11 +1,9 @@
-use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Pixels, Window, div, px, svg};
 use i18n::t;
 use state::{FullscreenControlsAutohide, SideTab};
 use ui::{
-    ActiveTheme as _, Levels, MenuItem, OptionCard, Picker, Switch, Text, Visualizer,
-    VisualizerStyle,
+    ActiveTheme as _, Levels, MenuItem, OptionCard, Picker, Switch, Visualizer, VisualizerStyle,
 };
 
 use super::rows::{Announced as _, grid, segmented};
@@ -96,11 +94,9 @@ impl SettingsView {
 
     /// How the spectrum is drawn behind the fullscreen artwork, off included.
     /// One card per visualizer style, each drawing a still spectrum the way that style does.
-    /// The visualizer styles as cards. While Soloist plays Spotify a line under them says the
-    /// visualizer follows local files only, since Soloist's sound never passes through Sonora.
+    /// The visualizer styles as cards.
     pub(super) fn visualizer_cards(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = *cx.theme();
-        let note = self.local_only(cx);
         let chosen = self.settings.read(cx).visualizer_style();
         let height = theme.metrics.list_row * 1.5;
         // the card clips only to a rectangle, so the spectrum cuts itself to the inside of the
@@ -151,24 +147,7 @@ impl SettingsView {
                         }))
                 }),
         );
-        let Some(note) = note else {
-            return cards.into_any_element();
-        };
-        div()
-            .flex()
-            .flex_col()
-            .gap_2()
-            .child(cards)
-            .child(
-                div()
-                    .id("settings-visualizer-note")
-                    .role(Role::Paragraph)
-                    .aria_label(note.clone())
-                    .text_size(theme.text(Text::Small))
-                    .text_color(theme.muted_foreground)
-                    .child(note),
-            )
-            .into_any_element()
+        cards.into_any_element()
     }
 
     /// Which views of the fullscreen player draw the visualizer. The menu stays open so several

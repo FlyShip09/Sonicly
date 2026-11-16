@@ -250,7 +250,7 @@ impl LoginView {
         }));
     }
 
-    /// The Sonora icon, the welcome and the line under it saying what the screen is waiting on.
+    /// The Sonicly icon, the welcome and the line under it saying what the screen is waiting on.
     fn welcome(&self, status: SharedString, cx: &App) -> impl IntoElement {
         let theme = cx.theme();
         let title = t!("login-welcome-title");
@@ -635,7 +635,7 @@ impl Render for LoginView {
 
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         let radius =
-            crate::chrome::window_radius(state::Sonora::global(cx).settings.read(cx), cx, window);
+            crate::chrome::window_radius(state::Sonicly::global(cx).settings.read(cx), cx, window);
         #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         let radius: Option<Pixels> = None;
 
@@ -662,7 +662,7 @@ impl Render for LoginView {
                     .gap_3()
                     .child(self.welcome(status, cx))
                     .when_some(failure, |this, failure| {
-                        this.child(crate::shared::trouble::trouble(failure, true, cx))
+                        this.child(crate::shared::trouble::trouble(failure, true))
                     })
                     .when_some(url, |this, url| this.child(self.url_prompt(url))),
             )

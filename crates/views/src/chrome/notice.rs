@@ -9,7 +9,7 @@ use gpui::{
 };
 use i18n::t;
 use music::SoundServer;
-use state::{AppSettings, Requirement, Requirements, Sonora, UpdateState, Updates};
+use state::{AppSettings, Requirement, Requirements, Sonicly, UpdateState, Updates};
 use ui::{ActiveTheme as _, Button, Text, corners};
 
 const ICON: Pixels = px(16.);
@@ -42,10 +42,10 @@ struct Card {
 
 impl AppNotice {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let sonora = Sonora::global(cx);
-        let updates = sonora.updates.clone();
-        let requirements = sonora.requirements.clone();
-        let settings = sonora.settings.clone();
+        let sonicly = Sonicly::global(cx);
+        let updates = sonicly.updates.clone();
+        let requirements = sonicly.requirements.clone();
+        let settings = sonicly.settings.clone();
         cx.observe(&updates, |_, _, cx| cx.notify()).detach();
         cx.observe(&requirements, |_, _, cx| cx.notify()).detach();
         Self {

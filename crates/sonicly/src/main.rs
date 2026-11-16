@@ -31,7 +31,7 @@ use gpui::{
 use music::LyricsProvider;
 use music::link::Linked;
 use router::{Destination, Screen};
-use state::{Opened, Outcome, Sonora, Toasts};
+use state::{Opened, Outcome, Sonicly, Toasts};
 use ui::ActiveTheme as _;
 use ui::ThemeKind;
 use views::Root;
@@ -50,7 +50,7 @@ fn main() -> ExitCode {
     if let Some(code) = webview::probed() {
         exit(code);
     }
-    // A command for the running Sonora is sent and answered here, without a log file, a
+    // A command for the running Sonicly is sent and answered here, without a log file, a
     // runtime or a window. Older macOS adds a `-psn_` argument to a Finder launch.
     let args = std::env::args_os()
         .filter(|arg| !arg.to_string_lossy().starts_with("-psn_"))
@@ -143,13 +143,13 @@ fn main() -> ExitCode {
         state::install_rounded_window_hook(set_corner_preference, cx);
         #[cfg(target_os = "macos")]
         state::install_rounded_window_hook(set_toolbar_style, cx);
-        let startup = Sonora::global(cx).settings.read(cx).startup().to_owned();
+        let startup = Sonicly::global(cx).settings.read(cx).startup().to_owned();
         let start = Screen::from_id(&startup)
             .unwrap_or(Screen::Home)
             .destination();
         router::init(start, cx);
         let (look, overrides, language, pack, stillness, pace, remembered) = {
-            let settings = Sonora::global(cx).settings.read(cx);
+            let settings = Sonicly::global(cx).settings.read(cx);
             (
                 settings.look(),
                 settings.theme_overrides(),
@@ -171,7 +171,7 @@ fn main() -> ExitCode {
         };
         ThemeKind::assume(reported.unwrap_or(remembered));
         if let Some(reported) = reported.filter(|reported| *reported != remembered) {
-            Sonora::global(cx)
+            Sonicly::global(cx)
                 .settings
                 .clone()
                 .update(cx, |settings, cx| settings.set_system_theme(reported, cx));
@@ -188,13 +188,13 @@ fn main() -> ExitCode {
         memory::watch(cx);
 
         open_window(cx);
-        let session = Sonora::global(cx).session.clone();
+        let session = Sonicly::global(cx).session.clone();
         session.update(cx, |session, cx| session.restore(cx));
 
         // A cold launch with files or links goes through the same batch a hot hand-off uses, now
         // that state exists to open them into. A link waits there for its provider to sign in.
         cx.subscribe(
-            &Sonora::global(cx).links.clone(),
+            &Sonicly::global(cx).links.clone(),
             |_, opened: &Opened, cx| {
                 if let Some(destination) = destination(&opened.0) {
                     router::navigate(destination, cx);
@@ -207,7 +207,7 @@ fn main() -> ExitCode {
         }
 
         // Commands skip the open batching, since nothing arrives in bursts there.
-        let control = Sonora::global(cx).control.clone();
+        let control = Sonicly::global(cx).control.clone();
         cx.spawn(async move |cx| {
             while let Some(asked) = commands.recv().await {
                 control.update(cx, |control, cx| match asked {
@@ -253,7 +253,7 @@ fn follow(items: &[String], tail: bool, cx: &mut App) {
     if !tail {
         show_window(cx);
     }
-    let links = Sonora::global(cx).links.clone();
+    let links = Sonicly::global(cx).links.clone();
     let mut paths: Vec<PathBuf> = Vec::new();
     for item in items {
         if links.update(cx, |links, cx| links.open(item, cx)) {
@@ -266,7 +266,7 @@ fn follow(items: &[String], tail: bool, cx: &mut App) {
     }
     if !tail
         && !paths.is_empty()
-        && Sonora::global(cx)
+        && Sonicly::global(cx)
             .settings
             .read(cx)
             .now_playing_on_file_open()
@@ -274,7 +274,7 @@ fn follow(items: &[String], tail: bool, cx: &mut App) {
         router::navigate(Destination::Fullscreen, cx);
     }
     if !paths.is_empty() {
-        let playback = Sonora::global(cx).playback.clone();
+        let playback = Sonicly::global(cx).playback.clone();
         playback.update(cx, |playback, cx| playback.open_paths(paths, tail, cx));
     }
 }
@@ -340,13 +340,13 @@ fn window_action(visible: Option<bool>) -> WindowAction {
 }
 
 fn open_window(cx: &mut App) {
-    let Sonora {
+    let Sonicly {
         session,
         library,
         playback,
         queue,
         ..
-    } = Sonora::global(cx);
+    } = Sonicly::global(cx);
     let (session, library, playback, queue) = (
         session.clone(),
         library.clone(),
@@ -362,7 +362,7 @@ fn open_window(cx: &mut App) {
             )
         });
 
-    let settings = Sonora::global(cx).settings.read(cx);
+    let settings = Sonicly::global(cx).settings.read(cx);
     let saver = settings.saver();
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     let decorations = settings.window_decorations();
@@ -402,7 +402,7 @@ fn open_window(cx: &mut App) {
             #[cfg(target_os = "windows")]
             set_corner_preference(
                 window,
-                Sonora::global(cx).settings.read(cx).window_rounding(),
+                Sonicly::global(cx).settings.read(cx).window_rounding(),
             );
             let handle = platform_handle(window);
             state::attach_remote(handle, cx);
@@ -510,10 +510,10 @@ fn platform_handle(window: &gpui::Window) -> Option<*mut std::ffi::c_void> {
 }
 
 // DWM draws the caption buttons behind the client area, where an opaque window hides them
-// and a transparent or blurred one shows them beside Sonora's own. They come with
+// and a transparent or blurred one shows them beside Sonicly's own. They come with
 // `WS_SYSMENU`, so that is the style to drop: `WS_CAPTION` has to stay, because DWM only
 // animates minimize, restore and close on a window that carries it. Alt+F4 and the taskbar
-// still close the window; only the Alt+Space menu goes, and Sonora's title bar has no use
+// still close the window; only the Alt+Space menu goes, and Sonicly's title bar has no use
 // for it.
 #[cfg(target_os = "windows")]
 fn hide_system_caption(handle: *mut std::ffi::c_void) {

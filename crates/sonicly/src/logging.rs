@@ -44,7 +44,7 @@ pub fn init() {
     log::debug!("{STARTED} {} started", state::version());
 }
 
-/// Writes a panic to the log before the default hook prints it. A Sonora started from a
+/// Writes a panic to the log before the default hook prints it. A Sonicly started from a
 /// desktop entry or a tray has no terminal to lose it to, so this is the only place a crash
 /// leaves a trace. `RUST_BACKTRACE` still decides whether there is a backtrace to write.
 fn catch_panics() {
@@ -95,8 +95,8 @@ impl Write for Capped {
 }
 
 /// Passes every record on with [`music::redact`] applied to its message, so neither the terminal
-/// nor the file Sonora asks people to attach to a bug report carries a token, an account name or
-/// the home folder. This covers the lines other crates write as well as Sonora's own.
+/// nor the file Sonicly asks people to attach to a bug report carries a token, an account name or
+/// the home folder. This covers the lines other crates write as well as Sonicly's own.
 struct Redacted(Box<dyn Log>);
 
 impl Log for Redacted {

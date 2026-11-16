@@ -1,4 +1,4 @@
-//! The question before a theme or family from a `sonora://theme/` link is installed, with its
+//! The question before a theme or family from a `sonicly://theme/` link is installed, with its
 //! name in the title, a miniature of the window cut into its variants, their names under it, and
 //! Install or Cancel.
 //! `state::Links` holds the offer and does the installing. This only draws it.
@@ -6,7 +6,7 @@
 use gpui::prelude::*;
 use gpui::{Context, Entity, FocusHandle, Pixels, Render, Window, div, px};
 use i18n::t;
-use state::{Links, Sonora};
+use state::{Links, Sonicly};
 use ui::{
     ActiveTheme as _, Button, Dismiss, FORM_CONTEXT, Look, Modal, Submit, Text, Theme, ThemeKind,
 };
@@ -29,7 +29,7 @@ pub(crate) struct ThemeInvite {
 
 impl ThemeInvite {
     pub fn new(cx: &mut Context<Self>) -> Self {
-        let links = Sonora::global(cx).links.clone();
+        let links = Sonicly::global(cx).links.clone();
         cx.observe(&links, |_, _, cx| cx.notify()).detach();
         Self {
             links,
@@ -51,7 +51,7 @@ impl ThemeInvite {
             return;
         }
         let (look, overrides) = {
-            let settings = Sonora::global(cx).settings.read(cx);
+            let settings = Sonicly::global(cx).settings.read(cx);
             (settings.look(), settings.theme_overrides())
         };
         Theme::fade(

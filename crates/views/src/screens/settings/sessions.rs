@@ -1,14 +1,14 @@
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, div};
 use i18n::t;
-use state::Sonora;
+use state::Sonicly;
 use ui::{Button, Field, Form, Picker, Switch};
 
 use super::{Group, SettingsView, Slot};
 
 impl SettingsView {
     /// The Sessions group: whether the player bar shows the Sessions button, and which server
-    /// Sonora Sessions go through. Sonicly has no official server, so the address is required.
+    /// Sonicly Sessions go through. Sonicly has no official server, so the address is required.
     pub(super) fn sessions_groups(&self, _: &App) -> Vec<Group> {
         vec![
             Group::new(
@@ -38,7 +38,7 @@ impl SettingsView {
     /// compact and the button small, so the two stand the same height. On a narrow page the field
     /// narrows and the label stays whole.
     pub(super) fn sessions_server_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let saving = Sonora::global(cx).listening.read(cx).saving();
+        let saving = Sonicly::global(cx).listening.read(cx).saving();
         let save = Button::new("sessions-server-save")
             .flex_none()
             .secondary()
@@ -73,7 +73,7 @@ impl SettingsView {
     /// Checks that the server typed in the field answers and keeps it once it does.
     fn save_sessions_server(&mut self, cx: &mut Context<Self>) {
         let typed = self.sessions_server.read(cx).text().to_owned();
-        Sonora::global(cx)
+        Sonicly::global(cx)
             .listening
             .clone()
             .update(cx, |listening, cx| listening.save_server(&typed, cx));

@@ -635,7 +635,6 @@ fn destination(target: Target) -> Destination {
         Target::Album(id) => Destination::Album(id),
         Target::Artist(id) => Destination::Artist(id),
         Target::Playlist(id) => Destination::Playlist(id),
-        Target::PlaybackSettings => Destination::Settings(SettingsPage::Playback),
         Target::ProviderSettings => Destination::Settings(SettingsPage::Providers),
     }
 }

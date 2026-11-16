@@ -12,8 +12,8 @@ use i18n::{Language, t};
 use music::SignInPrompt;
 use router::{Destination, SettingsPage, SettingsTab, navigate};
 use state::{
-    AppSettings, Drm, Equalizer, Io, Outputs, Playback, Scan, Scrobbling, Session, SessionState,
-    Sleep, Soloist, Sonora,
+    AppSettings, Equalizer, Io, Outputs, Playback, Scan, Scrobbling, Session, SessionState, Sleep,
+    Sonicly,
 };
 use ui::{
     Activate, ActiveTheme as _, Card, Deck, Dismiss, Input, Lazy, Popovers, Scrollbar,
@@ -113,8 +113,6 @@ enum Slot {
     StreamQuality,
     StreamFormat,
     StreamBitrate,
-    Widevine,
-    Soloist,
     OutputDevice,
     OutputFailure,
     SampleRate,
@@ -236,8 +234,6 @@ pub struct SettingsView {
     /// Measures the cache and the downloads again every so often while the storage section's
     /// tab is on screen, since tracks are kept and evicted as they play.
     _storage: Task<()>,
-    drm: Entity<Drm>,
-    soloist: Entity<Soloist>,
     equalizer: Entity<Equalizer>,
     settings: Entity<AppSettings>,
     outputs: Entity<Outputs>,
@@ -278,9 +274,9 @@ pub struct SettingsView {
     scrobbling: Entity<Scrobbling>,
     scrobble_first: Entity<Input>,
     scrobble_second: Entity<Input>,
-    /// The field for the custom name Sonora goes by in Spotify's device list.
+    /// The field for the custom name Sonicly goes by in Spotify's device list.
     connect_name: Entity<Input>,
-    /// The address of the listener's own Sonora Sessions server.
+    /// The address of the listener's own Sonicly Sessions server.
     sessions_server: Entity<Input>,
     /// The service whose link dialog is open, by slug.
     scrobble_prompt: Option<&'static str>,
@@ -328,15 +324,10 @@ impl SettingsView {
         playback: Entity<Playback>,
         cx: &mut Context<Self>,
     ) -> Self {
-        let settings = Sonora::global(cx).settings.clone();
-        let scrobbling = Sonora::global(cx).scrobbling.clone();
-        let drm = Sonora::global(cx).drm.clone();
-        let equalizer = Sonora::global(cx).equalizer.clone();
-        let outputs = Sonora::global(cx).outputs.clone();
-        let soloist = Sonora::global(cx).soloist.clone();
-        cx.observe(&drm, |this, _, cx| this.remeasure(cx)).detach();
-        cx.observe(&soloist, |this, _, cx| this.remeasure(cx))
-            .detach();
+        let settings = Sonicly::global(cx).settings.clone();
+        let scrobbling = Sonicly::global(cx).scrobbling.clone();
+        let equalizer = Sonicly::global(cx).equalizer.clone();
+        let outputs = Sonicly::global(cx).outputs.clone();
         cx.observe(&equalizer, |this, _, cx| this.remeasure(cx))
             .detach();
         cx.observe(&outputs, |this, _, cx| this.remeasure(cx))
@@ -429,7 +420,7 @@ impl SettingsView {
         sessions_server.update(cx, |input, cx| input.set_text(typed, cx));
         // the Save button stands held while the server it saves is checked, and the field wears a
         // red border from a save that was turned down until one goes through
-        let listening = Sonora::global(cx).listening.clone();
+        let listening = Sonicly::global(cx).listening.clone();
         cx.observe(&listening, |this: &mut Self, listening, cx| {
             let rejected = listening.read(cx).rejected();
             this.sessions_server
@@ -450,8 +441,6 @@ impl SettingsView {
             session,
             _storage: storage,
             playback,
-            drm,
-            soloist,
             equalizer,
             settings,
             outputs,
@@ -905,8 +894,6 @@ impl SettingsView {
             ),
             Slot::Sleep => (t!("settings-sleep"), t!("settings-sleep-detail")),
             Slot::StayAwake => (t!("settings-stay-awake"), t!("settings-stay-awake-detail")),
-            Slot::Widevine => (t!("settings-widevine"), self.widevine_detail(cx)),
-            Slot::Soloist => (t!("settings-soloist"), t!("settings-soloist-detail")),
             Slot::OutputDevice => (
                 t!("settings-output-device"),
                 t!("settings-output-device-detail"),
@@ -1103,8 +1090,6 @@ impl SettingsView {
             Slot::SampleRate => self.sample_rate_row(cx),
             Slot::Buffer => self.buffer_row(cx),
             Slot::MatchRate => self.match_rate_row(cx),
-            Slot::Widevine => self.widevine_row(cx),
-            Slot::Soloist => self.soloist_row(cx),
             Slot::Equalizer => self.equalizer_row(cx),
             Slot::LyricsSources => self.lyrics_sources_row(cx),
             Slot::LyricsPriority => self.lyrics_priority(cx),

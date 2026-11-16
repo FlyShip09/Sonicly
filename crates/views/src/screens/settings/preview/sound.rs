@@ -1,5 +1,5 @@
-//! The path the sound takes out of Sonora, drawn as a row of small steps from the source to the
-//! device. Only what Sonora really does and can report has a step: the track's source and rate,
+//! The path the sound takes out of Sonicly, drawn as a row of small steps from the source to the
+//! device. Only what Sonicly really does and can report has a step: the track's source and rate,
 //! loudness normalization, the equalizer, resampling, and the device it plays on.
 
 use std::cell::RefCell;
@@ -43,7 +43,7 @@ struct Step {
 
 impl SoundPreview {
     pub(in crate::screens::settings) fn new(cx: &mut Context<SettingsView>) -> Self {
-        let signal = state::Sonora::global(cx).signal.clone();
+        let signal = state::Sonicly::global(cx).signal.clone();
         cx.observe(&signal, |this, signal, cx| {
             let path = signal.read(cx).path().cloned();
             let preview = &this.previews.sound;
@@ -69,8 +69,8 @@ impl SoundPreview {
     }
 }
 
-/// The Sound page's preview: the source, then each thing Sonora does to the sound on its way,
-/// then the device, with a mark when what leaves Sonora is the decoded track bit for bit.
+/// The Sound page's preview: the source, then each thing Sonicly does to the sound on its way,
+/// then the device, with a mark when what leaves Sonicly is the decoded track bit for bit.
 pub(in crate::screens::settings) fn preview(
     state: &SoundPreview,
     view: &SettingsView,
@@ -78,7 +78,7 @@ pub(in crate::screens::settings) fn preview(
     cx: &mut Context<SettingsView>,
 ) -> Option<AnyElement> {
     if state.following.borrow().is_none() {
-        let signal = state::Sonora::global(cx).signal.clone();
+        let signal = state::Sonicly::global(cx).signal.clone();
         let following = signal.update(cx, |signal, cx| signal.follow(cx));
         state.path.replace(signal.read(cx).path().cloned());
         state.following.replace(Some(following));
@@ -104,13 +104,6 @@ pub(in crate::screens::settings) fn preview(
         .map(|provider| provider.name())
         .or_else(|| session.provider_name());
 
-    // Soloist plays Spotify to the system itself, so the path ends with it rather than with
-    // Sonora's equalizer, resampler and device
-    let direct = match &track {
-        Some(track) => track.direct,
-        None => view.soloist_plays(cx),
-    };
-
     let mut steps = Vec::new();
     steps.push(Step {
         icon: slug.map_or("icons/music.svg", provider_logo),
@@ -135,15 +128,7 @@ pub(in crate::screens::settings) fn preview(
             detail: gain.map(|db| t!("settings-signal-gain", db = signed(db))),
         });
     }
-    if direct {
-        steps.push(Step {
-            icon: "icons/headphones.svg",
-            tint: None,
-            label: t!("settings-signal-soloist"),
-            detail: None,
-        });
-    }
-    if view.equalizer.read(cx).enabled() && !direct {
+    if view.equalizer.read(cx).enabled() {
         steps.push(Step {
             icon: "icons/sliders-horizontal.svg",
             tint: None,
@@ -160,7 +145,7 @@ pub(in crate::screens::settings) fn preview(
         });
     }
     let outputs = view.outputs.read(cx);
-    let device = outputs.current().filter(|_| !direct);
+    let device = outputs.current();
     steps.push(Step {
         icon: "icons/speaker.svg",
         tint: None,

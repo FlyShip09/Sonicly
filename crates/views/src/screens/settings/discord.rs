@@ -1,7 +1,7 @@
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context};
 use i18n::t;
-use state::{DiscordName, Sonora};
+use state::{DiscordName, Sonicly};
 use ui::{Button, MenuItem, Picker, Switch, TabBar};
 
 use super::{Group, SettingsView, Slot};
@@ -19,7 +19,7 @@ impl SettingsView {
         if available && settings.discord_presence() {
             // the choice only means something while Spotify is signed in and listed as a device
             let connect = settings.spotify_connect()
-                && Sonora::global(cx).devices.read(cx).supported()
+                && Sonicly::global(cx).devices.read(cx).supported()
                 && !super::connect::jellyfin(cx);
             groups.push(
                 Group::new("settings-group-status", "icons/radio.svg")

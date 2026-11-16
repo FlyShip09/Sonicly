@@ -17,7 +17,6 @@ MASTER = ROOT / "assets" / "icon.svg"
 LINUX_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512]
 WINDOWS_SIZES = [16, 20, 24, 32, 40, 48, 64, 80, 96, 128, 256]
 TRAY_SIZES = [18, 36]
-TRAY_STROKE = 3.2
 
 ICNS_TYPES = [
     ("icp4", 16, 1),
@@ -37,14 +36,27 @@ SQUIRCLE_RADIUS = 185.4 / 824
 SQUIRCLE_SMOOTHING = 0.6
 WINDOWS_RADIUS = 0.1875
 
-OPTICAL_STROKE = [(16, 4.0), (24, 3.2), (32, 2.8), (48, 2.3)]
+# Hand-picked (bar, gap) widths in whole pixels for the sizes where scaling the master would blur
+# the bars. Small sizes get heavier bars and a larger share of the canvas; see docs/BRAND.md.
+HINTS = {
+    16: (2, 1), 18: (2, 1), 20: (2, 1), 22: (2, 1), 24: (2, 1),
+    32: (3, 1), 36: (4, 2), 40: (3, 2), 48: (4, 2), 64: (5, 3),
+}
+# A 16 px circle has no room for two-pixel bars, which would run into its edge.
+ROUND_HINTS = {**HINTS, 16: (1, 1)}
+# The macOS tile only covers SQUIRCLE_FILL of the canvas, so its glyph is smaller at each size.
+SQUIRCLE_HINTS = {16: (1, 1), 32: (2, 1), 64: (4, 2)}
 
 ICON_CANVAS = 1024
 NAMED_COLORS = {"white": "#ffffff", "black": "#000000"}
 
 
+def num(value):
+    return f"{round(value, 4):g}"
+
+
 class Master:
-    """Reads the background and equalizer bars shared by the platform icons."""
+    """Reads the background and wave bars shared by the platform icons."""
 
     def __init__(self, path):
         if not path.exists():
@@ -80,20 +92,52 @@ class Master:
         if not self.bars:
             sys.exit("icons: master has no bars")
 
-    def glyph(self, stroke):
+        self.bars.sort()
+        half = self.stroke / 2
+        self.left = self.bars[0][0] - half
+        self.top = min(y0 for _, y0, _ in self.bars) - half
+        self.width = self.bars[-1][0] + half - self.left
+        self.height = max(y1 for _, _, y1 in self.bars) + half - self.top
+        self.share = self.width / self.span
+
+    def glyph(self, span, share, pixels=None, hints=HINTS, color=None):
+        """Draws the bars `share` of `span` wide and centered, on whole pixels where hinted."""
+        color = color or self.foreground
+        if pixels in hints:
+            return self.hinted(span, pixels, *hints[pixels], color)
+
+        k = span * share / self.width
+        cx = span / 2 - (self.left + self.width / 2) * k
+        cy = span / 2 - (self.top + self.height / 2) * k
         return "\n".join(
-            f'  <path d="M{x} {y0}V{y1}" stroke="{self.foreground}"'
-            f' stroke-width="{stroke:g}" stroke-linecap="{self.cap}"/>'
+            f'  <path d="M{num(cx + x * k)} {num(cy + y0 * k)}V{num(cy + y1 * k)}"'
+            f' stroke="{color}" stroke-width="{num(self.stroke * k)}"'
+            f' stroke-linecap="{self.cap}"/>'
             for x, y0, y1 in self.bars
         )
 
-
-def stroke_for(pixels, master):
-    """Thickens small glyphs using their displayed size, before any Retina scaling."""
-    for limit, width in OPTICAL_STROKE:
-        if pixels <= limit:
-            return width * master.stroke / 2
-    return master.stroke
+    def hinted(self, span, pixels, bar, gap, color):
+        """Redraws the bars as whole-pixel rectangles of the given bar and gap widths."""
+        count = len(self.bars)
+        width = count * bar + (count - 1) * gap
+        scale = width / self.width
+        x0 = (pixels - width) // 2
+        y0 = (pixels - round(self.height * scale)) // 2
+        unit = span / pixels
+        # Two-pixel bars stay square-ended, since a rounded end that small only blurs.
+        radius = bar / 2 if bar >= 3 else 0
+        rects = []
+        for i, (_, start, end) in enumerate(self.bars):
+            top = round((start - self.stroke / 2 - self.top) * scale)
+            bottom = round((end + self.stroke / 2 - self.top) * scale)
+            assert bottom - top >= bar, f"icons: bar {i} collapses at {pixels}px"
+            assert 0 <= x0 and 0 <= y0 + top and y0 + bottom <= pixels, "icons: glyph overflows"
+            rects.append(
+                f'  <rect x="{num((x0 + i * (bar + gap)) * unit)}" y="{num((y0 + top) * unit)}"'
+                f' width="{num(bar * unit)}" height="{num((bottom - top) * unit)}"'
+                f' rx="{num(radius * unit)}" fill="{color}"/>'
+            )
+        return "\n".join(rects)
 
 
 def squircle(side, radius, smoothing):
@@ -143,35 +187,31 @@ def squircle(side, radius, smoothing):
     )
 
 
-def round_svg(master, pixels):
+def round_svg(master, pixels=None):
     half = master.span / 2
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{master.span:g}"'
         f' height="{master.span:g}" viewBox="0 0 {master.span:g} {master.span:g}">\n'
         f'  <circle cx="{half:g}" cy="{half:g}" r="{half:g}"'
         f' fill="{master.background}"/>\n'
-        f"{master.glyph(stroke_for(pixels, master))}\n"
+        f"{master.glyph(master.span, master.share, pixels, ROUND_HINTS)}\n"
         f"</svg>\n"
     )
 
 
 def squircle_svg(master, pixels):
-    """Draws the macOS icon with its Dock margin at the requested logical size."""
+    """Draws the macOS icon with its Dock margin, hinted for the pixel size it renders at."""
     canvas = 1024.0
     side = canvas * SQUIRCLE_FILL
     inset = (canvas - side) / 2
-    scale = side / master.span
     path = squircle(side, side * SQUIRCLE_RADIUS, SQUIRCLE_SMOOTHING)
-    glyph = master.glyph(stroke_for(pixels * SQUIRCLE_FILL, master))
+    glyph = master.glyph(canvas, master.share * SQUIRCLE_FILL, pixels, SQUIRCLE_HINTS)
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{canvas:g}"'
         f' height="{canvas:g}" viewBox="0 0 {canvas:g} {canvas:g}">\n'
-        f'  <g transform="translate({inset:g} {inset:g})">\n'
-        f'    <path d="{path}" fill="{master.background}"/>\n'
-        f'    <g transform="scale({scale:g})">\n'
+        f'  <path transform="translate({inset:g} {inset:g})" d="{path}"'
+        f' fill="{master.background}"/>\n'
         f"{glyph}\n"
-        f"    </g>\n"
-        f"  </g>\n"
         f"</svg>\n"
     )
 
@@ -183,28 +223,29 @@ def readme_svg(master):
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{master.span:g}"'
         f' height="{master.span:g}" viewBox="0 0 {master.span:g} {master.span:g}">\n'
         f'  <path d="{path}" fill="{master.background}"/>\n'
-        f"{master.glyph(master.stroke)}\n"
+        f"{master.glyph(master.span, master.share)}\n"
         f"</svg>\n"
     )
 
 
-def template_svg(master):
+def template_svg(master, pixels):
+    """Draws the bars alone in black, the menu bar tints a template image itself."""
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{master.span:g}"'
         f' height="{master.span:g}" viewBox="0 0 {master.span:g} {master.span:g}">\n'
-        f"{master.glyph(TRAY_STROKE)}\n"
+        f"{master.glyph(master.span, master.share, pixels, color='black')}\n"
         f"</svg>\n"
     )
 
 
-def rounded_svg(master, pixels):
+def rounded_svg(master, pixels=None):
     radius = master.span * WINDOWS_RADIUS
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{master.span:g}"'
         f' height="{master.span:g}" viewBox="0 0 {master.span:g} {master.span:g}">\n'
         f'  <rect width="{master.span:g}" height="{master.span:g}"'
         f' rx="{radius:g}" ry="{radius:g}" fill="{master.background}"/>\n'
-        f"{master.glyph(stroke_for(pixels, master))}\n"
+        f"{master.glyph(master.span, master.share, pixels)}\n"
         f"</svg>\n"
     )
 
@@ -214,7 +255,7 @@ def layer_svg(master):
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{ICON_CANVAS}"'
         f' height="{ICON_CANVAS}" viewBox="0 0 {master.span:g} {master.span:g}">\n'
-        f"{master.glyph(master.stroke)}\n"
+        f"{master.glyph(master.span, master.share)}\n"
         f"</svg>\n"
     )
 
@@ -236,6 +277,7 @@ def write_icon_bundle(master, path):
     Returns whether anything changed, since actool never compiles the same Assets.car twice.
     """
     background = {"solid": srgb(master.background)}
+    glyph = {"solid": srgb(master.foreground)}
     # actool swaps any dark background for its own system-dark, so only the glyph varies.
     manifest = {
         "fill": background,
@@ -245,15 +287,17 @@ def write_icon_bundle(master, path):
                     {
                         "image-name": "glyph.svg",
                         "name": "glyph",
-                        # Clear and tinted both draw the "tinted" variant, lit by luminance.
+                        # Clear and tinted both draw the "tinted" variant, lit by luminance,
+                        # so the bars stay the light color there too.
                         "fill-specializations": [
-                            {"appearance": appearance, "value": background}
+                            {"appearance": appearance, "value": glyph}
                             for appearance in ("dark", "tinted")
                         ],
                     }
                 ],
-                "shadow": {"kind": "neutral", "opacity": 0.5},
-                "translucency": {"enabled": True, "value": 0.5},
+                # The brand is flat: a faint shadow and opaque bars, not frosted glass.
+                "shadow": {"kind": "neutral", "opacity": 0.25},
+                "translucency": {"enabled": False, "value": 0.5},
             }
         ],
         "supported-platforms": {"squares": ["macOS"]},
@@ -271,7 +315,7 @@ def write_icon_bundle(master, path):
     shutil.rmtree(path, ignore_errors=True)
     (path / "Assets").mkdir(parents=True)
     for file, text in files.items():
-        file.write_text(text, encoding="utf-8")
+        file.write_text(text, encoding="utf-8", newline="\n")
     return True
 
 
@@ -301,9 +345,9 @@ def rasterize(svg_text, pixels, workdir, name):
     """Renders directly from vector artwork onto a transparent pixel canvas."""
     source = workdir / f"{name}.svg"
     target = workdir / f"{name}.png"
-    source.write_text(svg_text, encoding="utf-8")
-    subprocess.run(
-        [
+    source.write_text(svg_text, encoding="utf-8", newline="\n")
+    if shutil.which("rsvg-convert"):
+        command = [
             "rsvg-convert",
             "--width", str(pixels),
             "--height", str(pixels),
@@ -311,9 +355,12 @@ def rasterize(svg_text, pixels, workdir, name):
             "--background-color", "none",
             "--output", str(target),
             str(source),
-        ],
-        check=True,
-    )
+        ]
+    else:
+        command = [
+            "resvg", "--width", str(pixels), "--height", str(pixels), str(source), str(target)
+        ]
+    subprocess.run(command, check=True)
     return target.read_bytes()
 
 
@@ -349,8 +396,11 @@ def write_icns(entries, path):
 
 
 def main():
-    if not shutil.which("rsvg-convert"):
-        sys.exit("icons: rsvg-convert missing, run under `nix shell nixpkgs#librsvg`")
+    if not (shutil.which("rsvg-convert") or shutil.which("resvg")):
+        sys.exit(
+            "icons: no SVG renderer, run under `nix shell nixpkgs#librsvg`"
+            " or `cargo install resvg`"
+        )
 
     master = Master(MASTER)
     assets = ROOT / "assets"
@@ -360,16 +410,19 @@ def main():
 
         scalable = assets / "linux" / "sonicly.svg"
         scalable.parent.mkdir(parents=True, exist_ok=True)
-        scalable.write_text(round_svg(master, 512), encoding="utf-8")
+        scalable.write_text(round_svg(master), encoding="utf-8", newline="\n")
 
+        (ROOT / ".github").mkdir(exist_ok=True)
         (ROOT / ".github" / "readme-icon.svg").write_text(
-            readme_svg(master), encoding="utf-8"
+            readme_svg(master), encoding="utf-8", newline="\n"
         )
         (assets / "macos").mkdir(parents=True, exist_ok=True)
-        (assets / "macos" / "sonicly.svg").write_text(readme_svg(master), encoding="utf-8")
+        (assets / "macos" / "sonicly.svg").write_text(
+            readme_svg(master), encoding="utf-8", newline="\n"
+        )
         (assets / "windows").mkdir(parents=True, exist_ok=True)
         (assets / "windows" / "sonicly.svg").write_text(
-            rounded_svg(master, 512), encoding="utf-8"
+            rounded_svg(master), encoding="utf-8", newline="\n"
         )
 
         for pixels in LINUX_SIZES:
@@ -388,9 +441,8 @@ def main():
 
         icns = []
         for kind, points, scale in ICNS_TYPES:
-            blob = rasterize(
-                squircle_svg(master, points), points * scale, workdir, kind
-            )
+            pixels = points * scale
+            blob = rasterize(squircle_svg(master, pixels), pixels, workdir, kind)
             icns.append((kind, blob))
         write_icns(icns, assets / "macos" / "sonicly.icns")
 
@@ -408,7 +460,7 @@ def main():
         tray = assets / "tray"
         tray.mkdir(parents=True, exist_ok=True)
         for pixels in TRAY_SIZES:
-            blob = rasterize(template_svg(master), pixels, workdir, f"t{pixels}")
+            blob = rasterize(template_svg(master, pixels), pixels, workdir, f"t{pixels}")
             (tray / f"template-{pixels}.png").write_bytes(blob)
         for obsolete in ["template-32.png", "template-64.png", "sonicly.png"]:
             (tray / obsolete).unlink(missing_ok=True)
@@ -417,17 +469,19 @@ def main():
         bundle = assets / "macos" / "sonicly.icon"
         car = assets / "macos" / "Assets.car"
         compiled = False
-        if sys.platform != "darwin":
-            print("icons: actool needs macOS, sonicly.icon and Assets.car left as they were")
-        elif write_icon_bundle(master, bundle) or not car.exists():
+        if write_icon_bundle(master, bundle) or not car.exists():
+            # A catalog compiled from an older bundle would ship the old artwork.
             car.unlink(missing_ok=True)
-            compile_icon_bundle(bundle, workdir, car)
-            compiled = True
+            if sys.platform == "darwin":
+                compile_icon_bundle(bundle, workdir, car)
+                compiled = True
+            else:
+                print("icons: actool needs macOS, rerun there to compile Assets.car")
 
     print(
         f"icons: {len(LINUX_SIZES)} linux png, 1 linux svg, 1 icns, 1 ico,"
-        f" {len(TRAY_SIZES)} tray png, 1 readme svg, 1 macos svg, 1 windows svg"
-        f"{', 1 icon bundle, 1 car' if compiled else ''}"
+        f" {len(TRAY_SIZES)} tray png, 1 readme svg, 1 macos svg, 1 windows svg,"
+        f" 1 icon bundle{', 1 car' if compiled else ''}"
     )
 
 

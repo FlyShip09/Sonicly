@@ -14,7 +14,7 @@ use super::rows::{Announced as _, grid};
 use super::{Group, SettingsView, Slot, TYPEFACES};
 use crate::shared::popups::matches_query;
 
-/// The website's gallery of themes people made, whose install buttons hand a theme to Sonora.
+/// The website's gallery of themes people made, whose install buttons hand a theme to Sonicly.
 /// How large a pack's sample glyphs draw on its card.
 const SAMPLE: Pixels = px(14.);
 const TYPEFACE_LIMIT: usize = 200;

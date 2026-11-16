@@ -470,7 +470,7 @@ pub(super) fn source_name(provider: &str) -> SharedString {
         "Jellyfin" => "settings-lyrics-provider-jellyfin",
         "Spotify" => "settings-lyrics-provider-spotify",
         "YouTube Music" => "settings-lyrics-provider-youtube",
-        "Apple Music" => "settings-lyrics-provider-apple-music",
+        "Binimum" => "settings-lyrics-provider-binimum",
         "Musixmatch" => "settings-lyrics-provider-musixmatch",
         "LrcLib" => "settings-lyrics-provider-lrclib",
         "Kugou" => "settings-lyrics-provider-kugou",

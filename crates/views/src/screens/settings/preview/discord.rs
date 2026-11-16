@@ -1,4 +1,4 @@
-//! A replica of the activity card Discord shows in a profile for the status Sonora sets, in
+//! A replica of the activity card Discord shows in a profile for the status Sonicly sets, in
 //! Discord's own dark theme, sizes and type. It follows every setting on the page and draws the
 //! status the way `state::discord` would send it for a track from listening history. Screen
 //! readers hear it as a named group of its text lines, buttons and provider badge.
@@ -41,10 +41,10 @@ const BAR_FILL: u32 = 0xdbdee1;
 const BUTTON: u32 = 0x4e5058;
 const BUTTON_HOVER: u32 = 0x6d6f78;
 const BUTTON_TEXT: u32 = 0xffffff;
-/// Sonora's application icon, which Discord shows in place of art the status leaves out: the
+/// Sonicly's application icon, which Discord shows in place of art the status leaves out: the
 /// mark in black on white.
-const APP_ICON: u32 = 0xffffff;
-const APP_MARK: u32 = 0x000000;
+const APP_ICON: u32 = 0x1C1B1A;
+const APP_MARK: u32 = 0xF3F0E8;
 /// The badge's disc is the provider's own colour with its mark in white on it.
 const BADGE_MARK: u32 = 0xffffff;
 /// How wide the card stands and how far its content sits from its edge.
@@ -61,7 +61,7 @@ const ART_GAP: Pixels = px(12.);
 const BADGE_SIZE: Pixels = px(32.);
 const BADGE_RING: Pixels = px(4.);
 const BADGE_OVERHANG: Pixels = px(4.);
-/// Sonora's mark on the application icon, as a share of the icon.
+/// Sonicly's mark on the application icon, as a share of the icon.
 const APP_MARK_SHARE: f32 = 0.56;
 /// A provider's mark on the badge, as a share of the badge.
 const BADGE_MARK_SHARE: f32 = 0.5;
@@ -83,8 +83,8 @@ const BUTTON_RADIUS: Pixels = px(8.);
 const BUTTON_GAP: Pixels = px(8.);
 /// How far through the track the card starts, as a share of its length, before it counts on.
 const START_SHARE: f32 = 0.3;
-/// What the status calls itself when the setting names Sonora, Discord's name for the app.
-const SONORA: &str = "Sonicly";
+/// What the status calls itself when the setting names Sonicly, Discord's name for the app.
+const SONICLY: &str = "Sonicly";
 
 /// What the Discord page's preview keeps between frames.
 pub(in crate::screens::settings) struct DiscordPreview {
@@ -116,9 +116,9 @@ impl DiscordPreview {
     }
 }
 
-/// The Discord page's preview, the card Discord shows for the status Sonora sets. It shows a
-/// track picked from listening history, playing while Sonora plays or has nothing loaded and
-/// paused while Sonora is paused, and dims only while Discord presence is disabled.
+/// The Discord page's preview, the card Discord shows for the status Sonicly sets. It shows a
+/// track picked from listening history, playing while Sonicly plays or has nothing loaded and
+/// paused while Sonicly is paused, and dims only while Discord presence is disabled.
 pub(in crate::screens::settings) fn preview(
     state: &DiscordPreview,
     view: &SettingsView,
@@ -150,10 +150,10 @@ pub(in crate::screens::settings) fn preview(
     let local = sample.id.as_deref().is_some_and(music::is_local_id);
 
     let listening: SharedString = match name {
-        DiscordName::Sonora => SONORA.into(),
+        DiscordName::Sonicly => SONICLY.into(),
         DiscordName::Provider => provider
             .map(|(_, _, listening)| SharedString::from(listening))
-            .unwrap_or_else(|| SONORA.into()),
+            .unwrap_or_else(|| SONICLY.into()),
         DiscordName::Music => t!("settings-discord-preview-music"),
         DiscordName::Title => sample.title.clone(),
         DiscordName::Artist => sample.artist.clone(),
@@ -274,7 +274,7 @@ pub(in crate::screens::settings) fn preview(
     )
 }
 
-/// The large image with the provider's badge at its bottom right, or Sonora's application
+/// The large image with the provider's badge at its bottom right, or Sonicly's application
 /// icon when the status carries no art, as Discord falls back to it. The badge, given as the
 /// provider's slug and name, reads to screen readers as an image named after the provider.
 fn image(art: Option<String>, badge: Option<(&'static str, &'static str)>, cx: &gpui::App) -> Div {

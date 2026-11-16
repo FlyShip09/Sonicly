@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <path d="M40.9600 0 c8.0648 0 12.0971 0 15.1775 1.5695 a14.4000 14.4000 0 0 1 6.2930 6.2930 c1.5695 3.0803 1.5695 7.1127 1.5695 15.1775 L64.0000 40.9600 c0 8.0648 0 12.0971 -1.5695 15.1775 a14.4000 14.4000 0 0 1 -6.2930 6.2930 c-3.0803 1.5695 -7.1127 1.5695 -15.1775 1.5695 L23.0400 64.0000 c-8.0648 0 -12.0971 0 -15.1775 -1.5695 a14.4000 14.4000 0 0 1 -6.2930 -6.2930 c-1.5695 -3.0803 -1.5695 -7.1127 -1.5695 -15.1775 L0 23.0400 c0 -8.0648 0 -12.0971 1.5695 -15.1775 a14.4000 14.4000 0 0 1 6.2930 -6.2930 c3.0803 -1.5695 7.1127 -1.5695 15.1775 -1.5695 Z" fill="white"/>
-  <path d="M13.3333 27.3333V36.6667" stroke="black" stroke-width="2" stroke-linecap="round"/>
-  <path d="M22.6667 20.3333V43.6667" stroke="black" stroke-width="2" stroke-linecap="round"/>
-  <path d="M32.0 13.3333V50.6667" stroke="black" stroke-width="2" stroke-linecap="round"/>
-  <path d="M41.3333 20.3333V43.6667" stroke="black" stroke-width="2" stroke-linecap="round"/>
-  <path d="M50.6667 27.3333V36.6667" stroke="black" stroke-width="2" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <path d="M15.3600 0 c3.0243 0 4.5364 0 5.6915 0.5886 a5.4000 5.4000 0 0 1 2.3599 2.3599 c0.5886 1.1551 0.5886 2.6673 0.5886 5.6915 L24.0000 15.3600 c0 3.0243 0 4.5364 -0.5886 5.6915 a5.4000 5.4000 0 0 1 -2.3599 2.3599 c-1.1551 0.5886 -2.6673 0.5886 -5.6915 0.5886 L8.6400 24.0000 c-3.0243 0 -4.5364 0 -5.6915 -0.5886 a5.4000 5.4000 0 0 1 -2.3599 -2.3599 c-0.5886 -1.1551 -0.5886 -2.6673 -0.5886 -5.6915 L0 8.6400 c0 -3.0243 0 -4.5364 0.5886 -5.6915 a5.4000 5.4000 0 0 1 2.3599 -2.3599 c1.1551 -0.5886 2.6673 -0.5886 5.6915 -0.5886 Z" fill="#1C1B1A"/>
+  <path d="M6 9V12" stroke="#F3F0E8" stroke-width="2" stroke-linecap="round"/>
+  <path d="M9 6V12" stroke="#F3F0E8" stroke-width="2" stroke-linecap="round"/>
+  <path d="M12 8V16" stroke="#F3F0E8" stroke-width="2" stroke-linecap="round"/>
+  <path d="M15 12V18" stroke="#F3F0E8" stroke-width="2" stroke-linecap="round"/>
+  <path d="M18 12V15" stroke="#F3F0E8" stroke-width="2" stroke-linecap="round"/>
 </svg>

@@ -1,14 +1,6 @@
 [workspace]
 resolver = "3"
-members = [
-    "crates/*",
-    "vendor/embed",
-    "vendor/i18n",
-    "vendor/music",
-    "vendor/state",
-    "vendor/storage",
-    "vendor/webview",
-]
+members = ["crates/*"]
 # A local clone of the gpui fork, used only while patching it.
 exclude = ["vendor/gpui"]
 
@@ -19,28 +11,25 @@ license = "GPL-3.0-or-later"
 repository = "https://github.com/FlyShip09/Sonicly"
 
 [workspace.dependencies]
-embed = { path = "vendor/embed" }
+embed = { path = "crates/embed" }
 cli = { path = "crates/cli" }
-i18n = { path = "vendor/i18n" }
+i18n = { path = "crates/i18n" }
 icons = { path = "crates/icons" }
-music = { path = "vendor/music" }
-state = { path = "vendor/state" }
-storage = { path = "vendor/storage" }
+music = { path = "crates/music" }
+state = { path = "crates/state" }
+storage = { path = "crates/storage" }
 input = { path = "crates/input" }
 router = { path = "crates/router" }
 ui = { path = "crates/ui" }
 views = { path = "crates/views" }
-webview = { path = "vendor/webview" }
+webview = { path = "crates/webview" }
 
 alsa = "0.11"
 anyhow = "1.0"
 ardftsrc = "0.4.4"
 async-trait = "0.1"
 base64 = "0.23"
-blowfish = "0.10"
 bytes = "1"
-cbc = "0.2"
-cc = "1"
 clap = { version = "4", default-features = false, features = [
     "std",
     "help",
@@ -193,7 +182,6 @@ serde-saphyr = { version = "2.1", default-features = false, features = [
 ] }
 sha1 = "0.11"
 sha2 = "0.11"
-smallvec = { version = "1.16", features = ["union"] }
 souvlaki = "0.9"
 sys-locale = "0.3"
 symphonia = { version = "0.5.5", default-features = false, features = [

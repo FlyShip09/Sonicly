@@ -1,0 +1,37 @@
+# Parity with upstream
+
+Status of each feature of the engine Sonicly was ported from. "Ported" means the
+code is in the tree and compiles; "seen" means it has been observed working in a
+running Sonicly.
+
+| Area | Feature | Status |
+| --- | --- | --- |
+| Playback | Engine, seeking, buffering, gapless, loudness normalization | Ported; play/seek seen (YouTube Music guest) |
+| Playback | Output device selection, sample rate, buffer | Ported |
+| Playback | OS media controls (SMTC, MPRIS, Now Playing) | Ported |
+| Sound | Parametric equalizer, presets, import/export | Ported |
+| Sound | Spectrum and analyzer | Ported |
+| Sources | Local files, tags, embedded art, `.lrc`/`.ttml` | Ported |
+| Sources | Local playlists: M3U | Ported |
+| Sources | Local playlists: CUE, PLS, XSPF | Not in upstream; planned |
+| Sources | YouTube Music (guest and signed in) | Ported; guest home seen |
+| Sources | Spotify (Premium, librespot) | Ported; search/genre lookup rewritten, not yet seen |
+| Sources | Tidal, Subsonic/Navidrome, Jellyfin | Ported |
+| Sources | Apple Music, Deezer | Removed (DRM) |
+| Sources | Downloaded Spotify helper ("Soloist") | Removed (ran an unverified download) |
+| Library | Songs, albums, artists, playlists, favorites, recents | Ported |
+| Queue | Shuffle, repeat, reorder, play next/last | Ported |
+| Lyrics | Synced, word-level, romanization, source priority | Ported; third-party proxy off by default |
+| Offline | Sealed download cache | Ported |
+| Offline | Download from a link via the user's yt-dlp | Planned |
+| Integrations | Last.fm, ListenBrainz, Maloja scrobbling | Ported |
+| Integrations | Discord Rich Presence | Ported, disabled until Sonicly has an application id |
+| Integrations | Shared listening sessions | Ported; needs a user-supplied server |
+| App | Themes, theme files, adaptive tint | Ported |
+| App | Keyboard shortcuts, quick search, CLI control | Ported |
+| App | Tray, single instance, deep links (`sonicly://`) | Ported |
+| App | Auto-update | Disabled (no releases yet) |
+| App | Install counter | Removed |
+| UI | Lyrics page styling (image/video background, typeface) | Planned |
+| UI | Floating mini player | Planned |
+| UI | Drag files onto the window to import | Planned |

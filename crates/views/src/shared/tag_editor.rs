@@ -3,7 +3,7 @@ use gpui::prelude::*;
 use gpui::{App, Context, Entity, FocusHandle, Global, Render, SharedString, Window, div};
 use i18n::t;
 use music::{Track, TrackTags};
-use state::{Io, Sonora, TagState, Tags};
+use state::{Io, Sonicly, TagState, Tags};
 use ui::{
     ActiveTheme as _, Button, Dismiss, FORM_CONTEXT, Form, Input, Modal, NextField, Submit, TabBar,
     Text,
@@ -174,9 +174,9 @@ impl Global for Installed {}
 impl TagEditor {
     pub fn entity(cx: &mut App) -> Entity<Self> {
         if cx.try_global::<Installed>().is_none() {
-            let sonora = Sonora::global(cx);
-            let session = sonora.session.clone();
-            let library = sonora.library.clone();
+            let sonicly = Sonicly::global(cx);
+            let session = sonicly.session.clone();
+            let library = sonicly.library.clone();
             let editor = cx.new(|cx| {
                 let io = Io::global(cx);
                 let tags = cx.new(|cx| Tags::new(session, library, io, cx));

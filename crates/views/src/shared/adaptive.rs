@@ -1,5 +1,5 @@
 use gpui::{App, Context, Entity, Task};
-use state::{AppSettings, Playback, QueuePosition, Reloaded, Sonora};
+use state::{AppSettings, Playback, QueuePosition, Reloaded, Sonicly};
 use ui::{ActiveTheme as _, CoverPalette, Look, Theme, ThemeKind, ThemeOverrides};
 
 /// Drives the theme's tint from the playing track's cover, and keeps the next
@@ -34,8 +34,8 @@ struct Ahead {
 
 impl Adaptive {
     pub fn new(playback: Entity<Playback>, cx: &mut Context<Self>) -> Self {
-        let sonora = Sonora::global(cx);
-        let (queue, settings) = (sonora.queue.clone(), sonora.settings.clone());
+        let sonicly = Sonicly::global(cx);
+        let (queue, settings) = (sonicly.queue.clone(), sonicly.settings.clone());
         cx.observe(&playback, |this, _, cx| this.sync(false, cx))
             .detach();
         cx.observe(&settings, |this, _, cx| this.sync(false, cx))
@@ -232,7 +232,7 @@ impl Adaptive {
 /// The theme fullscreen wears over the ambient background for a cover's `palette`, for a preview
 /// that has to look like fullscreen while the app wears the chosen theme.
 pub(crate) fn stage(palette: CoverPalette, cx: &App) -> Theme {
-    let settings = Sonora::global(cx).settings.read(cx);
+    let settings = Sonicly::global(cx).settings.read(cx);
     let look = Look {
         kind: ThemeKind::Dark,
         tint: palette.primary,

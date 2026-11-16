@@ -18,7 +18,7 @@ pub enum VeilEdge {
     Bottom,
 }
 
-/// Whether backdrop blurs are drawn at all. `SONORA_BLUR=0` turns them off for a renderer that
+/// Whether backdrop blurs are drawn at all. `SONICLY_BLUR=0` turns them off for a renderer that
 /// cannot afford them, and every haze falls back to its flat colour.
 pub fn effects() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();

@@ -10,7 +10,7 @@ use gpui::{
 use i18n::t;
 use music::{AccountChoices, SignIn, SignInPrompt};
 use router::{Destination, SettingsPage, navigate};
-use state::{Failure, Outcome, Scan, SessionState, Sonora, Toast, Toasts};
+use state::{Failure, Outcome, Scan, SessionState, Sonicly, Toast, Toasts};
 use ui::{
     ActiveTheme as _, Avatar, Button, HoverFade, Initials, LEADING, Modal, Radio, Skeleton, Text,
     Theme, mix,
@@ -570,14 +570,14 @@ impl SettingsView {
 
     pub(super) fn rescan_local_folder(&mut self, cx: &mut Context<Self>) {
         Scan::global(cx).update(cx, |scan, _| scan.asked());
-        Sonora::global(cx)
+        Sonicly::global(cx)
             .library
             .clone()
             .update(cx, |library, cx| library.rescan_local(true, cx));
     }
 
     pub(super) fn remove_local_folder(&mut self, path: String, cx: &mut Context<Self>) {
-        Sonora::global(cx)
+        Sonicly::global(cx)
             .library
             .clone()
             .update(cx, |library, cx| {
@@ -1375,12 +1375,7 @@ impl RenderOnce for ProviderRow {
                     .child(div().flex().flex_none().items_center().child(trailing)),
             )
             .when_some(error, |this, error| {
-                let notice = match error.problem {
-                    Some(music::SignInProblem::Subscription) => {
-                        crate::shared::trouble::trouble(error, false, cx)
-                    }
-                    _ => account_error(&error, cx).into_any_element(),
-                };
+                let notice = account_error(&error, cx).into_any_element();
                 this.child(
                     div()
                         .flex()

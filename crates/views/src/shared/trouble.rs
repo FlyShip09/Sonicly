@@ -1,40 +1,13 @@
-use gpui::accesskit::Role;
 use gpui::prelude::*;
-use gpui::{AnyElement, App, ClickEvent, ElementId, SharedString, Window, div};
+use gpui::{AnyElement, App, ClickEvent, ElementId, SharedString, Window};
 use i18n::t;
 use music::SignInProblem;
 use state::{Failure, Network};
-use ui::{ActiveTheme as _, Button, Notice, Text, Vacancy};
+use ui::{Button, Notice, Vacancy};
 
 /// Shows a sign-in failure with recovery guidance for known account problems.
 /// Connection failures keep their own title and icon because signing in again will not help.
-pub(crate) fn trouble(failure: Failure, centered: bool, cx: &App) -> AnyElement {
-    if failure.problem == Some(SignInProblem::Subscription) {
-        let message = t!("login-problem-subscription");
-        return div()
-            .id("subscription-failure")
-            .role(Role::Alert)
-            .aria_label(message.clone())
-            .flex()
-            .flex_col()
-            .gap_1()
-            .text_size(cx.theme().text(Text::Small))
-            .when(centered, |this| this.items_center().text_center())
-            .child(div().text_color(cx.theme().muted_foreground).child(message))
-            .child(
-                Button::new("check-apple-subscription")
-                    .label(t!("login-subscription-check"))
-                    .icon("icons/external-link.svg")
-                    .ghost()
-                    .small()
-                    .tint(cx.theme().muted_foreground)
-                    .on_click(|_, _, cx| {
-                        cx.stop_propagation();
-                        cx.open_url("https://music.apple.com/");
-                    }),
-            )
-            .into_any_element();
-    }
+pub(crate) fn trouble(failure: Failure, centered: bool) -> AnyElement {
     let offline = failure.offline();
     let Failure {
         problem,
@@ -162,7 +135,6 @@ fn unwrapped_reason(text: &str) -> String {
 fn reason(problem: SignInProblem) -> &'static str {
     match problem {
         SignInProblem::Premium => "login-problem-premium",
-        SignInProblem::Subscription => "login-problem-subscription",
         SignInProblem::Region => "login-problem-region",
         SignInProblem::Credentials => "login-problem-credentials",
         SignInProblem::Password => "login-problem-password",

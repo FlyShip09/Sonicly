@@ -4,14 +4,12 @@ use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{AnyElement, App, Context, Div, MouseUpEvent, SharedString, Window, div, relative};
 use i18n::t;
-use music::drm::Origin;
 use music::{Codec, Encoding, Offer, Quality, Transcode};
-use state::{CdmState, Sleep, SoloistState};
-use ui::{ActiveTheme as _, Button, MenuItem, OptionCard, Picker, Scrubber, Switch, Text};
+use state::Sleep;
+use ui::{ActiveTheme as _, MenuItem, OptionCard, Picker, Scrubber, Switch, Text};
 
 use super::rows::{Announced as _, grid, segmented};
 use super::{Group, SettingsView, Slot};
-use crate::shared::confirm::{Confirm, Kind};
 
 /// How many quality cards a row is laid out for, however few levels a service has.
 const QUALITY_COLUMNS: usize = 4;
@@ -57,25 +55,9 @@ impl SettingsView {
                     .rows([Slot::StreamFormat, Slot::StreamBitrate]),
             );
         }
-        if self.drm.read(cx).shown(cx) {
-            groups.push(
-                Group::new("settings-group-protected", "icons/lock.svg").rows([Slot::Widevine]),
-            );
-        }
-        if self.soloist.read(cx).shown(cx) {
-            groups.push(
-                Group::new("settings-group-soloist", "icons/headphones.svg").rows([Slot::Soloist]),
-            );
-        }
         groups.extend(self.sessions_groups(cx));
         groups.extend(self.connect_groups(cx));
         groups
-    }
-
-    /// The detail of the Widevine row for its state, which a search reads.
-    pub(super) fn widevine_detail(&self, cx: &App) -> SharedString {
-        let (detail, _) = widevine_copy(self.drm.read(cx).state());
-        i18n::lookup(detail, None)
     }
 
     pub(super) fn playback_row(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -122,23 +104,19 @@ impl SettingsView {
         )
     }
 
-    /// The switch that keeps played tracks on disk. Soloist streams every track and keeps its
-    /// own cache, so the switch is out of use while it plays.
+    /// The switch that keeps played tracks on disk.
     pub(super) fn keep_tracks_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let on = self.playback.read(cx).keep_tracks();
-        let unavailable = self.soloist_plays(cx);
 
-        self.soloist_row_for(
+        self.row(
             t!("settings-keep-tracks"),
             Switch::new("keep-tracks", on)
                 .name(t!("settings-keep-tracks"))
-                .disabled(unavailable)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.playback
                         .update(cx, |playback, cx| playback.set_keep_tracks(!on, cx));
                 }))
                 .into_any_element(),
-            unavailable,
         )
     }
 
@@ -396,197 +374,6 @@ impl SettingsView {
             );
 
         self.row(t!("settings-sleep"), control.into_any_element())
-    }
-
-    /// The Widevine module row, which only appears while the current provider is one whose
-    /// tracks need the module and this build has a host for one. Sonora uses a browser's copy
-    /// when one is here and otherwise offers Google's download, so the row says where that
-    /// stands. The download is offered by hand whenever Google's copy is not the one in use,
-    /// because a browser's copy can be one this host cannot open. While the download is on
-    /// offer the explanation wraps below the row, the one description the settings keep, since
-    /// pressing Download is the consent to fetching Google's module.
-    pub(super) fn widevine_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = *cx.theme();
-        let state = self.drm.read(cx).state().clone();
-        let (detail, note) = widevine_copy(&state);
-        let offerable = matches!(
-            state,
-            CdmState::Declined | CdmState::Missing | CdmState::Ready(Origin::Installed)
-        );
-        let removable = matches!(state, CdmState::Ready(Origin::Fetched));
-        let detail = i18n::lookup(detail, None);
-
-        let action = div()
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap_2()
-            .text_color(theme.muted_foreground)
-            .text_size(theme.text(Text::Label))
-            .child(ui::spoken(
-                "settings-widevine-note",
-                i18n::lookup(note, None),
-            ))
-            .when(offerable, |row| {
-                row.child(
-                    Button::new("fetch-widevine")
-                        .label(t!("settings-widevine-fetch"))
-                        .small()
-                        .outline()
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.drm.update(cx, |drm, cx| drm.download(cx));
-                        })),
-                )
-            })
-            .when(removable, |row| {
-                row.child(
-                    Button::new("uninstall-widevine")
-                        .label(t!("settings-widevine-uninstall"))
-                        .small()
-                        .ghost()
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            let drm = this.drm.clone();
-                            Confirm::ask(
-                                Kind::Widevine,
-                                move |cx| drm.update(cx, |drm, cx| drm.uninstall(cx)),
-                                cx,
-                            );
-                        })),
-                )
-            });
-
-        div()
-            .flex()
-            .flex_col()
-            .child(self.row(t!("settings-widevine"), action.into_any_element()))
-            .when(offerable, |row| {
-                row.child(
-                    div()
-                        .id("settings-widevine-detail")
-                        .role(Role::Paragraph)
-                        .aria_label(detail.clone())
-                        .pb_5()
-                        .text_color(theme.muted_foreground)
-                        .text_size(theme.text(Text::Label))
-                        .child(detail),
-                )
-            })
-            .into_any_element()
-    }
-}
-
-impl SettingsView {
-    /// The Soloist row, which only appears while the current provider can play through
-    /// Soloist on this computer. Not set up, it offers the setup. Set up, it names the build and
-    /// carries the switch that turns Soloist on and off without undoing the setup. Remove is
-    /// offered whenever the program is on disk, a setup left halfway included. The explanation
-    /// wraps below the row either way, since it is where the listener learns what Soloist
-    /// changes before they turn it on and after.
-    pub(super) fn soloist_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = *cx.theme();
-        let state = self.soloist.read(cx).state().clone();
-        let removable = self.soloist.read(cx).installed()
-            && matches!(state, SoloistState::Off | SoloistState::Ready(_));
-        let note = match &state {
-            SoloistState::Looking => t!("settings-soloist-looking"),
-            SoloistState::Off => t!("settings-soloist-off"),
-            SoloistState::Setup(_) => t!("settings-soloist-setting-up"),
-            SoloistState::Ready(build) => {
-                t!("settings-soloist-ready", version = build.version.as_str())
-            }
-        };
-        let on = self.soloist.read(cx).in_use();
-        let detail = match on {
-            true => t!("settings-soloist-on-detail"),
-            false => t!("settings-soloist-detail"),
-        };
-
-        let action = div()
-            .flex()
-            .flex_none()
-            .items_center()
-            .gap_2()
-            .text_color(theme.muted_foreground)
-            .text_size(theme.text(Text::Label))
-            .child(ui::spoken("settings-soloist-note", note))
-            .when(state == SoloistState::Off, |row| {
-                row.child(
-                    Button::new("setup-soloist")
-                        .label(t!("settings-soloist-setup"))
-                        .small()
-                        .outline()
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.soloist.update(cx, |soloist, cx| soloist.begin(cx));
-                        })),
-                )
-            })
-            .when(removable, |row| {
-                row.child(
-                    Button::new("remove-soloist")
-                        .label(t!("settings-soloist-remove"))
-                        .small()
-                        .ghost()
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            let soloist = this.soloist.clone();
-                            Confirm::ask(
-                                Kind::Soloist,
-                                move |cx| soloist.update(cx, |soloist, cx| soloist.remove(cx)),
-                                cx,
-                            );
-                        })),
-                )
-            })
-            .when(matches!(state, SoloistState::Ready(_)), |row| {
-                row.child(
-                    Switch::new("use-soloist", on)
-                        .name(t!("settings-soloist"))
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.soloist
-                                .update(cx, |soloist, cx| soloist.set_used(!on, cx));
-                        })),
-                )
-            });
-
-        div()
-            .flex()
-            .flex_col()
-            .child(self.row(t!("settings-soloist"), action.into_any_element()))
-            .child(
-                div()
-                    .id("settings-soloist-detail")
-                    .role(Role::Paragraph)
-                    .aria_label(detail.clone())
-                    .pb_5()
-                    .text_color(theme.muted_foreground)
-                    .text_size(theme.text(Text::Label))
-                    .child(detail),
-            )
-            .into_any_element()
-    }
-}
-
-/// What the Widevine row says: the detail key for its state, and the note beside it.
-/// Shared by the row and its search entry.
-pub(super) fn widevine_copy(state: &CdmState) -> (&'static str, &'static str) {
-    match state {
-        CdmState::Looking => ("settings-widevine-detail", "settings-widevine-looking"),
-        CdmState::Ready(Origin::Configured) => {
-            ("settings-widevine-detail", "settings-widevine-configured")
-        }
-        CdmState::Ready(Origin::Installed) => {
-            ("settings-widevine-detail", "settings-widevine-installed")
-        }
-        CdmState::Ready(Origin::Fetched) => {
-            ("settings-widevine-detail", "settings-widevine-fetched")
-        }
-        CdmState::Wanted | CdmState::Offered(_) => {
-            ("settings-widevine-none", "settings-widevine-asking")
-        }
-        CdmState::Offering => ("settings-widevine-none", "settings-widevine-fetching"),
-        CdmState::Installing => ("settings-widevine-none", "settings-widevine-installing"),
-        CdmState::Declined | CdmState::Missing => {
-            ("settings-widevine-none", "settings-widevine-missing")
-        }
     }
 }
 

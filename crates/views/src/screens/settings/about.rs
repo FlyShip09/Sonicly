@@ -185,7 +185,7 @@ fn notices() -> Option<PathBuf> {
     path.exists().then_some(path)
 }
 
-/// Notepad on Windows refuses a file that Sonora still writes to, so the button opens a copy.
+/// Notepad on Windows refuses a file that Sonicly still writes to, so the button opens a copy.
 /// `File::open` shares write access, and `fs::copy` documents no share mode.
 fn snapshot(log: &Path) -> io::Result<PathBuf> {
     let copy = log.with_file_name("sonicly.copy.log");

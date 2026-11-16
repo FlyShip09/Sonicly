@@ -10,9 +10,7 @@ use crate::shared::steps::steps;
 type Action = Rc<dyn Fn(&(), &mut Window, &mut App)>;
 
 /// The walkthrough for one provider's manual cookie sign-in: the page to send the user to
-/// and the keys of every string the dialog shows. A provider whose sign-in is one cookie
-/// found by name shares the parametrized flow; a provider needing a whole request header
-/// names its own steps, with the title and the opener shared by every provider.
+/// and the keys of every string the dialog shows.
 struct Guide {
     url: &'static str,
     title: &'static str,
@@ -34,50 +32,10 @@ const YOUTUBE: Guide = Guide {
     note: "login-cookie-step-note",
 };
 
-const APPLE: Guide = Guide {
-    url: "https://music.apple.com",
-    title: "login-cookie-header-title",
-    hint: "login-cookie-hint",
-    steps: [
-        "login-cookie-named-step-1",
-        "login-cookie-step-2",
-        "login-cookie-apple-step-3",
-        "login-cookie-step-4",
-    ],
-    note: "login-cookie-apple-note",
-};
-
-const DEEZER: Guide = Guide {
-    url: "https://www.deezer.com",
-    title: "login-cookie-named-title",
-    hint: "login-cookie-named-hint",
-    steps: [
-        "login-cookie-named-step-1",
-        "login-cookie-named-step-2",
-        "login-cookie-named-step-3",
-        "login-cookie-named-step-4",
-    ],
-    note: "login-cookie-named-note",
-};
-
-/// The guide for a provider slug. YouTube's is the fallback: pasting a whole request header
-/// needs no cookie name, so its wording fits any header paste.
-fn guide(slug: &str) -> &'static Guide {
-    match slug {
-        "apple" => &APPLE,
-        "deezer" => &DEEZER,
-        _ => &YOUTUBE,
-    }
-}
-
-/// The site the devtools show and the cookie to copy, for the flows whose strings name them.
-/// YouTube's header flow needs neither, so it carries no entry here.
-fn named(slug: &str) -> Option<(&'static str, &'static str)> {
-    match slug {
-        "deezer" => Some(("www.deezer.com", "arl")),
-        "apple" => Some(("music.apple.com", "media-user-token")),
-        _ => None,
-    }
+/// The guide for a provider slug. Every provider that signs in by a pasted request header
+/// shares YouTube's, whose wording names no cookie.
+fn guide(_slug: &str) -> &'static Guide {
+    &YOUTUBE
 }
 
 #[derive(IntoElement)]
@@ -139,10 +97,6 @@ impl RenderOnce for CookiePrompt {
 
         let mut args = FluentArgs::new();
         args.set("provider", provider.value());
-        if let Some((site, cookie)) = named(slug) {
-            args.set("site", site.value());
-            args.set("cookie", cookie.value());
-        }
 
         Modal::new("cookie-prompt", lookup(guide.title, Some(&args)))
             .w(px(560.))

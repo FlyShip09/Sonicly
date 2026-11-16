@@ -235,7 +235,7 @@ comes again on every change, on the same connection, until the command line hang
 → {"v":1,"body":{"watch":{"position":false}}}
 ← {"v":1,"body":"done"}
 ← {"v":1,"body":{"value":{"volume":80}}}
-← {"v":1,"body":{"failed":{"no-account":"Deezer"}}}
+← {"v":1,"body":{"failed":{"no-account":"Tidal"}}}
 ```
 
 `v` is `wire::VERSION`. A line of another version is refused before its body is read, so an older

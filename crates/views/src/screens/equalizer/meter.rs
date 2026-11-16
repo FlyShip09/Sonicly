@@ -17,7 +17,7 @@ const INLINE: usize = 2;
 const STATUS_SHRINK: f32 = 1000.;
 
 /// The strip under the graph: the output's level meter, then the clip warning and its fix while
-/// the output overloads, and at the far end whether what leaves Sonora is bit-perfect. The screen
+/// the output overloads, and at the far end whether what leaves Sonicly is bit-perfect. The screen
 /// places it as a cached view at a fixed height, so the meter's reads and the warning and status
 /// coming and going redraw only the strip and never move the page.
 pub(super) struct OutputMeter {
@@ -38,12 +38,12 @@ struct Warning {
     fixable: bool,
 }
 
-/// Whether the sound leaves Sonora as the decoded track bit for bit, as the strip says it.
+/// Whether the sound leaves Sonicly as the decoded track bit for bit, as the strip says it.
 #[derive(Clone, PartialEq)]
 enum Status {
     /// Nothing is loaded, or the engine has not opened the track yet.
     Idle,
-    /// Bit-perfect from Sonora, with the rate the sound server converts it to afterwards.
+    /// Bit-perfect from Sonicly, with the rate the sound server converts it to afterwards.
     Perfect { server: Option<u32> },
     /// What changes the sound, in the order it happens.
     Altered(Vec<Alter>),
@@ -52,15 +52,13 @@ enum Status {
 /// One thing that changes the sound, holding only what its short label shows.
 #[derive(Clone, Copy, PartialEq)]
 enum Alter {
-    /// Soloist plays the track past Sonora, so nothing more can be said of the sound.
-    Direct,
     Rounded(u8),
     Normalized,
     Resampled(u32, u32),
     Equalized,
     Volume,
     Remixed(u16, u16),
-    /// The bits Sonora carries, `None` for a track without a bit depth, and the device's.
+    /// The bits Sonicly carries, `None` for a track without a bit depth, and the device's.
     Requantized(Option<u8>, u8),
 }
 
@@ -238,7 +236,6 @@ impl Render for OutputMeter {
 impl From<Change> for Alter {
     fn from(change: Change) -> Self {
         match change {
-            Change::Direct => Self::Direct,
             Change::Rounded { from } => Self::Rounded(from),
             Change::Normalised(_) | Change::Limited => Self::Normalized,
             Change::Resampled { from, to } => Self::Resampled(from, to),
@@ -266,7 +263,6 @@ fn status(signal: &Signal) -> Status {
 
 fn label(alter: Alter) -> SharedString {
     match alter {
-        Alter::Direct => t!("equalizer-status-direct"),
         Alter::Rounded(from) => t!("equalizer-status-bits", from = from, to = FLOAT_BITS),
         Alter::Normalized => t!("equalizer-status-normalized"),
         Alter::Resampled(from, to) => {

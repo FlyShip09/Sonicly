@@ -1,4 +1,4 @@
-//! Headless regression suite keeping sonorahq/sonora#1101 fixed (NVDA heard silence).
+//! Headless regression suite keeping a screen reader regression fixed (NVDA heard silence).
 //!
 //! A node reaches the AccessKit tree only when its element carries BOTH an id
 //! and a role (`Element::a11y_role()` returns `Some`). Each test renders one

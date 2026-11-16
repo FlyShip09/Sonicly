@@ -23,7 +23,6 @@ pub(crate) mod popups;
 pub(crate) mod powerbar;
 pub(crate) mod shelves;
 pub(crate) mod smart_playlist;
-pub(crate) mod soloist;
 pub(crate) mod steps;
 pub(crate) mod tag_editor;
 pub(crate) mod text;
@@ -34,15 +33,12 @@ pub(crate) mod transport;
 pub(crate) mod trouble;
 pub(crate) mod visualizer;
 pub(crate) mod volume;
-pub(crate) mod widevine;
 
 pub(crate) use ui::effects;
 
 /// The brand colours of the providers' marks.
 const SPOTIFY: u32 = 0x1ed760;
 const YOUTUBE: u32 = 0xff0033;
-const DEEZER: u32 = 0xa238ff;
-const APPLE: u32 = 0xfa2d48;
 const SUBSONIC: u32 = 0xffa31a;
 const JELLYFIN: u32 = 0x00a4dc;
 /// How much of the foreground text keeps where the theme would grey it over the ambient field.
@@ -54,8 +50,6 @@ pub(crate) fn provider_logo(slug: &str) -> &'static str {
         "spotify" => "icons/spotify.svg",
         "youtube" => "icons/youtubemusic.svg",
         "subsonic" => "icons/subsonic.svg",
-        "deezer" => "icons/deezer.svg",
-        "apple" => "icons/applemusic.svg",
         "tidal" => "icons/tidal.svg",
         "jellyfin" => "icons/jellyfin.svg",
         _ => "icons/music.svg",
@@ -68,8 +62,6 @@ pub(crate) fn provider_brand(slug: &str, cx: &gpui::App) -> gpui::Hsla {
     match slug {
         "spotify" => gpui::rgb(SPOTIFY).into(),
         "youtube" => gpui::rgb(YOUTUBE).into(),
-        "deezer" => gpui::rgb(DEEZER).into(),
-        "apple" => gpui::rgb(APPLE).into(),
         "subsonic" => gpui::rgb(SUBSONIC).into(),
         "jellyfin" => gpui::rgb(JELLYFIN).into(),
         _ => ui::ActiveTheme::theme(cx).foreground,

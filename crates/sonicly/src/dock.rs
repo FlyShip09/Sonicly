@@ -1,4 +1,4 @@
-/// Sets the Dock icon from the embedded family when Sonora runs outside an app bundle. A bundle
+/// Sets the Dock icon from the embedded family when Sonicly runs outside an app bundle. A bundle
 /// keeps its own icon, because an image set here would replace the adaptive one in `Assets.car`.
 #[cfg(target_os = "macos")]
 pub fn install_icon() {
