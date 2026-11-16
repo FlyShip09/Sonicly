@@ -17,7 +17,7 @@ use crate::{
 use super::index::Index;
 use super::scan::Scanned;
 use super::store::{Starred, Store, Stored};
-use super::{m3u, tags, wire};
+use super::{m3u, pls, tags, wire, xspf};
 
 const COVERS: usize = 4;
 const NOT_SUPPORTED: &str = "local playlists are not shared";
@@ -335,14 +335,11 @@ impl MusicApi for LocalClient {
     }
 
     async fn track_tags(&self, track_id: &str) -> Result<TrackTags> {
-        let path = wire::path_from_track_id(track_id)
-            .ok_or_else(|| anyhow!("{track_id} is not a local track id"))?;
-        tags::read(path)
+        tags::read(whole_file(track_id)?)
     }
 
     async fn set_track_tags(&self, track_id: &str, updated: TrackTags) -> Result<()> {
-        let path = wire::path_from_track_id(track_id)
-            .ok_or_else(|| anyhow!("{track_id} is not a local track id"))?;
+        let path = whole_file(track_id)?;
         let year_changed = tags::read(path)?.year != updated.year;
         let album_tracks = year_changed.then(|| self.album_track_paths(track_id));
 
@@ -478,7 +475,15 @@ impl MusicApi for LocalClient {
         let bytes =
             std::fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
         let folder = path.parent().unwrap_or_else(|| Path::new(""));
-        let (found, skipped) = self.find_files(&m3u::read(&bytes, folder));
+        let extension = path
+            .extension()
+            .map(|extension| extension.to_string_lossy().to_ascii_lowercase());
+        let listed = match extension.as_deref() {
+            Some("pls") => pls::read(&bytes, folder),
+            Some("xspf") => xspf::read(&bytes, folder),
+            _ => m3u::read(&bytes, folder),
+        };
+        let (found, skipped) = self.find_files(&listed);
         let name = path
             .file_stem()
             .map(|stem| stem.to_string_lossy().trim().to_owned())
@@ -639,8 +644,7 @@ impl MusicApi for LocalClient {
     }
 
     async fn delete_track_file(&self, track_id: &str) -> Result<()> {
-        let path = wire::path_from_track_id(track_id)
-            .ok_or_else(|| anyhow!("{track_id} is not a local track id"))?;
+        let path = whole_file(track_id)?;
 
         self.store.set_starred(Starred::Tracks, track_id, false)?;
         std::fs::remove_file(path).with_context(|| format!("cannot delete {}", path.display()))?;
@@ -795,6 +799,16 @@ impl MusicApi for LocalClient {
             sections,
         })
     }
+}
+
+/// The file a track id names, for a caller about to read or change the file as that track's
+/// own. A track a cue sheet cuts out of a longer file is refused: its tags are the whole
+/// album's, and deleting it would delete every other track of the sheet with it.
+fn whole_file(track_id: &str) -> Result<&Path> {
+    if wire::window(track_id).is_some() {
+        anyhow::bail!("{track_id} is one track of a longer file, named by its cue sheet");
+    }
+    wire::path_from_track_id(track_id).ok_or_else(|| anyhow!("{track_id} is not a local track id"))
 }
 
 /// The library's tracks by where each file really is, for matching a path that reaches a file

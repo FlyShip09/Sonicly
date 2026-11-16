@@ -48,7 +48,8 @@ pub fn write(tracks: &[Track], folder: &Path) -> String {
 
 /// The text of a playlist file. An `.m3u8` is UTF-8, with or without a byte order mark, while an
 /// older `.m3u` may be Latin-1, which is read byte for byte when the file is not valid UTF-8.
-fn decode(bytes: &[u8]) -> String {
+/// PLS, XSPF and cue sheets are read the same way.
+pub(super) fn decode(bytes: &[u8]) -> String {
     let bytes = bytes.strip_prefix(BOM).unwrap_or(bytes);
     match std::str::from_utf8(bytes) {
         Ok(text) => text.to_owned(),
@@ -58,7 +59,16 @@ fn decode(bytes: &[u8]) -> String {
 
 /// The file one line of a playlist names, if it names one.
 fn entry(line: &str, folder: &Path) -> Option<PathBuf> {
-    if line.is_empty() || line.starts_with('#') {
+    match line.starts_with('#') {
+        true => None,
+        false => located(line, folder),
+    }
+}
+
+/// The file a playlist of any format means by `line`: a path, relative to `folder` or not, or
+/// a `file://` URL. Nothing for an empty one or a web address.
+pub(super) fn located(line: &str, folder: &Path) -> Option<PathBuf> {
+    if line.is_empty() {
         return None;
     }
     let path = match line.get(..FILE_URL.len()) {
