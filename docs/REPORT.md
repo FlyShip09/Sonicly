@@ -60,8 +60,14 @@ the level log of the same run covers the first 8 to 11 s in half-second steps an
 | WAV | Demos (No Artwork)/01 Teaspoon.wav | 13 s | 2 s to 9 s in 6.6 s | yes, -31.5 to -23.4 dBFS | none beside it |
 
 All eight decode and play. The lengths match what ffprobe reads from the same files. Titles and
-artists came from the tags, the Japanese and Nordic ones included. None of the test files
-carries embedded art, so the covers are the placeholder.
+artists came from the tags, the Japanese and Nordic ones included.
+
+### Embedded artwork
+
+Three albums were copied to `.targets/media-art` with a cover embedded by ffmpeg (FLAC picture
+block, MP3 ID3v2 APIC, M4A `covr`). Home showed each album's cover on its tile, on its tracks
+in Quick picks and on its artist; Now playing showed the FLAC's cover and took the background's
+colour from it.
 
 ### Controls, with FLAC
 
@@ -133,9 +139,37 @@ Working set of the debug build as `scripts/shot.ps1` prints it.
 | Playlists page, a local file playing, merged build | 139 MB |
 | Lyrics with a video background (measured on its own branch) | 206-210 MB |
 
-No release build has been measured yet.
+### Release build (Windows x64, version 0.1.0)
+
+| Measure | Value |
+| --- | --- |
+| `sonicly.exe` | 82.6 MB, GUI subsystem, Sonicly icon and version resource |
+| Portable zip | 30.1 MB (`scripts/windows/package-portable.ps1`) |
+| Process start to first window | 716 ms |
+| Home at 1080x1080 after 8 s, YouTube Music guest | 145 MB working set, 150 MB private, 0.9 s CPU |
+
+One run each, not an average.
+
+### A 10,000-track library (debug build)
+
+10,000 one-second MP3 files in 100 artist folders (`.targets/big`), Songs page open at
+1080x1080.
+
+| Measure | Value |
+| --- | --- |
+| Working set after relaunch with the library already scanned | 149-151 MB (121 MB private) |
+| Process start to first window | 592-778 ms |
+| CPU time between 12 s and 42 s after start, nothing playing | about 0.8 s, under 3% of one core |
+
+The list draws only the rows on screen. Scrolling it was not measured: the capture window takes
+no input, so frame times at 60 or 120 Hz are still unknown.
 
 ## Not verified
+
+- The Windows installer: its script is reviewed but Inno Setup is not installed, so it has
+  never been compiled. Nothing is code-signed.
+- Scrolling frame times, and the fix for playlists that name a cue-split file (unit test
+  written, not run; `cargo test` is run only when the owner asks).
 
 - Streaming from YouTube Music, Spotify, Tidal, Subsonic or Jellyfin, any sign-in, and a yt-dlp
   download: these need the owner.
@@ -143,7 +177,7 @@ No release build has been measured yet.
   output chain at real time, not what it sounds like.
 - Gapless joins between files, loudness normalization, the equalizer, output device switching,
   OS media controls.
-- Embedded artwork and `.ttml` lyrics (the test files have neither).
+- `.ttml` lyrics (no test file has them).
 - A real drag from the system onto the window; the lyrics video background and the Fluid field
   in the merged build (seen on their own branch only).
 - macOS and Linux: nothing was built or run there.
@@ -154,8 +188,6 @@ No release build has been measured yet.
 
 - `gpui::window: RefCell already borrowed` is logged at startup now and then (twice in about
   thirty launches). Nothing visibly failed. Cause not looked into.
-- A playlist that names a file split by a cue sheet takes one of the sheet's tracks, not all of
-  them and not the file.
 - A late engine event read after a load has reached the engine can still show the track as
   paused for a moment before the engine's "playing" corrects it. It no longer stops the load.
 - No test covers the `unsent` fix; it was checked by reproduction only.
