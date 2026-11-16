@@ -149,6 +149,8 @@ pub struct Button {
     toggled: Option<bool>,
     /// Whether the button stands for one tab of a tab list.
     tab: bool,
+    /// Whether something around the button draws its selection, so it paints none of its own.
+    slid: bool,
     indicator: bool,
     /// The colour of the status dot over the icon's top left corner, `None` for no dot.
     status: Option<Hsla>,
@@ -198,6 +200,7 @@ impl Button {
             expanded: None,
             toggled: None,
             tab: false,
+            slid: false,
             indicator: false,
             status: None,
             backgroundless: false,
@@ -382,6 +385,18 @@ impl Button {
         self
     }
 
+    /// Whether the button is the chosen one of its group.
+    pub(crate) fn is_selected(&self) -> bool {
+        self.selected
+    }
+
+    /// Leaves the selected fill to whatever holds the button, such as a segmented bar whose
+    /// highlight slides from one segment to the next.
+    pub(crate) fn slid(mut self) -> Self {
+        self.slid = true;
+        self
+    }
+
     /// Paints an active-state dot below the icon without changing the button's layout or hit area.
     pub fn indicator(mut self, indicator: bool) -> Self {
         self.indicator = indicator;
@@ -531,6 +546,7 @@ impl RenderOnce for Button {
             expanded,
             toggled,
             tab,
+            slid,
             indicator,
             status,
             backgroundless,
@@ -874,7 +890,7 @@ impl RenderOnce for Button {
             .when(small, |this| this.text_size(theme.text(Text::Label)))
             .when_some(weight, |this, weight| this.font_weight(weight))
             .when_some(palette.background, |this, background| this.bg(background))
-            .when(selected && !backgroundless, |this| {
+            .when(selected && !backgroundless && !slid, |this| {
                 this.bg(selected_background)
             })
             .when_some(palette.border, |this, border| {
@@ -1091,7 +1107,7 @@ impl RenderOnce for Button {
         button.style().refine(&overrides);
         // The glow goes on last, over whatever fill the variant and the caller chose.
         let rest = solid_fill(&overrides)
-            .or_else(|| (selected && !backgroundless).then_some(selected_background))
+            .or_else(|| (selected && !backgroundless && !slid).then_some(selected_background))
             .or(palette.background);
         let button = match glow_color.and_then(|fill| glow_fill(rest, fill, glow)) {
             Some(color) => button.bg(color),
