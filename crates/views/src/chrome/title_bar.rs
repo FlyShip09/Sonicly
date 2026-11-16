@@ -20,8 +20,9 @@ use router::{Destination, Navigation, SettingsPage, navigate, open_settings};
 use state::{AppSettings, Sonicly, Stars};
 
 const SYSTEM_ZOOMS: bool = cfg!(target_os = "windows");
-/// The rule between the current screen's controls and the account and sidebar segment.
-const SEGMENT_RULE: Pixels = px(1.);
+/// A hairline: the bar's own bottom edge, which the page's surface reaches over, and the edge of
+/// the right sidebar continued up through the bar.
+const EDGE: Pixels = px(1.);
 
 /// Tells whether the page a refresh reloaded is still waiting for its data.
 pub(crate) type Busy = Box<dyn Fn(&App) -> bool>;
@@ -165,8 +166,7 @@ impl TitleBar {
                     .icon("icons/chevron-left.svg")
                     .tooltip("nav-back")
                     .disabled(!can_back)
-                    .size_8()
-                    .px_0()
+                    .small()
                     .when(can_back, |button| {
                         button
                             .hover(move |style| style.bg(hover))
@@ -182,8 +182,7 @@ impl TitleBar {
                     .icon("icons/chevron-right.svg")
                     .tooltip("nav-forward")
                     .disabled(!can_forward)
-                    .size_8()
-                    .px_0()
+                    .small()
                     .when(can_forward, |button| {
                         button
                             .hover(move |style| style.bg(hover))
@@ -200,8 +199,7 @@ impl TitleBar {
                         .icon("icons/refresh-cw.svg")
                         .turned(turn)
                         .tooltip("app-refresh")
-                        .size_8()
-                        .px_0()
+                        .small()
                         .hover(move |style| style.bg(hover))
                         .active(move |style| style.bg(hover))
                         .on_click(|_, window, cx| window.dispatch_action(Box::new(Refresh), cx)),
@@ -326,19 +324,6 @@ impl TitleBar {
             )
     }
 
-    /// The thin upright rule that sets the account and sidebar segment apart from the controls
-    /// of the current screen.
-    fn segment_rule(cx: &App) -> impl IntoElement {
-        let theme = cx.theme();
-
-        div()
-            .flex_none()
-            .w(SEGMENT_RULE)
-            .h(theme.metrics.control_small / 2.)
-            .mx_1()
-            .bg(theme.border)
-    }
-
     fn toggle(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let icon = match self.options.sidebar_open {
             true => "icons/panel-left-close.svg",
@@ -394,6 +379,11 @@ impl Render for TitleBar {
         let radius = crate::chrome::window_radius(settings, cx, window);
         #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         let radius: Option<Pixels> = None;
+        // In the workspace the page's own surface runs up under the bar from the sidebar's edge,
+        // so the bar reads as the top of the page and the sidebar as one full-height column.
+        let chrome = Chrome::get(cx);
+        let unified = navigation && !self.options.transparent && !theme.transparent;
+        let (left, right) = (chrome.left(), chrome.right());
 
         div()
             .id("title-bar")
@@ -438,11 +428,39 @@ impl Render for TitleBar {
                     window.start_window_move();
                 }
             }))
+            .when(unified, |this| {
+                this.relative().child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .bottom(-EDGE)
+                        .left(left)
+                        .right_0()
+                        .bg(theme.background)
+                        .when(left > Pixels::ZERO, |this| {
+                            this.border_l_1().border_color(theme.sidebar_border)
+                        })
+                        .when(right > Pixels::ZERO, |this| {
+                            this.child(
+                                div()
+                                    .absolute()
+                                    .top_0()
+                                    .bottom_0()
+                                    .right(right - EDGE)
+                                    .w(EDGE)
+                                    .bg(theme.border),
+                            )
+                        }),
+                )
+            })
             .child(
                 div()
                     .flex()
                     .flex_none()
                     .items_center()
+                    // The sidebar's toggle stays over the sidebar, and the history starts where
+                    // the page does.
+                    .when(unified, |this| this.min_w(left))
                     .map(|this| match (leading, inset) {
                         (true, _) => this.pl_2(),
                         (false, Some(inset)) => this.pl(inset),
@@ -478,10 +496,7 @@ impl Render for TitleBar {
                                 .child(self.downloads.clone()),
                         )
                     })
-                    .map(|this| match (navigation, content) {
-                        (true, Some(content)) => this.child(content).child(Self::segment_rule(cx)),
-                        (_, content) => this.children(content),
-                    })
+                    .children(content)
                     .map(|this| match navigation || sidebar_right.is_some() {
                         true => this.pr_1(),
                         false => this.pr_3(),
@@ -495,6 +510,7 @@ impl Render for TitleBar {
                         .items_center()
                         .gap_1()
                         .pr_3()
+                        .when(navigation, |this| this.pl_3())
                         .when(navigation, |this| {
                             this.child(self.star(window, cx)).child(self.account(cx))
                         })

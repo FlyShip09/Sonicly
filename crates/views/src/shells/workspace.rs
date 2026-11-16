@@ -282,10 +282,9 @@ impl Render for Workspace {
                             .min_w_0()
                             .min_h_0()
                             .ml(overlay_width)
-                            // The page is one surface set into the frame: its own colour, and a
-                            // hairline along the edges it shares with the title bar and sidebar.
+                            // The page is one surface set into the frame: its own colour, which
+                            // the title bar carries on above it, and a hairline along the sidebar.
                             .when(!theme.transparent, |this| this.bg(theme.background))
-                            .border_t_1()
                             .when(edged, |this| this.border_l_1())
                             .border_color(theme.sidebar_border)
                             .when(overlay, |this| this.overflow_hidden())
