@@ -5,7 +5,7 @@ use gpui::{
 };
 use i18n::t;
 use music::Track;
-use state::{History, HistoryState, Playback, Sonicly};
+use state::{Generated, History, HistoryState, Playback, Sonicly, Swatches};
 use ui::{
     ActiveTheme as _, Button, Listing as _, Modal, Scrollbar, Scroller, TableDelegate, TableEvent,
     TableState, runtime, table, vacant,
@@ -68,6 +68,8 @@ impl HistoryView {
 
         let chrome = crate::chrome::Chrome::entity(cx);
         cx.observe(&chrome, |_, _, cx| cx.notify()).detach();
+        let swatches = Swatches::entity(cx);
+        cx.observe(&swatches, |_, _, cx| cx.notify()).detach();
         cx.observe(&history, |this, _, cx| {
             this.table.rebuild(cx);
             cx.notify();
@@ -136,8 +138,8 @@ impl HistoryView {
         }
 
         PageHero::new("history-hero", t!("nav-history"))
-            .fallback("icons/rotate-ccw-clock.svg")
-            .accent()
+            .fallback(Generated::Recents.glyph())
+            .generated(Swatches::colors(Generated::Recents, cx))
             .eyebrow(t!("detail-playlist"))
             .meta(strip)
             .actions(

@@ -3,15 +3,15 @@ use std::rc::Rc;
 use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, Div, ElementId, Entity, FontWeight, MouseButton,
+    AnyElement, App, ClickEvent, Context, Div, ElementId, Entity, FontWeight, Hsla, MouseButton,
     MouseDownEvent, Pixels, Rems, SharedString, Stateful, Window, div, px, relative, rems,
 };
 use i18n::t;
 use music::{Album, Track};
 use state::{Origin, Playback};
 use ui::{
-    ActiveTheme as _, Artwork, Badge, Button, Flight, LEADING, MenuItem, Perch, Pin, Pinnable as _,
-    Skeleton, TableState, Tails as _, Text, Theme, Tipped as _, spoken,
+    ActiveTheme as _, Artwork, Badge, Button, Flight, GeneratedCover, LEADING, MenuItem, Perch,
+    Pin, Pinnable as _, Skeleton, TableState, Tails as _, Text, Theme, Tipped as _, spoken,
 };
 
 use crate::shared::tracks::{self, TrackSource};
@@ -358,6 +358,8 @@ pub(crate) struct PageHero {
     cover: Option<String>,
     fallback: Option<SharedString>,
     accent: bool,
+    /// The colours a page without a cover of its own draws one from, with the fallback glyph.
+    generated: Option<Vec<Hsla>>,
     eyebrow: Option<SharedString>,
     meta: Option<AnyElement>,
     actions: Option<AnyElement>,
@@ -378,6 +380,7 @@ impl PageHero {
             cover: None,
             fallback: None,
             accent: false,
+            generated: None,
             eyebrow: None,
             meta: None,
             actions: None,
@@ -442,6 +445,13 @@ impl PageHero {
 
     pub(crate) fn accent(mut self) -> Self {
         self.accent = true;
+        self
+    }
+
+    /// Draws the cover from `colors`, the colours of the collection's first covers, for a page
+    /// with no artwork of its own. The fallback glyph goes on it.
+    pub(crate) fn generated(mut self, colors: &[Hsla]) -> Self {
+        self.generated = Some(colors.to_vec());
         self
     }
 
@@ -541,12 +551,24 @@ impl RenderOnce for PageHero {
             .gap(COVER_GAP)
             .pb_6()
             .child({
-                let artwork = Artwork::new(self.cover)
+                let artwork = match (self.cover, self.generated) {
+                    (None, Some(colors)) => GeneratedCover::new(
+                        (self.id.clone(), "generated"),
+                        self.title.clone(),
+                        self.fallback.unwrap_or_default(),
+                    )
+                    .colors(colors)
                     .size(art)
                     .corner_radius(Self::cover_radius(&theme))
-                    .when(self.circle, Artwork::circle)
-                    .when_some(self.fallback, Artwork::fallback)
-                    .when(self.accent, Artwork::accent);
+                    .into_any_element(),
+                    (cover, _) => Artwork::new(cover)
+                        .size(art)
+                        .corner_radius(Self::cover_radius(&theme))
+                        .when(self.circle, Artwork::circle)
+                        .when_some(self.fallback, Artwork::fallback)
+                        .when(self.accent, Artwork::accent)
+                        .into_any_element(),
+                };
                 let cover =
                     div()
                         .flex_none()

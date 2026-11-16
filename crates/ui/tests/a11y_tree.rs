@@ -39,9 +39,9 @@ use gpui::{
     div,
 };
 use ui::{
-    Button, Card, Checkbox, DraggedPin, Field, Form, Glowing as _, Input, OptionCard, OtpInput,
-    Pin, PinKind, Pinnable as _, Radio, RangeScrubber, RangeState, Scrubber, ScrubberState, Spot,
-    Theme, Toast,
+    Button, Card, Checkbox, DraggedPin, Field, Form, GeneratedCover, Glowing as _, Input,
+    OptionCard, OtpInput, Pin, PinKind, Pinnable as _, Radio, RangeScrubber, RangeState, Scrubber,
+    ScrubberState, Spot, Theme, Toast,
 };
 
 /// Formats what the frame builder would put in the tree for `element`.
@@ -780,5 +780,28 @@ async fn movable_row_keeps_its_role_name_and_place(cx: &mut TestAppContext) {
             .iter()
             .any(|line| line.contains("place=Some(3) of=Some(5)")),
         "a row that can be dragged into a new order loses its place in the list: {lines:?}"
+    );
+}
+
+#[gpui::test]
+async fn generated_cover_is_an_image_named_for_its_collection(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |window, cx| {
+        let element = GeneratedCover::new("favorites-cover", "Favorites", "icons/heart-filled.svg")
+            .colors([gpui::hsla(0.6, 0.5, 0.4, 1.)])
+            .size(gpui::px(140.))
+            .render(window, cx)
+            .into_element();
+        snapshot("generated-cover", &element)
+    });
+    let lines = rendered(&lines, "generated-cover");
+    assert!(
+        lines.iter().any(|line| line.contains("role=Image")),
+        "a generated cover drops out of the tree, the hero reads as a blank: {lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("name=Some(\"Favorites\")")),
+        "a generated cover is not named for its collection: {lines:?}"
     );
 }

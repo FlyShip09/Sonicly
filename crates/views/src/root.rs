@@ -1454,7 +1454,9 @@ impl Render for Root {
             )
             .when(!show_sign_in, |this| this.child(shell));
         // A closed menu or dialog fades out here, over everything else in the window.
-        let root = root.child(ui::lingers());
+        let root = root
+            .child(ui::lingers())
+            .children(crate::chrome::cover_specimens(window, cx));
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         let root = root.child(WindowFrame::new());
         root
