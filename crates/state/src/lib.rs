@@ -103,9 +103,7 @@ pub use sponsorblock::SponsorBlock;
 pub use stars::{REPO_URL, Stars};
 pub use tags::{TagState, Tags};
 pub use toast::{Outcome, Target, Toast, ToastAction, Toasts};
-pub use updates::{
-    Channel, RELEASE_REPO, Release, UpdateState, Updates, commit, updates_itself, version,
-};
+pub use updates::{RELEASE_REPO, Release, UpdateState, Updates, commit, version};
 pub use vault::CACHE_GB_RANGE;
 pub use wake::Wake;
 pub use window_shape::{

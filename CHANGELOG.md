@@ -33,4 +33,5 @@ one line about what someone using Sonicly can now do.
 
 ### Security
 
+- Sonicly can no longer download and run an installer to update itself. That code is deleted; an update notice, once there are releases, only links to the release page.
 - Spotify and YouTube Music sign-ins are now sealed on disk like the others; see `docs/PRIVACY.md` for the one-minute gap that remains for YouTube.

@@ -1103,12 +1103,8 @@ lyrics-source-local = Letras do arquivo local
 lyrics-writers = Escrita por { $writers }
 
 update-available = Sonicly { $version } está disponível
-update-detail = Você está na versão { $running }. Veja o que mudou ou atualize agora.
 update-detail-notes = Você está na versão { $running }. Veja o que mudou e atualize o Sonicly da forma como você o instalou.
 update-notes = O que há de novo
-update-now = Atualizar
-update-working = Baixando a atualização…
-update-failed = Não foi possível instalar a atualização. Tente novamente pela página de lançamentos.
 update-never = Não verificar atualizações
 notice-never = Não mostrar novamente
 requirement-audio-bridge-title = O Sonicly não consegue acessar seu servidor de som
