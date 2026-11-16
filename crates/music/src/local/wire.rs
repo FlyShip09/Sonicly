@@ -528,6 +528,7 @@ pub fn modified_at(path: &Path) -> Option<i64> {
 }
 
 /// Reads one file into a track, with the album artist, year, release type and label its tags claim.
+/// `None` when the file is not audio any reader here recognises.
 /// A file naming an album artist joins that artist's album of the same name. One that names none
 /// joins the album of the same name in its own folder, so featured artists never split an album.
 /// The year comes out of the same read because it is what an album is dated by, and opening every
@@ -566,6 +567,17 @@ pub fn track_from_file(
     // hand-rolled reader skips a frame it doesn't understand by its declared size alone, so it
     // can still recover the other, perfectly well-formed frames around it.
     let lenient = tag.is_none().then(|| id3::read(path)).flatten();
+
+    // A file no reader makes anything of is not music, whatever its name ends in: an empty
+    // file, a download cut off before its header, a text file with the wrong extension. Listing
+    // it would put a song in the library that can never play.
+    if tagged.is_none() && fallback.is_none() && lenient.is_none() {
+        log::warn!(
+            "local: {} is not an audio file Sonicly can read, so it is left out",
+            path.display()
+        );
+        return None;
+    }
 
     let (inferred_title, inferred_artist) = infer_from_stem(&file_stem(path));
 
@@ -1157,8 +1169,8 @@ mod tests {
     #[test]
     fn a_track_is_dated_by_the_file_it_came_from() {
         let dir = scratch("sonicly-wire-test-dated");
-        let path = dir.join("song.mp3");
-        std::fs::write(&path, []).unwrap();
+        let path = dir.join("song.flac");
+        super::super::tags::tests::flac(&path, &[]);
 
         let stamped = modified_at(&path).expect("a file just written has a modified time");
         let track = track_from_file(&path, None, None, &dir)
@@ -1172,8 +1184,8 @@ mod tests {
     #[test]
     fn an_album_is_dated_by_its_newest_track() {
         let dir = scratch("sonicly-wire-test-album-dated");
-        let path = dir.join("song.mp3");
-        std::fs::write(&path, []).unwrap();
+        let path = dir.join("song.flac");
+        super::super::tags::tests::flac(&path, &[]);
 
         let mut older = track_from_file(&path, None, None, &dir)
             .expect("a track")
@@ -1193,6 +1205,22 @@ mod tests {
         );
 
         assert_eq!(album.added_at, Some(2_000));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_file_no_reader_knows_as_audio_is_not_a_track() {
+        let dir = scratch("sonicly-wire-test-not-audio");
+        let empty = dir.join("empty.mp3");
+        std::fs::write(&empty, []).unwrap();
+        let text = dir.join("notes.mp3");
+        std::fs::write(&text, "this is not audio at all").unwrap();
+        let noise = dir.join("noise.wav");
+        std::fs::write(&noise, [0x5a; 4096]).unwrap();
+
+        assert!(track_from_file(&empty, None, None, &dir).is_none());
+        assert!(track_from_file(&text, None, None, &dir).is_none());
+        assert!(track_from_file(&noise, None, None, &dir).is_none());
         std::fs::remove_dir_all(&dir).ok();
     }
 

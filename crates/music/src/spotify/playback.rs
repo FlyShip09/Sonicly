@@ -424,6 +424,7 @@ impl Engine {
                 false => Normalisation::Off,
             },
             direct: false,
+            nominal: true,
         };
         let id = track_id.to_owned();
         self.signals.send(PlaybackEvent::Signal { id, track }).ok();
@@ -577,9 +578,10 @@ fn translate(event: PlayerEvent) -> Option<PlaybackEvent> {
             track_id: uri,
             ..
         } => Some(PlaybackEvent::Throttled { id: track_id(uri) }),
-        PlayerEvent::Unavailable { track_id: uri, .. } => {
-            Some(PlaybackEvent::Unavailable { id: track_id(uri) })
-        }
+        PlayerEvent::Unavailable { track_id: uri, .. } => Some(PlaybackEvent::Unavailable {
+            id: track_id(uri),
+            reason: None,
+        }),
         _ => None,
     }
 }

@@ -170,19 +170,43 @@ pub fn install(window: WindowId, hwnd: *mut c_void, cx: &mut App) -> bool {
     true
 }
 
+/// What the taskbar is to show next, handed to the task that talks to the shell.
+enum Change {
+    Show(Shown),
+    Mark(Progress),
+}
+
 /// Owns the toolbar and the taskbar progress and keeps both in step with
 /// playback, the way `Tray` does for the tray menu.
+///
+/// The shell calls themselves run in `_shell`, a task of their own, and never
+/// inside an update of the app. Each of them waits on Explorer, and while it
+/// waits Windows delivers whatever other threads send to the window: a move,
+/// a resize, an activation. GPUI answers those by updating the app, which it
+/// cannot do while an update is already under way, so the message was dropped
+/// and logged as `RefCell already borrowed`.
 pub struct ThumbBar {
-    bar: Bar,
+    changes: UnboundedSender<Change>,
     shown: Shown,
     progress: Progress,
     /// Moves the progress every [`TICK`]. Runs only while a track plays.
     ticker: Option<Task<()>>,
     _events: Task<()>,
+    _shell: Task<()>,
 }
 
 impl ThumbBar {
     fn new(mut bar: Bar, mut receiver: UnboundedReceiver<Event>, cx: &mut Context<Self>) -> Self {
+        let (changes, mut pending) = mpsc::unbounded_channel();
+        let _shell = cx.spawn(async move |_, _| {
+            while let Some(change) = pending.recv().await {
+                match change {
+                    Change::Show(shown) => bar.show(&shown),
+                    Change::Mark(progress) => bar.mark(progress),
+                }
+            }
+        });
+
         let _events = cx.spawn(async move |this, cx| {
             while let Some(event) = receiver.recv().await {
                 if this.upgrade().is_none() {
@@ -210,15 +234,16 @@ impl ThumbBar {
             .detach();
 
         let shown = shown(cx);
-        bar.show(&shown);
+        changes.send(Change::Show(shown.clone())).ok();
         let progress = progress(cx);
-        bar.mark(progress);
+        changes.send(Change::Mark(progress)).ok();
         let mut this = Self {
-            bar,
+            changes,
             shown,
             progress,
             ticker: None,
             _events,
+            _shell,
         };
         this.tick(cx);
         this
@@ -227,7 +252,7 @@ impl ThumbBar {
     fn publish(&mut self, cx: &mut Context<Self>) {
         let progress = progress(cx);
         if progress != self.progress {
-            self.bar.mark(progress);
+            self.changes.send(Change::Mark(progress)).ok();
             self.progress = progress;
             self.tick(cx);
         }
@@ -236,7 +261,7 @@ impl ThumbBar {
         if shown == self.shown {
             return;
         }
-        self.bar.show(&shown);
+        self.changes.send(Change::Show(shown.clone())).ok();
         self.shown = shown;
     }
 

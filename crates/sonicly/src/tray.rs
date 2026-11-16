@@ -12,7 +12,7 @@ use gpui::{App, AppContext as _, Context, Entity, Global, SharedString, Task};
 use i18n::t;
 use router::Destination;
 use state::{Outcome, PlaybackState, Repeat, Sonicly, Toasts};
-use tokio::sync::mpsc::{self, UnboundedReceiver};
+use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 #[cfg(any(target_os = "macos", windows))]
 use native::Icon;
@@ -107,8 +107,18 @@ pub fn install(
     Icon::hosted()
 }
 
+/// What the tray is to do next, handed to the task that talks to the shell.
+enum Change {
+    Show(Box<Shown>),
+    Place(bool),
+}
+
+/// Keeps the tray icon and its menu in step with playback. The icon itself lives in `_shell`,
+/// a task of its own, so no call to the shell is made inside an update of the app: on Windows
+/// such a call waits on Explorer, the window's messages from other threads are delivered
+/// meanwhile, and GPUI drops the ones it cannot answer while an update is under way.
 pub struct Tray {
-    icon: Icon,
+    changes: UnboundedSender<Change>,
     shown: Shown,
     /// Whether the icon is in the tray now, which `place` compares against the setting.
     placed: bool,
@@ -117,6 +127,7 @@ pub struct Tray {
     art: Option<Arc<Art>>,
     artwork: Option<Task<()>>,
     _events: Task<()>,
+    _shell: Task<()>,
 }
 
 impl Tray {
@@ -174,39 +185,47 @@ impl Tray {
         let settings = Sonicly::global(cx).settings.clone();
         cx.observe(&settings, |this, _, cx| this.place(cx)).detach();
 
+        let (changes, mut pending) = mpsc::unbounded_channel();
+        let _shell = cx.spawn(async move |this, cx| {
+            while let Some(change) = pending.recv().await {
+                match change {
+                    Change::Show(shown) => icon.show(&shown),
+                    Change::Place(placed) => {
+                        let Err(error) = icon.place(placed) else {
+                            continue;
+                        };
+                        log::warn!("tray: cannot place the tray icon: {error:#}");
+                        this.update(cx, |this, cx| this.refused(placed, cx)).ok();
+                    }
+                }
+            }
+        });
+
         let shown = shown(None, cx);
-        icon.show(&shown);
+        changes.send(Change::Show(Box::new(shown.clone()))).ok();
         crate::dock::menu(&shown, cx);
         let mut tray = Self {
-            icon,
+            changes,
             shown,
             placed: false,
             cover: None,
             art: None,
             artwork: None,
             _events,
+            _shell,
         };
         tray.place(cx);
         tray.follow(cx);
         tray
     }
 
-    /// Puts the icon in the tray, or takes it out, following `tray_icon` alone. An icon that cannot
-    /// be placed turns `tray_icon` off and says so.
+    /// Puts the icon in the tray, or takes it out, following `tray_icon` alone.
     fn place(&mut self, cx: &mut Context<Self>) {
         let placed = Sonicly::global(cx).settings.read(cx).tray_icon();
         if placed == self.placed {
             return;
         }
-        if let Err(error) = self.icon.place(placed) {
-            log::warn!("tray: cannot place the tray icon: {error:#}");
-            if placed {
-                Toasts::show(Outcome::Failed, "toast-tray-unavailable", cx);
-                let settings = Sonicly::global(cx).settings.clone();
-                settings.update(cx, |settings, cx| settings.set_tray_icon(false, cx));
-                return;
-            }
-        }
+        self.changes.send(Change::Place(placed)).ok();
         self.placed = placed;
         if !placed {
             return;
@@ -219,13 +238,27 @@ impl Tray {
         self.publish(cx);
     }
 
+    /// The shell did not do what `place` asked. An icon that cannot be placed turns `tray_icon`
+    /// off and says so; one that cannot be taken out is only logged.
+    fn refused(&mut self, placed: bool, cx: &mut Context<Self>) {
+        if !placed {
+            return;
+        }
+        self.placed = false;
+        Toasts::show(Outcome::Failed, "toast-tray-unavailable", cx);
+        let settings = Sonicly::global(cx).settings.clone();
+        settings.update(cx, |settings, cx| settings.set_tray_icon(false, cx));
+    }
+
     fn publish(&mut self, cx: &mut Context<Self>) {
         self.follow(cx);
         let shown = shown(self.art.clone(), cx);
         if shown == self.shown {
             return;
         }
-        self.icon.show(&shown);
+        self.changes
+            .send(Change::Show(Box::new(shown.clone())))
+            .ok();
         if shown.docked() != self.shown.docked() {
             crate::dock::menu(&shown, cx);
         }

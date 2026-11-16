@@ -1060,8 +1060,7 @@ impl Downloads {
     /// Says the tracks of an album or playlist could not be listed.
     fn failed_to_fetch(&mut self, error: &anyhow::Error, cx: &mut Context<Self>) {
         log::warn!("downloads: cannot list the tracks to download: {error:#}");
-        crate::noted(error, cx);
-        Toasts::post(Toast::new(Outcome::Failed, "toast-download-failed"), cx);
+        Toasts::failed("toast-download-failed", None, error, cx);
     }
 
     /// Cancels the download of a song the listener stopped from the list of running downloads.

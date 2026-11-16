@@ -605,6 +605,49 @@ pub struct TrackSignal {
     /// player does. Nothing of Sonicly's own sound path then touches it: no equalizer, no
     /// visualizer, no resampler, no chosen device.
     pub direct: bool,
+    /// Whether the bit rate in `encoding` is only the level that was asked for. librespot does
+    /// not say which file it was served, so for Spotify it is.
+    pub nominal: bool,
+}
+
+/// What is really playing, for a badge that shows the quality: every figure is one the decoder
+/// that was opened, the file or the service reported. A figure nobody reported is `None`,
+/// never a guess.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct StreamInfo {
+    /// The codec's name, such as `FLAC` or `AAC`.
+    pub codec: Option<&'static str>,
+    /// The rate the decoder puts out, in hertz, before Sonicly resamples it to the device's.
+    pub sample_rate: Option<u32>,
+    /// The bits per sample of a lossless stream. A lossy one has none.
+    pub bit_depth: Option<u8>,
+    pub channels: Option<u16>,
+    /// The bit rate of a lossy stream in kilobits a second.
+    pub kbps: Option<u32>,
+}
+
+impl TrackSignal {
+    /// What of this is known for certain. An engine that plays by itself, as a web player does,
+    /// opens no decoder of Sonicly's, so its rate and channels are left out, and a bit rate that
+    /// is only the level asked for is too.
+    pub fn stream(&self) -> StreamInfo {
+        let kbps = match self.encoding {
+            Some(
+                Encoding::Aac { kbps }
+                | Encoding::Vorbis { kbps }
+                | Encoding::Mp3 { kbps }
+                | Encoding::Opus { kbps },
+            ) => Some(kbps),
+            _ => None,
+        };
+        StreamInfo {
+            codec: self.encoding.and_then(Encoding::codec),
+            sample_rate: (!self.direct).then_some(self.rate),
+            bit_depth: self.encoding.and_then(Encoding::depth),
+            channels: (!self.direct).then_some(self.channels),
+            kbps: kbps.filter(|kbps| *kbps > 0 && !self.nominal),
+        }
+    }
 }
 
 /// What loudness normalisation does to a track.
@@ -628,6 +671,20 @@ pub struct Transcode {
 }
 
 impl Encoding {
+    /// The codec's name as it is written, `None` for one Sonicly has no name for.
+    pub fn codec(self) -> Option<&'static str> {
+        Some(match self {
+            Self::Flac { .. } => "FLAC",
+            Self::Alac { .. } => "ALAC",
+            Self::Pcm { .. } => "PCM",
+            Self::Aac { .. } => "AAC",
+            Self::Vorbis { .. } => "Vorbis",
+            Self::Mp3 { .. } => "MP3",
+            Self::Opus { .. } => "Opus",
+            Self::Other => return None,
+        })
+    }
+
     /// The bits per sample of a lossless encoding, which a lossy one has none of.
     pub fn depth(self) -> Option<u8> {
         match self {
@@ -706,8 +763,11 @@ pub enum PlaybackEvent {
     Ended {
         id: Option<String>,
     },
+    /// The track will not play. `reason` is why, in the words of whatever refused it, when
+    /// the engine was told.
     Unavailable {
         id: Option<String>,
+        reason: Option<String>,
     },
     /// The provider turned the load down for now, as it does under a rate limit, so the same
     /// track may play after a wait.
@@ -1369,6 +1429,49 @@ fn remaster_note(note: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stream_reports_only_what_is_known() {
+        let signal = |encoding, direct, nominal| TrackSignal {
+            encoding,
+            rate: 96_000,
+            channels: 2,
+            normalisation: Normalisation::Off,
+            direct,
+            nominal,
+        };
+        let flac = Encoding::Flac {
+            depth: 24,
+            rate: 96_000,
+        };
+        assert_eq!(
+            signal(Some(flac), false, false).stream(),
+            StreamInfo {
+                codec: Some("FLAC"),
+                sample_rate: Some(96_000),
+                bit_depth: Some(24),
+                channels: Some(2),
+                kbps: None,
+            }
+        );
+
+        let lossy = signal(Some(Encoding::Vorbis { kbps: 320 }), false, false).stream();
+        assert_eq!((lossy.bit_depth, lossy.kbps), (None, Some(320)));
+        // the level asked for is not what was served, and an unreported rate is not zero
+        let asked = signal(Some(Encoding::Vorbis { kbps: 320 }), false, true).stream();
+        assert_eq!((asked.codec, asked.kbps), (Some("Vorbis"), None));
+        let silent = signal(Some(Encoding::Mp3 { kbps: 0 }), false, false).stream();
+        assert_eq!(silent.kbps, None);
+
+        // a web player opens no decoder here, so its rate and channels are nobody's report
+        let direct = signal(Some(Encoding::Aac { kbps: 256 }), true, false).stream();
+        assert_eq!((direct.sample_rate, direct.channels), (None, None));
+        assert_eq!(direct.kbps, Some(256));
+
+        let unnamed = signal(Some(Encoding::Other), false, false).stream();
+        assert_eq!((unnamed.codec, unnamed.sample_rate), (None, Some(96_000)));
+        assert_eq!(signal(None, false, false).stream().codec, None);
+    }
 
     #[test]
     fn iso_8601_to_epoch_parses_correctly() {

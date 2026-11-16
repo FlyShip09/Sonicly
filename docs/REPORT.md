@@ -169,6 +169,43 @@ Cost of the new look, Home at 1080x1080 on the test library, one run each: 114 M
 and after; CPU between 12 s and 42 s after start 0.3 s before, 0.1 s after; with a track
 playing 131 MB and 0.6 s before, 126 MB and 0.7 s after.
 
+## Errors pass
+
+Started from the owner's own log, then a hunt through the app without an account.
+
+| Fault | Cause | Fix | Seen or reasoned |
+| --- | --- | --- | --- |
+| The settings file had stopped loading, so no change was being saved | `discord_name` and `spotify_connect_name` held the value an early build wrote, and one unreadable value fails the whole file | Both values are read again; unit tests | The owner's own file loads in a scratch profile. Tests compile, not run |
+| Heart as a guest answered "could not be added" (401) | Library changes were sent whatever the session | `state::has_account` at the three places every save, library change and playlist change passes through; a toast names the service and opens Settings, Providers | Seen: song heart, album heart, `sonicly like on`. Reasoned: menus, artist follow, playlist follow |
+| Failure toasts gave no reason | Errors were logged and dropped | The reason rides on the toast's second line; a track that will not play carries the engine's reason | Seen for a damaged local file |
+| WASAPI "stream configuration is no longer valid" | Device or format change | None needed: the output is retired and the engine reloads the track where it was heard | The owner's log shows the reopen in the same second; position read from code |
+| `gpui::window: RefCell already borrowed` | Taskbar and tray shell calls made inside an app update let Windows deliver window messages gpui then drops | Both make their shell calls from a task of their own | Mechanism seen (a message inside the call on five of five launches); none since in the logs kept, which is not proof |
+| Debug `key:` steps crashed | The step lent out `Root` while a key press redraws it | Steps go through the untyped window handle; `key:a` types | Seen: typing, Enter, Escape in quick search |
+| Search found nothing in a files-only library | Ranking read the streaming shelf only | Both shelves ranked | Seen |
+| Junk files listed as songs | Any file with an audio extension became a track | Left out unless a reader knows it as audio | Seen, 6 of 6 |
+| Home showed only Quick picks with no account | A sign-out settling at startup cancelled the local feed | The local feed is asked for again after it | Seen by the lead |
+
+Added: `Playback::stream_info` and `stream` in `sonicly --json current`, read for the eight
+local formats (the lead read `FLAC, 44100 Hz, 16 bit, 2 channels` from a playing file in the
+merged build). Nothing is guessed: a service that does not say reports nothing.
+
+Known from this pass and not fixed:
+
+- Files that are not audio and were indexed before this build stay listed until Rescan.
+- The Apple Music visitor mode (`--debug-guest=apple`) asks for the account's home feed and
+  recents and logs three 403s.
+- A seek past the end of a track logs a decoder warning before moving on.
+- An Ogg file cut short lists as 0:00.
+- One unreadable value still fails the whole `settings.json`; the app then names the line.
+- After a relaunch the app reloads a track that failed and fails on it again at start.
+- `sonicly search` on the command line answers only from a signed-in service, not local files.
+- `data/library.db` under the config folder, left by the first from-scratch build, is never
+  read.
+
+Not exercised in this pass: rescan after files change, queue editing, playlist export,
+the equalizer, settings toggles across a relaunch, the mini player, file open, `sonicly://`
+links, single-instance hand-over, guest context-menu saves and follows, Apple previews.
+
 ## Memory
 
 Working set of the debug build as `scripts/shot.ps1` prints it.

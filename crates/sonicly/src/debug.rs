@@ -42,7 +42,8 @@
 //! - `--debug-at=<ms>:<step>` does `<step>` that many milliseconds after the window opens, so a
 //!   capture can catch motion. It may be given more than once. A step is a pointer event at
 //!   window coordinates in logical pixels (`move:x,y`, `down:x,y`, `up:x,y`, `click:x,y`,
-//!   `wheel:x,y,lines`), a keystroke (`key:ctrl-k`), `toggle`, `next` or `prev` on the player,
+//!   `wheel:x,y,lines`), a keystroke (`key:ctrl-k`, `key:enter`; a bare `key:a` or `key:space`
+//!   types into the focused field), `toggle`, `next` or `prev` on the player,
 //!   `back` or `forward` in the history, or `go:<what>` with anything `--debug-screen` takes.
 
 use std::ffi::OsString;
@@ -332,8 +333,8 @@ impl Launch {
 /// Does one `--debug-at` step on the main window.
 fn perform(step: &str, window: gpui::WindowHandle<Root>, cx: &mut App) {
     use gpui::{
-        KeyDownEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent,
-        MouseUpEvent, PlatformInput, ScrollDelta, ScrollWheelEvent, point,
+        Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+        PlatformInput, ScrollDelta, ScrollWheelEvent, point,
     };
 
     let (kind, value) = step.split_once(':').unwrap_or((step, ""));
@@ -373,14 +374,19 @@ fn perform(step: &str, window: gpui::WindowHandle<Root>, cx: &mut App) {
             modifiers,
             touch_phase: Default::default(),
         })],
-        "key" => match Keystroke::parse(value) {
-            Ok(keystroke) => vec![PlatformInput::KeyDown(KeyDownEvent {
-                keystroke,
-                is_held: false,
-                prefer_character_input: false,
-            })],
-            Err(_) => return log::warn!("debug: cannot read the keystroke {value}"),
-        },
+        "key" => {
+            let Ok(keystroke) = Keystroke::parse(value) else {
+                return log::warn!("debug: cannot read the keystroke {value}");
+            };
+            // Through the untyped handle, as the platform sends its own events: the typed one
+            // lends out `Root` for the length of the call, and a key press draws the window,
+            // which renders `Root`. A key no binding takes types its character.
+            cx.update_window(window.into(), |_, window, cx| {
+                window.dispatch_keystroke(keystroke, cx);
+            })
+            .ok();
+            return;
+        }
         _ => {
             let playback = Sonicly::global(cx).playback.clone();
             match kind {
@@ -405,13 +411,12 @@ fn perform(step: &str, window: gpui::WindowHandle<Root>, cx: &mut App) {
             return;
         }
     };
-    window
-        .update(cx, |_, window, cx| {
-            for event in events {
-                window.dispatch_event(event, cx);
-            }
-        })
-        .ok();
+    cx.update_window(window.into(), |_, window, cx| {
+        for event in events {
+            window.dispatch_event(event, cx);
+        }
+    })
+    .ok();
 }
 
 /// The window size `--debug-size` asked for, which wins over the size the window was last

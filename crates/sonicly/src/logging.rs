@@ -6,8 +6,11 @@ use std::path::{Path, PathBuf};
 use env_logger::{Env, Logger, Target};
 use log::{Log, Metadata, Record};
 
-const CONSOLE: &str = "warn,symphonia=error,lofty=error,discord_rich_presence=error";
-const DISK: &str = "warn,symphonia=error,lofty=error,discord_rich_presence=error,sonicly=debug,sonicly::memory=info,ui=debug,music=debug,ytmusic=debug,state::potoken=debug,state::webplayer=debug,state::lyrics=debug,webview=debug";
+// symphonia reports every file it cannot probe as an error of its own. The scan says that
+// itself, once per file and as the warning it is.
+const CONSOLE: &str =
+    "warn,symphonia=error,symphonia_core::probe=off,lofty=error,discord_rich_presence=error";
+const DISK: &str = "warn,symphonia=error,symphonia_core::probe=off,lofty=error,discord_rich_presence=error,sonicly=debug,sonicly::memory=info,ui=debug,music=debug,ytmusic=debug,state::potoken=debug,state::webplayer=debug,state::lyrics=debug,webview=debug";
 const FILTER: &str = "SONICLY_LOG";
 const PREVIOUS: &str = "sonicly.log.1";
 const LIMIT: u64 = 16 * 1024 * 1024;
@@ -46,14 +49,16 @@ pub fn init() {
 
 /// Writes a panic to the log before the default hook prints it. A Sonicly started from a
 /// desktop entry or a tray has no terminal to lose it to, so this is the only place a crash
-/// leaves a trace. `RUST_BACKTRACE` still decides whether there is a backtrace to write.
+/// leaves a trace, and the backtrace is always written with it.
 fn catch_panics() {
     let default = std::panic::take_hook();
 
     std::panic::set_hook(Box::new(move |panic| {
         let thread = std::thread::current();
         let name = thread.name().unwrap_or("unnamed");
-        let backtrace = std::backtrace::Backtrace::capture();
+        // captured whatever `RUST_BACKTRACE` says: a crash on someone else's machine is only
+        // ever seen through this file
+        let backtrace = std::backtrace::Backtrace::force_capture();
         match backtrace.status() {
             std::backtrace::BacktraceStatus::Captured => {
                 log::error!("panic: {panic} on the {name} thread\n{backtrace}")

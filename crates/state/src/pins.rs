@@ -418,10 +418,11 @@ impl Pins {
     /// The provider's own uri for a pin, when the provider keeps pins itself. A listed item
     /// keeps the uri it was listed with, and the provider builds one for anything else. A
     /// provider that keeps no pins, as YouTube does, answers `None`, so the pin stays a local
-    /// one rather than failing on a call it cannot make.
+    /// one rather than failing on a call it cannot make. So does a guest session, which has no
+    /// account for the provider to keep a pin in.
     fn remote(&self, pin: &Pin, cx: &App) -> Option<String> {
         let session = self.session.read(cx);
-        if !session.capabilities().pins || music::is_local_id(&pin.id) {
+        if !session.capabilities().pins || session.guest() || music::is_local_id(&pin.id) {
             return None;
         }
         let listed = self

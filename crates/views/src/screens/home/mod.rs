@@ -234,7 +234,7 @@ impl HomeView {
 
         Picks::mixed("quick-picks", items, self.playback.clone(), width, page)
             .title("home-quick-picks")
-            .vacancy("home-quick-picks-empty")
+            .vacancy(self.home.read(cx).vacancy(cx))
             .loading(self.home.read(cx).is_loading(cx))
             .on_previous(cx.listener(|this, _, _, cx| {
                 this.quick_picks.page = this.quick_picks.page.saturating_sub(1);

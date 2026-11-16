@@ -197,6 +197,16 @@ mod tests {
     }
 
     #[test]
+    fn the_old_device_name_choice_still_loads() {
+        let values = parse(br#"{ "spotify_connect_name": "sonora", "gapless": false }"#).unwrap();
+        assert_eq!(
+            values.spotify_connect_name,
+            crate::settings::ConnectName::Sonicly
+        );
+        assert!(!values.gapless);
+    }
+
+    #[test]
     fn the_version_is_the_first_key_written() {
         let written = serde_json::to_string(&Values::default()).unwrap();
         assert!(written.starts_with(&format!("{{\"version\":{CURRENT},")));
