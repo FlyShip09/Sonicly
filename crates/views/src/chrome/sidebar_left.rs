@@ -450,11 +450,15 @@ impl SidebarLeft {
 
         let held = pinned.len();
         let count = held + rest.len();
-        let row = ui::snapped(cx.theme().metrics.list_row, window);
+        // unfolded, pins are rows of the same source list as the navigation above them
+        let (row, gap) = match self.folded() {
+            true => (ui::snapped(cx.theme().metrics.list_row, window), ROW_GAP),
+            false => (ui::snapped(cx.theme().metrics.nav_row, window), NAV_GAP),
+        };
         Some(
             Deck::new("sidebar-pins-deck")
                 .rows((0..count).map(|_| row))
-                .gap(ROW_GAP)
+                .gap(gap)
                 .draw(cx.processor(move |this, index: usize, _, cx| {
                     let pin = match index < held {
                         true => pinned.get(index),
@@ -662,6 +666,7 @@ impl SidebarLeft {
             .when(pin.kind.round(), Card::circle)
             .when(pin.kind == PinKind::Liked, Card::accent)
             .when(self.folded(), Card::glance)
+            .when(!self.folded(), Card::compact)
             .play(
                 playing,
                 cx.listener(move |this, _, _, cx| {
