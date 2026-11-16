@@ -1771,6 +1771,7 @@ impl Aside {
                 .pt_2()
                 .flex()
                 .flex_col()
+                .when(face.centered, |this| this.items_center().text_center())
                 .text_size(theme.text(Text::Small))
                 .text_color(quiet(&theme))
                 .child(ui::spoken("lyrics-credit-source", from))

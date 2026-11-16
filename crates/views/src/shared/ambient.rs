@@ -44,6 +44,8 @@ const SHADE: f32 = 0.55;
 /// Time constant of the exponential ease onto a new palette, in seconds. The
 /// field lands within a few percent of the target after about three of these.
 const WASH: f32 = 0.8;
+/// How much of the cover's colours the fluid field keeps, more than the waves' `1 - SHADE`.
+const FLUID_KEPT: f32 = 0.62;
 /// How many times smaller across each side the field behind the window is drawn before it is
 /// stretched back over it. Nothing in it is sharper than a heavy blur, so the stretch does not show,
 /// and the shader runs on a sixteenth of the pixels.
@@ -563,7 +565,10 @@ impl Ambient {
         let pictured = match style.background {
             LyricsBackground::Waves => return None,
             LyricsBackground::Fluid => {
-                let [base, highlight, second, shadow, _] = field.colors.map(shaded);
+                // The streams keep more of the cover than the waves do: they are softer, and the
+                // shader's own ceiling still holds them under the lines.
+                let [base, highlight, second, shadow, _] =
+                    field.colors.map(|color| kept(color, FLUID_KEPT));
                 let fluid = ui::Fluid::new([shadow, base, second, highlight])
                     .stage(stage)
                     .time(field.elapsed)
@@ -880,8 +885,12 @@ fn layered(colors: [Hsla; COLORS]) -> [Hsla; COLORS] {
 /// colour's channels cut by what the sheet lets through, so cutting them here is the same
 /// picture with one layer fewer to spend the window's alpha on.
 fn shaded(color: Hsla) -> Hsla {
+    kept(color, 1. - SHADE)
+}
+
+/// A colour with its channels cut to `kept` of themselves, as black laid over it would leave it.
+fn kept(color: Hsla, kept: f32) -> Hsla {
     let rgba = Rgba::from(color);
-    let kept = 1. - SHADE;
 
     Hsla::from(Rgba {
         r: rgba.r * kept,

@@ -31,7 +31,7 @@ const LEGIBLE: f32 = 0.183;
 const SAMPLES: (u32, u32) = (48, 27);
 /// Which share of the sampled points the brightness is read at, counting from the darkest, so a
 /// few bright points can raise it but one stray highlight does not.
-const BRIGHT_SHARE: f32 = 0.85;
+const BRIGHT_SHARE: f32 = 0.95;
 
 /// Why a video cannot be shown, which the page says in its own words.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
