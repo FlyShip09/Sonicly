@@ -10,11 +10,7 @@ use crate::{LyricsHit, LyricsProvider, LyricsQuery};
 const SOURCE: &str = "Apple Music";
 const SEARCH: &str = "https://lyrics-api.binimum.org/";
 const TRUST: u32 = 180;
-const AGENT: &str = concat!(
-    "sonicly/",
-    env!("CARGO_PKG_VERSION"),
-    " (https://github.com/sonorahq/sonora)"
-);
+const AGENT: &str = concat!("sonicly/", env!("CARGO_PKG_VERSION"));
 
 pub struct Binimum {
     http: reqwest::Client,

@@ -111,7 +111,7 @@ impl YouTubeProvider {
     }
 
     fn saved(&self) -> Option<Saved> {
-        let body = std::fs::read(&self.credentials).ok()?;
+        let body = credentials::read(&self.credentials).ok()?;
         match serde_json::from_slice(&body) {
             Ok(saved) => Some(saved),
             Err(error) => {

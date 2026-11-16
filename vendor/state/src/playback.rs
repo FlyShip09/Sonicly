@@ -178,13 +178,11 @@ const LISTED_FILES: usize = 5;
 /// How many tracks' signal reports are kept: the one playing, the one queued behind it, and
 /// room for a skip that has not been heard yet.
 const SIGNALS: usize = 4;
-/// The FAQ entry on why Spotify may refuse an account the keys to its audio.
 /// How long the pointer rests on a play button before its collection is fetched, so a pointer
 /// crossing a row of covers asks for none of them.
 const WARM_DWELL: Duration = Duration::from_millis(40);
 /// How long a fetched collection may start a press without being asked for again.
 const WARM_TTL: Duration = Duration::from_secs(120);
-const KEYS_FAQ: &str = "https://sonorahq.org/faq#spotify-playback-keys";
 
 /// A collection fetched for a play button, so a press on it need not wait for its tracks.
 struct Warm {
@@ -3872,7 +3870,7 @@ impl Playback {
                 let soloist = Sonora::global(cx).soloist.clone();
                 soloist.update(cx, |soloist, cx| soloist.begin(cx));
             }),
-            false => toast.visit("toast-why", KEYS_FAQ),
+            false => toast,
         };
         Toasts::post(toast, cx);
         if let Some(soloist) = cx

@@ -9,11 +9,7 @@ use crate::{Lyrics, LyricsHit, LyricsLine, LyricsProvider, LyricsQuery, LyricsWo
 
 const SOURCE: &str = "LrcLib";
 const ENDPOINT: &str = "https://lrclib.net/api/search";
-const AGENT: &str = concat!(
-    "sonicly/",
-    env!("CARGO_PKG_VERSION"),
-    " (https://github.com/sonorahq/sonora)"
-);
+const AGENT: &str = concat!("sonicly/", env!("CARGO_PKG_VERSION"));
 
 pub struct LrcLib {
     http: reqwest::Client,

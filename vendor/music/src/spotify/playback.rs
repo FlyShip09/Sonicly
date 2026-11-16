@@ -242,6 +242,7 @@ impl Factory {
 
 impl PlaybackFactory for Factory {
     fn start(&self, config: PlaybackConfig) -> (Box<dyn MusicPlayer>, Box<dyn PlaybackEvents>) {
+        #[cfg(feature = "soloist")]
         if self.official() {
             let keeper = Keeper::new(&self.session, &config);
             let (engine, events) = soloist::start(&config);
@@ -314,11 +315,13 @@ impl Keeper {
 /// Soloist as the Spotify engine. It streams every track, a downloaded one too, so nothing
 /// plays without a network while it is in use. A track is only fetched ahead as the next in the
 /// queue, which Soloist then joins to the current one by itself.
+#[cfg(feature = "soloist")]
 struct Official {
     engine: soloist::Engine,
     keeper: Keeper,
 }
 
+#[cfg(feature = "soloist")]
 impl MusicPlayer for Official {
     fn download(&self, track_id: &str, progress: Fraction) -> BoxFuture<'static, Result<()>> {
         self.keeper.download(track_id, progress)

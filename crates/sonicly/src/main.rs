@@ -50,16 +50,6 @@ fn main() -> ExitCode {
     if let Some(code) = webview::probed() {
         exit(code);
     }
-    // The Widevine host is this executable started again by the app. It must not claim the
-    // instance socket, write the app's log file or start a runtime or a window.
-    if let Some(module) = music::drm::hosted() {
-        logging::console();
-        if let Err(error) = music::drm::host(&module) {
-            log::error!("widevine: the cdm host failed: {error:#}");
-            exit(1);
-        }
-        return ExitCode::SUCCESS;
-    }
     // A command for the running Sonora is sent and answered here, without a log file, a
     // runtime or a window. Older macOS adds a `-psn_` argument to a Finder launch.
     let args = std::env::args_os()
@@ -123,11 +113,9 @@ fn main() -> ExitCode {
         let database = storage::Database::standard();
         let providers: Vec<Arc<dyn music::MusicProvider>> = vec![
             Arc::new(music::spotify::SpotifyProvider::from_env()),
-            Arc::new(music::apple::AppleProvider::new()),
             Arc::new(music::youtube::YouTubeProvider::new()),
             Arc::new(music::subsonic::SubsonicProvider::new()),
             Arc::new(music::jellyfin::JellyfinProvider::new()),
-            Arc::new(music::deezer::DeezerProvider::new()),
             Arc::new(music::tidal::TidalProvider::new()),
         ];
         let local_provider: Arc<dyn music::MusicProvider> =
@@ -401,6 +389,8 @@ fn open_window(cx: &mut App) {
             app_owns_titlebar_drag: true,
             app_id: Some(assets::app_id().into()),
             window_min_size: Some(LEAST_SIZE),
+            // capture mode: scripts/shot.ps1 photographs the window without stealing focus
+            focus: std::env::var_os("SONICLY_SHOT").is_none(),
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             window_decorations: Some(decorations),
             ..Default::default()

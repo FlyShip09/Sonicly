@@ -1,6 +1,8 @@
 use anyhow::{Context as _, Result, bail};
 
+#[cfg(feature = "apple-music")]
 use crate::apple::AppleProvider;
+#[cfg(feature = "deezer")]
 use crate::deezer::DeezerProvider;
 use crate::spotify::SpotifyProvider;
 use crate::subsonic::{SubsonicClient, auth};
@@ -23,12 +25,14 @@ async fn youtube_labels_an_ep_as_one() -> Result<()> {
     album_is_an_ep(&YouTubeProvider::new()).await
 }
 
+#[cfg(feature = "deezer")]
 #[tokio::test]
 #[ignore = "reads the catalogue through the stored Deezer session"]
 async fn deezer_labels_an_ep_as_one() -> Result<()> {
     album_is_an_ep(&DeezerProvider::new()).await
 }
 
+#[cfg(feature = "apple-music")]
 #[tokio::test]
 #[ignore = "reads the catalogue through the stored Apple Music session"]
 async fn apple_labels_an_ep_as_one() -> Result<()> {

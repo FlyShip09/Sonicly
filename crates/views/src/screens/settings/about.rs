@@ -6,71 +6,33 @@ use gpui::prelude::*;
 use gpui::{AnyElement, Context, FontWeight, SharedString, div, img};
 use i18n::t;
 use state::Channel;
-use ui::{ActiveTheme as _, Avatar, Glowing as _, Switch, Text};
+use ui::{ActiveTheme as _, Switch, Text};
 
 use super::rows::{outward, segmented};
-use super::{Group, SettingsView, Slot, group_heading};
+use super::{Group, SettingsView, Slot};
 
 /// How large the app icon stands, in covers.
 const MARK_TILE: f32 = 0.5;
 /// The app icon as this platform shows it, registered by the binary's asset source.
 const APP_ICON: &str = "brand/sonicly.svg";
 const LICENSE_URL: &str = "https://www.gnu.org/licenses/gpl-3.0.html";
-const SOURCE_URL: &str = "https://github.com/sonorahq/sonora";
-
-#[derive(Clone, Copy)]
-struct Member {
-    login: &'static str,
-    avatar: &'static str,
-    profile: &'static str,
-    role: Role,
-}
-
-#[derive(Clone, Copy)]
-enum Role {
-    LeadMaintainer,
-    Maintainer,
-    Contributor,
-}
-
-impl Role {
-    fn label(self) -> SharedString {
-        match self {
-            Self::LeadMaintainer => t!("settings-role-lead-maintainer"),
-            Self::Maintainer => t!("settings-role-maintainer"),
-            Self::Contributor => t!("settings-role-contributor"),
-        }
-    }
-}
-
-macro_rules! member {
-    ($login:literal, $role:expr) => {
-        Member {
-            login: $login,
-            avatar: concat!("https://github.com/", $login, ".png"),
-            profile: concat!("https://github.com/", $login),
-            role: $role,
-        }
-    };
-}
-
-const MEMBERS: [Member; 5] = [
-    member!("nolight132", Role::LeadMaintainer),
-    member!("zxsleebu", Role::Maintainer),
-    member!("fx-got", Role::Maintainer),
-    member!("Makakashan", Role::Contributor),
-    member!("imizgun", Role::Contributor),
-];
+/// Sonicly's own repository, which the source row opens.
+const SOURCE_URL: &str = "https://github.com/FlyShip09/Sonicly";
+/// The third-party notices as a package ships them.
+const NOTICES: &str = "THIRD-PARTY.md";
 
 impl SettingsView {
     pub(super) fn about_groups(&self) -> Vec<Group> {
+        // no release repository means nothing to check, so neither update row stands
+        let updates = state::RELEASE_REPO.is_some().then_some(Slot::Updates);
         let channel = state::updates_itself().then_some(Slot::Channel);
         vec![
             Group::untitled().rows(
-                [Slot::Version, Slot::Updates]
+                [Slot::Version]
                     .into_iter()
+                    .chain(updates)
                     .chain(channel)
-                    .chain([Slot::Log, Slot::License, Slot::Source]),
+                    .chain([Slot::Log, Slot::License, Slot::Licenses, Slot::Source]),
             ),
         ]
     }
@@ -158,6 +120,22 @@ impl SettingsView {
         .into_any_element()
     }
 
+    /// The row that opens the third-party notices. It is disabled when the build ships none,
+    /// as an unpackaged one does.
+    pub(super) fn licenses_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let path = notices();
+
+        outward("licenses", t!("settings-licenses"), None, cx)
+            .disabled(path.is_none())
+            .on_click(move |_, _, _| {
+                let Some(path) = &path else { return };
+                if let Err(error) = open::that_detached(path) {
+                    log::warn!("settings: cannot open {}: {error}", path.display());
+                }
+            })
+            .into_any_element()
+    }
+
     pub(super) fn source_row(&self, cx: &mut Context<Self>) -> AnyElement {
         outward("source", t!("settings-source"), None, cx)
             .on_click(|_, _, cx| cx.open_url(SOURCE_URL))
@@ -198,57 +176,13 @@ impl SettingsView {
             .text_size(theme.text(Text::Small))
             .child(t!("settings-notice"))
     }
+}
 
-    /// The people behind Sonora, each opening their GitHub profile.
-    pub(super) fn team(&self, cx: &Context<Self>) -> impl IntoElement {
-        let theme = *cx.theme();
-
-        div()
-            .flex()
-            .flex_col()
-            .child(
-                group_heading(t!("settings-team"), Some("icons/user-round.svg"), cx)
-                    .id("settings-team")
-                    .role(gpui::accesskit::Role::Heading)
-                    .aria_level(2)
-                    .aria_label(t!("settings-team")),
-            )
-            .children(MEMBERS.into_iter().enumerate().map(|(index, member)| {
-                div()
-                    .id(("team-member", index))
-                    .role(gpui::accesskit::Role::Link)
-                    .aria_label(member.login)
-                    .aria_description(member.role.label())
-                    .aria_position_in_set(index + 1)
-                    .aria_size_of_set(MEMBERS.len())
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .h(theme.metrics.list_row)
-                    .mx_neg_3()
-                    .px_3()
-                    .rounded(theme.radius)
-                    .cursor_pointer()
-                    .on_click(move |_, _, cx| cx.open_url(member.profile))
-                    .child(Avatar::new(Some(member.avatar)).size(theme.metrics.thumb))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .truncate()
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(member.login),
-                    )
-                    .child(
-                        div()
-                            .flex_none()
-                            .text_size(theme.text(Text::Label))
-                            .text_color(theme.muted_foreground)
-                            .child(member.role.label()),
-                    )
-                    .glowed(theme.secondary_hover)
-            }))
-    }
+/// The notices file beside the executable, when the package put one there.
+// shortcut: only the Windows installer's layout is known, widen once Linux and macOS packages exist
+fn notices() -> Option<PathBuf> {
+    let path = std::env::current_exe().ok()?.with_file_name(NOTICES);
+    path.exists().then_some(path)
 }
 
 /// Notepad on Windows refuses a file that Sonora still writes to, so the button opens a copy.

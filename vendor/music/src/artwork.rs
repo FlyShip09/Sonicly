@@ -1,11 +1,8 @@
-use std::time::Duration;
-
 use anyhow::{Context as _, Result};
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 
 use crate::Track;
-use crate::cover::{CoverLimits, square_jpeg};
 
 const ALBUMS: &str = "https://api.deezer.com/search/album";
 const TRACKS: &str = "https://api.deezer.com/search/track";
@@ -19,24 +16,8 @@ const MUSICBRAINZ_RESULTS: &str = "5";
 /// The lowest score MusicBrainz may give a release group for its art to be trusted.
 const MUSICBRAINZ_SCORE: u32 = 90;
 const COVER_ART: &str = "https://coverartarchive.org/release-group";
-/// Uguu, a temporary host: anonymous uploads served as plain images, gone after three hours.
-const UGUU: &str = "https://uguu.se/upload";
-/// The scheme the local provider gives its covers, folder art and pictures extracted from tags.
-const FILE_URL: &str = "file://";
-/// How long the fetch of a provider's cover, or its upload, may take before it counts as failed
-/// and the search answers instead.
-const UPLOAD_TIMEOUT: Duration = Duration::from_secs(20);
-/// What an uploaded cover is shrunk to before it leaves the machine.
-const UPLOAD_LIMITS: CoverLimits = CoverLimits {
-    side: 512,
-    bytes: 1024 * 1024,
-};
 /// MusicBrainz refuses a client that does not say who it is.
-const AGENT: &str = concat!(
-    "sonicly/",
-    env!("CARGO_PKG_VERSION"),
-    " (https://github.com/sonorahq/sonora)"
-);
+const AGENT: &str = concat!("sonicly/", env!("CARGO_PKG_VERSION"));
 
 /// Finds cover art by name in public catalogues that need no account and serve every image from
 /// a public https url: Deezer first, then iTunes, then MusicBrainz with the Cover Art Archive. A
@@ -91,19 +72,6 @@ enum Source {
 
 impl Source {
     const ALL: [Self; 3] = [Self::Deezer, Self::Itunes, Self::MusicBrainz];
-}
-
-/// Uguu's answer to an upload.
-#[derive(Deserialize)]
-struct Uploaded {
-    success: bool,
-    #[serde(default)]
-    files: Vec<UploadedFile>,
-}
-
-#[derive(Deserialize)]
-struct UploadedFile {
-    url: String,
 }
 
 #[derive(Deserialize)]
@@ -335,79 +303,6 @@ impl ArtworkSearch {
             .context("cannot read the cover art archive")?;
         let url = response.url().as_str();
         Ok(url.starts_with("https://").then(|| url.to_owned()))
-    }
-
-    /// Reads the picture at `source`, a provider's own cover url or a local file's `file://` one,
-    /// and uploads it to Uguu for three hours, answering the public url there. Only the
-    /// re-encoded picture leaves the machine, never `source`, which for a self-hosted server
-    /// carries the credentials that fetch it.
-    pub async fn upload(&self, source: &str) -> Result<String> {
-        let picture = match source.strip_prefix(FILE_URL) {
-            Some(path) => {
-                let path = path.to_owned();
-                tokio::task::spawn_blocking(move || std::fs::read(path))
-                    .await
-                    .context("cannot read the cover file")?
-                    .context("cannot read the cover file")?
-            }
-            None => self.fetch(source).await?,
-        };
-        let jpeg = square_jpeg(&picture, UPLOAD_LIMITS)?;
-
-        let boundary = format!("sonicly{:016x}", fastrand::u64(..));
-        let mut body = format!(
-            "--{boundary}\r\nContent-Disposition: form-data; name=\"files[]\"; filename=\"cover.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
-        )
-        .into_bytes();
-        body.extend_from_slice(&jpeg);
-        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
-
-        let answer: Uploaded = self
-            .http
-            .post(UGUU)
-            .timeout(UPLOAD_TIMEOUT)
-            .header(reqwest::header::USER_AGENT, AGENT)
-            .header(
-                reqwest::header::CONTENT_TYPE,
-                format!("multipart/form-data; boundary={boundary}"),
-            )
-            .body(body)
-            .send()
-            .await
-            .context("cannot reach uguu")?
-            .error_for_status()
-            .context("cannot upload the cover to uguu")?
-            .json()
-            .await
-            .context("cannot read the uguu answer")?;
-        let url = answer
-            .files
-            .into_iter()
-            .next()
-            .map(|file| file.url)
-            .filter(|url| answer.success && url.starts_with("https://"));
-        url.context("uguu answered without a url")
-    }
-
-    /// The bytes behind a provider's cover url. Every error drops the url, so the credentials in
-    /// it never reach a log.
-    async fn fetch(&self, source: &str) -> Result<Vec<u8>> {
-        let picture = self
-            .http
-            .get(source)
-            .timeout(UPLOAD_TIMEOUT)
-            .send()
-            .await
-            .map_err(reqwest::Error::without_url)
-            .context("cannot reach the cover")?
-            .error_for_status()
-            .map_err(reqwest::Error::without_url)
-            .context("cannot fetch the cover")?
-            .bytes()
-            .await
-            .map_err(reqwest::Error::without_url)
-            .context("cannot read the cover")?;
-        Ok(picture.to_vec())
     }
 
     /// One page of results for the artist and `name`. Deezer reports a refused search, such as

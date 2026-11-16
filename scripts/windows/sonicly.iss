@@ -11,7 +11,7 @@
 #define SetupName GetEnv("SONICLY_SETUP")
 
 [Setup]
-AppId={{8D65C17E-79E8-46D7-9A37-42E85E73F738}
+AppId={{4EC1FC22-9007-4B9B-9D0A-6ACDABC0A96E}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
@@ -233,12 +233,6 @@ Root: HKA; Subkey: "Software\Classes\SoniclySpotify"; ValueType: string; ValueNa
 Root: HKA; Subkey: "Software\Classes\SoniclySpotify"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKA; Subkey: "Software\Classes\SoniclySpotify\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"
 Root: HKA; Subkey: "Software\Classes\SoniclySpotify\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
-; deezer
-Root: HKA; Subkey: "Software\Sonicly\Capabilities\UrlAssociations"; ValueType: string; ValueName: "deezer"; ValueData: "SoniclyDeezer"; Flags: uninsdeletevalue
-Root: HKA; Subkey: "Software\Classes\SoniclyDeezer"; ValueType: string; ValueName: ""; ValueData: "Deezer Link"; Flags: uninsdeletekey
-Root: HKA; Subkey: "Software\Classes\SoniclyDeezer"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
-Root: HKA; Subkey: "Software\Classes\SoniclyDeezer\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"
-Root: HKA; Subkey: "Software\Classes\SoniclyDeezer\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
 ; tidal
 Root: HKA; Subkey: "Software\Sonicly\Capabilities\UrlAssociations"; ValueType: string; ValueName: "tidal"; ValueData: "SoniclyTidal"; Flags: uninsdeletevalue
 Root: HKA; Subkey: "Software\Classes\SoniclyTidal"; ValueType: string; ValueName: ""; ValueData: "TIDAL Link"; Flags: uninsdeletekey

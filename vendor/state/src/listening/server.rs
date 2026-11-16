@@ -1,13 +1,11 @@
-//! Where the Sonora Sessions server is: the official one, or one the listener runs, whose address
-//! is read leniently and checked before it is trusted.
+//! Where the Sonora Sessions server is: one the listener runs, whose address is read leniently and
+//! checked before it is trusted. Sonicly has no official server, so there is no default.
 
 use std::time::Duration;
 
 use anyhow::{Context as _, Result, bail};
 use reqwest::Url;
 
-/// The official server.
-pub(crate) const OFFICIAL: &str = "wss://sessions.sonorahq.org/ws";
 /// Points the app at another server whatever the settings say, as one run locally while working
 /// on it.
 pub(crate) const VARIABLE: &str = "SONICLY_SESSION_SERVER";

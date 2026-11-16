@@ -13,6 +13,12 @@
 //! reader asks for it. Everything else, the waiting and the seeking and what a broken
 //! connection does, is the same for all of them and lives here.
 
+// Sonicly: the parts only Apple Music and Deezer use are dead while those are compiled out.
+#![cfg_attr(
+    not(all(feature = "apple-music", feature = "deezer")),
+    allow(dead_code)
+)]
+
 use std::borrow::Cow;
 use std::fs::File;
 use std::future::Future;

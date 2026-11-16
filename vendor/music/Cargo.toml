@@ -5,18 +5,30 @@ edition.workspace = true
 license.workspace = true
 
 [features]
-# The host for the Widevine CDM, which Apple Music playback needs. Off by default: it compiles a
-# C++ shim, so it wants a C++ compiler, and nothing else in the crate wants it.
-widevine = ["widevine/cdm"]
+# Sonicly: both providers are compiled out. Neither feature is a default and no crate in this
+# workspace may enable them.
+#
+# `apple-music` CANNOT BUILD in this repository: the provider needs upstream's `widevine` crate
+# (cenc parsing and the CDM host), which Sonicly deliberately does not import. The feature exists
+# only so the `apple` module stays in the tree, unchanged, for merging upstream fixes.
+apple-music = []
+deezer = ["dep:blowfish", "dep:cbc"]
+# Sonicly: Spotify Soloist, which downloads a program from a CDN and runs it unverified. Off by
+# default and never enabled in this workspace; `src/soloist_off.rs` stands in for it.
+soloist = []
+
+[[example]]
+name = "deezer-probe"
+required-features = ["deezer"]
 
 [dependencies]
 anyhow.workspace = true
 ardftsrc.workspace = true
 async-trait.workspace = true
 base64.workspace = true
-blowfish.workspace = true
+blowfish = { workspace = true, optional = true }
 bytes.workspace = true
-cbc.workspace = true
+cbc = { workspace = true, optional = true }
 fastrand.workspace = true
 sha1.workspace = true
 flate2.workspace = true
@@ -67,7 +79,6 @@ symphonia.workspace = true
 tempfile.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
-widevine.workspace = true
 ytmusic.workspace = true
 
 [target.'cfg(unix)'.dependencies]
@@ -89,7 +100,8 @@ objc2-core-foundation.workspace = true
 # cpal 0.18 raises its WASAPI thread to real-time priority only with `realtime`. Without it a busy
 # system starves the stream and playback crackles whatever the buffer.
 cpal = { workspace = true, features = ["realtime"] }
-windows.workspace = true
+# Sonicly: `Win32_Security_Cryptography` is DPAPI, which seals stored credentials.
+windows = { workspace = true, features = ["Win32_Security_Cryptography"] }
 
 [dev-dependencies]
 env_logger.workspace = true

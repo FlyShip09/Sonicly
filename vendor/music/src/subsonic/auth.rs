@@ -47,6 +47,7 @@ fn path() -> PathBuf {
     credentials::dir("subsonic").join(credentials::FILE)
 }
 
+/// Sonicly: a bare host is taken to be https, and an `http://` the listener typed is kept.
 pub fn normalize_server(raw: &str) -> Result<String> {
     let trimmed = raw.trim().trim_end_matches('/');
     if trimmed.is_empty() {
@@ -54,13 +55,13 @@ pub fn normalize_server(raw: &str) -> Result<String> {
     }
     let with_scheme = match trimmed.contains("://") {
         true => trimmed.to_owned(),
-        false => format!("http://{trimmed}"),
+        false => format!("https://{trimmed}"),
     };
     Ok(with_scheme)
 }
 
 pub fn load() -> Option<Credentials> {
-    let bytes = std::fs::read(path()).ok()?;
+    let bytes = credentials::read(&path()).ok()?;
     let mut credentials: Credentials = serde_json::from_slice(&bytes).ok()?;
     credentials.server = normalize_server(&credentials.server).ok()?;
     match credentials.username.is_empty() {

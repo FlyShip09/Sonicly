@@ -438,7 +438,7 @@ fn path() -> PathBuf {
 }
 
 pub(crate) fn load() -> Option<Credentials> {
-    let bytes = std::fs::read(path()).ok()?;
+    let bytes = credentials::read(&path()).ok()?;
     let credentials: Credentials = serde_json::from_slice(&bytes)
         .inspect_err(|error| log::warn!("tidal: the stored sign-in cannot be read: {error}"))
         .ok()?;

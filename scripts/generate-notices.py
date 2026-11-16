@@ -16,8 +16,10 @@ PREAMBLE = """# Third-party licenses
 
 Sonicly is licensed under the GNU General Public License v3.0 or later; the full
 text is in `COPYING`. The complete corresponding source is the tagged commit of
-<https://github.com/sonorahq/sonora> together with the dependency revisions
+<https://github.com/FlyShip09/Sonicly> together with the dependency revisions
 pinned in `Cargo.lock`.
+
+Sonicly is built on Sonora, <https://github.com/sonorahq/sonora>, which is under the same license.
 
 The binary embeds:
 

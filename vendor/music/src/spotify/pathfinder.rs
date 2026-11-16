@@ -45,7 +45,7 @@ async fn query<T: DeserializeOwned>(
     operation: &str,
     variables: serde_json::Value,
 ) -> Result<T> {
-    let hash = hashes::resolve(session, operation).await?;
+    let hash = hashes::resolve(operation).await?;
     let rejected = match send(session, operation, &hash.value, &variables).await {
         Ok(data) => return Ok(data),
         Err(error) => error,
@@ -53,7 +53,7 @@ async fn query<T: DeserializeOwned>(
     if hash.tried {
         return Err(rejected);
     }
-    let Some(latest) = hashes::refetch(session, operation, &hash.value).await else {
+    let Some(latest) = hashes::refetch(operation).await else {
         return Err(rejected);
     };
     if latest == hash.value {

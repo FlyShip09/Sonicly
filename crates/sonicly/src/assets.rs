@@ -99,7 +99,7 @@ impl AssetSource for Assets {
 /// Matches the installed desktop file for launcher icons and window grouping on Linux.
 pub fn app_id() -> &'static str {
     match cfg!(target_os = "linux") && std::path::Path::new("/.flatpak-info").exists() {
-        true => "io.github.nolight132.sonora",
+        true => "io.github.flyship09.sonicly",
         false => "sonicly",
     }
 }

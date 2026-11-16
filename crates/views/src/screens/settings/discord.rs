@@ -13,8 +13,10 @@ impl SettingsView {
     /// row stand, since the rest shapes a status nobody sees.
     pub(super) fn discord_groups(&self, cx: &App) -> Vec<Group> {
         let settings = self.settings.read(cx);
+        // without an application id there is no status, so only the switch stands, disabled
+        let available = state::DISCORD_APPLICATION_ID.is_some();
         let mut groups = vec![Group::untitled().rows([Slot::Discord])];
-        if settings.discord_presence() {
+        if available && settings.discord_presence() {
             // the choice only means something while Spotify is signed in and listed as a device
             let connect = settings.spotify_connect()
                 && Sonora::global(cx).devices.read(cx).supported()
@@ -25,7 +27,6 @@ impl SettingsView {
                         Slot::DiscordName,
                         Slot::DiscordShowPaused,
                         Slot::DiscordBadge,
-                        Slot::DiscordUploadCovers,
                         Slot::DiscordAnonymous,
                     ])
                     .rows(connect.then_some(Slot::DiscordHideOnConnect)),
@@ -43,12 +44,14 @@ impl SettingsView {
     }
 
     pub(super) fn discord_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let on = self.settings.read(cx).discord_presence();
+        let available = state::DISCORD_APPLICATION_ID.is_some();
+        let on = available && self.settings.read(cx).discord_presence();
 
         self.row(
             t!("settings-discord"),
             Switch::new("discord", on)
                 .name(t!("settings-discord"))
+                .disabled(!available)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.settings
                         .update(cx, |settings, cx| settings.set_discord_presence(!on, cx));
@@ -128,22 +131,6 @@ impl SettingsView {
         )
     }
 
-    pub(super) fn discord_upload_covers_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let on = self.settings.read(cx).discord_upload_covers();
-
-        self.row(
-            t!("settings-discord-upload-covers"),
-            Switch::new("discord-upload-covers", on)
-                .name(t!("settings-discord-upload-covers"))
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.settings.update(cx, |settings, cx| {
-                        settings.set_discord_upload_covers(!on, cx)
-                    });
-                }))
-                .into_any_element(),
-        )
-    }
-
     pub(super) fn discord_anonymous_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let on = self.settings.read(cx).discord_without_details();
 
@@ -179,36 +166,22 @@ impl SettingsView {
     /// The buttons under the status, each a segment that turns on and off by itself.
     pub(super) fn discord_buttons_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let settings = self.settings.read(cx);
-        let sonora = settings.discord_sonora_button();
         let provider = settings.discord_provider_button();
 
         let buttons = TabBar::new("discord-buttons")
             .name(t!("settings-discord-buttons"))
             .flex_none()
-            .items([
-                Button::new("discord-button-provider")
-                    .label(t!("settings-discord-name-provider"))
-                    .small()
-                    .ghost()
-                    .selected(provider)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.settings.update(cx, |settings, cx| {
-                            settings.set_discord_provider_button(!provider, cx)
-                        });
-                        cx.notify();
-                    })),
-                Button::new("discord-button-sonicly")
-                    .label(t!("settings-discord-name-sonicly"))
-                    .small()
-                    .ghost()
-                    .selected(sonora)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.settings.update(cx, |settings, cx| {
-                            settings.set_discord_sonora_button(!sonora, cx)
-                        });
-                        cx.notify();
-                    })),
-            ]);
+            .items([Button::new("discord-button-provider")
+                .label(t!("settings-discord-name-provider"))
+                .small()
+                .ghost()
+                .selected(provider)
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.settings.update(cx, |settings, cx| {
+                        settings.set_discord_provider_button(!provider, cx)
+                    });
+                    cx.notify();
+                }))]);
 
         self.row(t!("settings-discord-buttons"), buttons.into_any_element())
     }

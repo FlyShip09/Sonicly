@@ -5,6 +5,7 @@ mod cover;
 mod detail;
 mod devices;
 mod discord;
+pub use discord::APPLICATION_ID as DISCORD_APPLICATION_ID;
 mod downloads;
 mod drm;
 mod equalizer;
@@ -41,7 +42,6 @@ mod sponsorblock;
 mod tags;
 mod toast;
 mod updates;
-mod usage;
 mod vault;
 mod wake;
 mod window_shape;
@@ -97,8 +97,9 @@ pub use song::SongDetail;
 pub use sponsorblock::SponsorBlock;
 pub use tags::{TagState, Tags};
 pub use toast::{Outcome, Target, Toast, ToastAction, Toasts};
-pub use updates::{Channel, Release, UpdateState, Updates, commit, updates_itself, version};
-pub use usage::Usage;
+pub use updates::{
+    Channel, RELEASE_REPO, Release, UpdateState, Updates, commit, updates_itself, version,
+};
 pub use vault::CACHE_GB_RANGE;
 pub use wake::Wake;
 pub use window_shape::{apply_window_rounding, install_rounded_window_hook};
@@ -251,7 +252,6 @@ pub struct Sonora {
     pub settings: Entity<AppSettings>,
     pub signal: Entity<Signal>,
     pub updates: Entity<Updates>,
-    pub usage: Entity<Usage>,
     pub wake: Entity<Wake>,
 }
 
@@ -384,7 +384,6 @@ pub fn init(
             cx,
         )
     });
-    let usage = cx.new(|cx| Usage::new(session.clone(), database, io.clone(), cx));
     let pins = cx.new(|cx| Pins::new(settings.clone(), library.clone(), session.clone(), cx));
     let potoken = potoken::attach(cx);
     let signal = cx.new(|cx| Signal::new(playback.clone(), outputs.clone(), equalizer.clone(), cx));
@@ -460,7 +459,6 @@ pub fn init(
         settings,
         signal,
         updates,
-        usage,
         wake,
     });
 }

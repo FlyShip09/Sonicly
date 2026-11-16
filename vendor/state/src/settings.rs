@@ -710,9 +710,11 @@ impl Default for Values {
             jellyfin_lyrics_offered: false,
             lyrics_enabled: true,
             lyrics_provider_priority: lyrics_priority(&[]),
-            // Kugou and NetEase, the last two, start switched off.
+            // Kugou and NetEase, the last two, start switched off. Sonicly: so does "Apple Music",
+            // which is the third-party Binimum proxy and not Apple.
             lyrics_providers: LYRICS_SOURCES[..8]
                 .iter()
+                .filter(|name| **name != "Apple Music")
                 .map(|name| name.to_string())
                 .collect(),
             lyrics_word_synced_first: false,
@@ -723,7 +725,8 @@ impl Default for Values {
             fullscreen_lyrics_scale: DEFAULT_LYRICS_SCALE,
             romanization_scripts: RomanizationScripts::default(),
             adaptive_menu: false,
-            check_updates: cfg!(target_os = "windows") || updates_itself(),
+            check_updates: crate::updates::RELEASE_REPO.is_some()
+                && (cfg!(target_os = "windows") || updates_itself()),
             update_channel: String::new(),
             close_to_tray: true,
             tray_icon: true,

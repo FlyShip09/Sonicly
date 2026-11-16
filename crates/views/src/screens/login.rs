@@ -10,11 +10,9 @@ use gpui::{
 };
 use i18n::t;
 use music::{AccountChoices, SignIn, SignInPrompt};
-use state::{ProviderInfo, Session, SessionState, Sonora, Usage};
+use state::{ProviderInfo, Session, SessionState};
 use ui::ActiveTheme as _;
-use ui::{
-    Button, Checkbox, Input, LEADING, Lattice, Modal, Scrollbar, Scroller, Separator, Text, mix,
-};
+use ui::{Button, Input, LEADING, Lattice, Modal, Scrollbar, Scroller, Separator, Text, mix};
 
 /// How wide the sign-in card stands.
 const CARD: Pixels = px(400.);
@@ -53,7 +51,6 @@ const POOLS: [(f32, f32, f32, f32); 3] = [
 
 pub struct LoginView {
     session: Entity<Session>,
-    usage: Entity<Usage>,
     secret: Entity<Input>,
     credentials: Credentials,
     credentials_for: Option<&'static str>,
@@ -77,11 +74,8 @@ pub struct LoginView {
 impl LoginView {
     pub fn new(session: Entity<Session>, cx: &mut Context<Self>) -> Self {
         cx.observe(&session, |_, _, cx| cx.notify()).detach();
-        let usage = Sonora::global(cx).usage.clone();
-        cx.observe(&usage, |_, _, cx| cx.notify()).detach();
         Self {
             session,
-            usage,
             secret: cx.new(|cx| Input::new("login-cookie-hint", cx)),
             credentials: Credentials::new(cx),
             credentials_for: None,
@@ -98,24 +92,7 @@ impl LoginView {
         }
     }
 
-    fn acted(&self, cx: &mut Context<Self>) {
-        self.usage.update(cx, |usage, cx| usage.report(cx));
-    }
-
-    fn consent(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let checked = self.usage.read(cx).consented();
-        Checkbox::new("usage-consent", checked)
-            .label(t!("login-usage-consent"))
-            .max_w(CARD)
-            .text_color(cx.theme().muted_foreground)
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.usage
-                    .update(cx, |usage, cx| usage.consent(!checked, cx));
-            }))
-    }
-
     fn abandon(&mut self, cx: &mut Context<Self>) {
-        self.acted(cx);
         self.clear_secret(cx);
         self.clear_credentials(cx);
         self.session
@@ -123,7 +100,6 @@ impl LoginView {
     }
 
     fn open_credentials(&mut self, slug: &'static str, cx: &mut Context<Self>) {
-        self.acted(cx);
         self.credentials_for = Some(slug);
         cx.notify();
     }
@@ -139,7 +115,6 @@ impl LoginView {
     }
 
     fn abandon_credentials(&mut self, cx: &mut Context<Self>) {
-        self.acted(cx);
         self.clear_credentials(cx);
         cx.notify();
     }
@@ -164,14 +139,12 @@ impl LoginView {
     }
 
     fn start(&mut self, slug: &'static str, method: SignIn, cx: &mut Context<Self>) {
-        self.acted(cx);
         self.manual_secret = None;
         self.session
             .update(cx, |session, cx| session.sign_in(slug, method, cx));
     }
 
     fn start_manual(&mut self, slug: &'static str, provider: &'static str, cx: &mut Context<Self>) {
-        self.acted(cx);
         self.manual_secret = Some((slug, provider));
         let hint = CookiePrompt::hint(slug);
         self.secret.update(cx, |input, cx| input.set_hint(hint, cx));
@@ -184,7 +157,6 @@ impl LoginView {
         if text.trim().is_empty() {
             return;
         }
-        self.acted(cx);
         self.clear_secret(cx);
         self.session
             .update(cx, |session, cx| session.submit_input(text, cx));
@@ -213,7 +185,6 @@ impl LoginView {
             [method] if buttons == 1 => self.start(slug, method.clone(), cx),
             [] => {}
             _ => {
-                self.acted(cx);
                 self.choosing = Some((slug, info.name));
                 cx.notify();
             }
@@ -551,7 +522,6 @@ impl LoginView {
     fn account_modal(&self, accounts: AccountChoices, cx: &mut Context<Self>) -> impl IntoElement {
         AccountPicker::new(accounts)
             .on_pick(cx.listener(|this, id: &SharedString, _, cx| {
-                this.acted(cx);
                 let id = id.to_string();
                 this.session
                     .update(cx, |session, cx| session.submit_input(id, cx));
@@ -646,7 +616,6 @@ impl Render for LoginView {
         let failure = providers.iter().find_map(|info| info.error.clone());
 
         let theme = *cx.theme();
-        let asking = self.usage.read(cx).asking();
         let lamp = match self.hovered {
             Some(slug) => crate::shared::provider_brand(slug, cx),
             None => self.lamp,
@@ -665,7 +634,8 @@ impl Render for LoginView {
         };
 
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-        let radius = crate::chrome::window_radius(Sonora::global(cx).settings.read(cx), cx, window);
+        let radius =
+            crate::chrome::window_radius(state::Sonora::global(cx).settings.read(cx), cx, window);
         #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         let radius: Option<Pixels> = None;
 
@@ -731,10 +701,7 @@ impl Render for LoginView {
                     .size_full()
                     .p(theme.metrics.pad)
                     .pt(theme.metrics.title_bar)
-                    .child(card)
-                    .when(asking, |this| {
-                        this.child(div().flex_none().child(self.consent(cx)))
-                    }),
+                    .child(card),
             )
             .when_some(manual_secret, |this, (slug, provider)| {
                 this.child(self.secret_prompt(slug, provider, cx).into_any_element())

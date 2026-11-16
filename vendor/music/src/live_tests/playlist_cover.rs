@@ -6,6 +6,7 @@ use anyhow::{Context as _, Result, anyhow, bail};
 use image::{DynamicImage, ImageFormat, RgbImage};
 use storage::{Cache, Database};
 
+#[cfg(feature = "deezer")]
 use crate::deezer::DeezerProvider;
 use crate::local::LocalProvider;
 use crate::spotify::SpotifyProvider;
@@ -29,6 +30,7 @@ async fn youtube_can_change_a_playlist_cover() -> Result<()> {
     exercise(connected(&YouTubeProvider::new()).await?.api.as_ref()).await
 }
 
+#[cfg(feature = "deezer")]
 #[tokio::test]
 #[ignore = "creates, changes, and deletes a playlist on the connected Deezer account"]
 async fn deezer_can_change_a_playlist_cover() -> Result<()> {

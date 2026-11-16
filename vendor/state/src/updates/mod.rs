@@ -13,17 +13,16 @@ use sha2::{Digest as _, Sha256};
 use crate::{AppSettings, Io, join};
 use install::Install;
 
-const RELEASES: &str = "https://api.github.com/repos/sonorahq/sonora/releases";
+/// Sonicly: the GitHub `owner/name` the releases are read from. `None` until Sonicly has a release
+/// repository of its own, and while it is `None` nothing here ever makes a request: no check, no
+/// download, and no channel to choose.
+pub const RELEASE_REPO: Option<&str> = None;
 const SUMS: &str = "SHA256SUMS";
 /// What the nightly workflow puts before the version label in the nightly release's title.
 const NIGHTLY_TITLE: &str = "Nightly ";
 /// How many leading hex digits of a commit hash the version row shows, as `git` abbreviates it.
 const SHORT_COMMIT: usize = 7;
-const AGENT: &str = concat!(
-    "sonicly/",
-    env!("CARGO_PKG_VERSION"),
-    " (https://github.com/sonorahq/sonora)"
-);
+const AGENT: &str = concat!("sonicly/", env!("CARGO_PKG_VERSION"));
 
 /// The builds Sonora updates to. Stable follows tagged releases, and Nightly follows the build
 /// of main the nightly workflow publishes every night.
@@ -65,10 +64,11 @@ impl Channel {
         }
     }
 
-    fn url(self) -> String {
+    fn url(self, repo: &str) -> String {
+        let releases = format!("https://api.github.com/repos/{repo}/releases");
         match self {
-            Self::Stable => format!("{RELEASES}/latest"),
-            Self::Nightly => format!("{RELEASES}/tags/nightly"),
+            Self::Stable => format!("{releases}/latest"),
+            Self::Nightly => format!("{releases}/tags/nightly"),
         }
     }
 }
@@ -92,7 +92,7 @@ pub fn commit() -> Option<&'static str> {
 /// Whether this copy of Sonora installs its own updates, which is when a channel can be chosen.
 /// A copy a package manager installed, or a portable one, does not.
 pub fn updates_itself() -> bool {
-    Install::current().updates_itself()
+    RELEASE_REPO.is_some() && Install::current().updates_itself()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -219,6 +219,9 @@ impl Updates {
     /// started by switching channels, which runs even with update checks turned off. A copy a
     /// package manager installed follows its own build's channel, and a nightly one never looks.
     fn look(&mut self, asked: bool, cx: &mut Context<Self>) {
+        let Some(repo) = RELEASE_REPO else {
+            return;
+        };
         let channel = match updates_itself() {
             true => self.channel,
             false if Channel::running() == Channel::Stable => Channel::Stable,
@@ -230,7 +233,7 @@ impl Updates {
         let http = self.http.clone();
         let io = self.io.clone();
         self.task = Some(cx.spawn(async move |this, cx| {
-            let found = join(io.spawn(async move { latest(&http, channel).await })).await;
+            let found = join(io.spawn(async move { latest(&http, repo, channel).await })).await;
             this.update(cx, |this, cx| {
                 this.task = None;
                 match found {
@@ -264,9 +267,9 @@ struct Asset {
 }
 
 /// The newest build on `channel`, or `None` when the running build should stay.
-async fn latest(http: &reqwest::Client, channel: Channel) -> Result<Option<Release>> {
+async fn latest(http: &reqwest::Client, repo: &str, channel: Channel) -> Result<Option<Release>> {
     let published: Published = http
-        .get(channel.url())
+        .get(channel.url(repo))
         .header("User-Agent", AGENT)
         .header("Accept", "application/vnd.github+json")
         .send()

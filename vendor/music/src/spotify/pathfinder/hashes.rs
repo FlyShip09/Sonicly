@@ -5,19 +5,16 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::{Context as _, Result, bail};
-use bytes::Bytes;
-use http::{Method, Request, header};
-use librespot_core::Session;
+use anyhow::{Context as _, Result};
+use http::header;
 use serde::{Deserialize, Serialize};
 
-use crate::escape;
-
-const WORKER: &str = "https://billowing-resonance-da83.johnwatson.workers.dev/hashes";
 const MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
 const FILE: &str = "pathfinder.json";
 
-/// Operations the shared hash service does not list, read from the web player bundle instead.
+/// Operations read from the web player bundle whenever it is fetched, whichever one was asked
+/// for. Sonicly contacts no third-party hash service, so the bundle is the only source and any
+/// other operation is looked up in it by name.
 const DESKTOP_OPERATIONS: [(&str, &str); 4] = [
     ("home", "query"),
     ("libraryV3", "query"),
@@ -36,12 +33,7 @@ struct Registry {
     operations: HashMap<String, String>,
 }
 
-#[derive(Deserialize)]
-struct Answer {
-    operations: HashMap<String, String>,
-}
-
-pub(super) async fn resolve(session: &Session, operation: &str) -> Result<Hash> {
+pub(super) async fn resolve(operation: &str) -> Result<Hash> {
     let cached = registry();
     if let Some(value) = cached
         .as_ref()
@@ -53,114 +45,20 @@ pub(super) async fn resolve(session: &Session, operation: &str) -> Result<Hash> 
             tried: false,
         });
     }
-    if DESKTOP_OPERATIONS
-        .iter()
-        .any(|(name, _)| *name == operation)
-    {
-        return match desktop_hash(operation).await {
-            Ok(value) => Ok(Hash {
-                value,
-                tried: false,
-            }),
-            Err(error) => cached
-                .and_then(|mut registry| registry.operations.remove(operation))
-                .map(|value| Hash { value, tried: true })
-                .ok_or(error),
-        };
+    match desktop_hash(operation).await {
+        Ok(value) => Ok(Hash {
+            value,
+            tried: false,
+        }),
+        Err(error) => cached
+            .and_then(|mut registry| registry.operations.remove(operation))
+            .map(|value| Hash { value, tried: true })
+            .ok_or(error),
     }
-    let latest = match fetched(session).await {
-        Ok(operations) => operations,
-        Err(error) => {
-            return cached
-                .and_then(|mut registry| registry.operations.remove(operation))
-                .map(|value| Hash { value, tried: true })
-                .ok_or(error);
-        }
-    };
-    latest
-        .get(operation)
-        .cloned()
-        .map(|value| Hash { value, tried: true })
-        .with_context(|| format!("the hash registry has no {operation} query"))
 }
 
-pub(super) async fn refetch(session: &Session, operation: &str, stale: &str) -> Option<String> {
-    if DESKTOP_OPERATIONS
-        .iter()
-        .any(|(name, _)| *name == operation)
-    {
-        return desktop_hash(operation).await.ok();
-    }
-    refreshed(session, Some(stale))
-        .await
-        .ok()?
-        .get(operation)
-        .cloned()
-        .or_else(|| {
-            log::warn!("pathfinder: the hash registry has no {operation} query");
-            None
-        })
-}
-
-async fn fetched(session: &Session) -> Result<HashMap<String, String>> {
-    refreshed(session, None).await
-}
-
-async fn refreshed(session: &Session, stale: Option<&str>) -> Result<HashMap<String, String>> {
-    let operations = match download(session, stale).await {
-        Ok(operations) => operations,
-        Err(error) => {
-            log::warn!("pathfinder: cannot refresh the query hashes: {error:#}");
-            return Err(error);
-        }
-    };
-    store(&operations);
-    Ok(operations)
-}
-
-async fn download(session: &Session, stale: Option<&str>) -> Result<HashMap<String, String>> {
-    let uri = match stale {
-        Some(stale) => format!("{WORKER}?stale={}", escape::component(stale)),
-        None => WORKER.to_owned(),
-    };
-    let request = Request::builder()
-        .method(Method::GET)
-        .uri(uri)
-        .header(header::ACCEPT, "application/json")
-        .body(Bytes::new())
-        .context("cannot build the query hash request")?;
-    let body = session
-        .http_client()
-        .request_body(request)
-        .await
-        .context("cannot request the query hashes")?;
-    let mut operations = parsed(&body)?;
-    if let Some(cached) = registry() {
-        for (operation, _) in DESKTOP_OPERATIONS {
-            if let Some(hash) = cached.operations.get(operation) {
-                operations
-                    .entry(operation.to_owned())
-                    .or_insert_with(|| hash.clone());
-            }
-        }
-    }
-    Ok(operations)
-}
-
-fn parsed(body: &[u8]) -> Result<HashMap<String, String>> {
-    let answer: Answer =
-        serde_json::from_slice(body).context("cannot decode the query hash registry")?;
-    if answer.operations.is_empty() {
-        bail!("the query hash registry is empty");
-    }
-    if let Some((operation, _)) = answer
-        .operations
-        .iter()
-        .find(|(_, hash)| !sane(hash.as_str()))
-    {
-        bail!("the {operation} query hash is malformed");
-    }
-    Ok(answer.operations)
+pub(super) async fn refetch(operation: &str) -> Option<String> {
+    desktop_hash(operation).await.ok()
 }
 
 fn sane(hash: &str) -> bool {
@@ -220,7 +118,9 @@ fn path() -> PathBuf {
     crate::credentials::root().join(FILE)
 }
 
-// Discover the operations missing from the shared hash service.
+// Discover an operation in the web player bundle.
+// shortcut: one bundle download per operation not yet cached, harvest every hash at once if that
+// proves slow
 async fn desktop_hash(operation: &str) -> Result<String> {
     // librespot overwrites User-Agent on every request, which makes this page serve
     // the mobile bundle. This unauthenticated client reads only public web assets.
@@ -242,6 +142,13 @@ async fn desktop_hash(operation: &str) -> Result<String> {
             }
         }
     }
+    let requested = requested.or_else(|| {
+        let hash = ["query", "mutation"]
+            .into_iter()
+            .find_map(|kind| operation_hash(&javascript, operation, kind))?;
+        operations.insert(operation.to_owned(), hash.to_owned());
+        Some(hash.to_owned())
+    });
     let requested =
         requested.with_context(|| format!("Spotify bundle has no {operation} operation"))?;
     store(&operations);
@@ -332,31 +239,5 @@ mod tests {
             Some(unpin.as_str())
         );
         assert!(operation_hash(&javascript, "pinLibraryItem", "query").is_none());
-    }
-
-    fn payload(hash: &str) -> Vec<u8> {
-        format!(
-            r#"{{"version":1,"updated_at":"2026-08-09T00:00:00.000Z",
-               "bundle":"web-player.abc.js","operations":{{"getAlbum":"{hash}"}}}}"#
-        )
-        .into_bytes()
-    }
-
-    #[test]
-    fn keeps_the_operations_of_a_registry() {
-        let hash = "0123456789abcdef".repeat(4);
-        let operations = parsed(&payload(&hash)).unwrap();
-        assert_eq!(operations["getAlbum"], hash);
-    }
-
-    #[test]
-    fn rejects_a_malformed_hash() {
-        assert!(parsed(&payload("")).is_err());
-        assert!(parsed(&payload(&"z".repeat(64))).is_err());
-    }
-
-    #[test]
-    fn rejects_an_empty_registry() {
-        assert!(parsed(br#"{"version":1,"operations":{}}"#).is_err());
     }
 }

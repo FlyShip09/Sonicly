@@ -53,7 +53,7 @@ fn valid(value: &str) -> bool {
 }
 
 pub(crate) fn load() -> Option<Credentials> {
-    let bytes = std::fs::read(path()).ok()?;
+    let bytes = credentials::read(&path()).ok()?;
     let credentials: Credentials = serde_json::from_slice(&bytes).ok()?;
     valid(&credentials.arl).then_some(credentials)
 }

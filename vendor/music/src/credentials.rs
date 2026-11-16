@@ -19,6 +19,12 @@ const MOVED: &[(&str, &[&str])] = &[
     ("youtube", &[FILE, "cookies.json"]),
 ];
 
+/// Sonicly: what a credential file sealed with DPAPI starts with, which tells it from one an
+/// older build left in plaintext. No JSON starts this way.
+#[cfg(windows)]
+const SEALED: &[u8] = b"sonicly-dpapi-1
+";
+
 /// Tells apart the temporary files of two writes running at once in one process.
 static WRITES: AtomicU64 = AtomicU64::new(0);
 
@@ -44,7 +50,14 @@ pub(crate) fn dir(slug: &str) -> PathBuf {
 /// go to a temporary file beside it that is synced and then renamed over the old one, so a
 /// crash leaves either the old sign-in or the new one and never half of either. It fails when
 /// the system names no data folder, rather than leaving credentials in the shared temp dir.
+///
+/// Sonicly: on Windows, where a file cannot be restricted to its owner this way, the contents are
+/// sealed with DPAPI under the current user's key, and [`read`] is what opens them.
 pub(crate) fn write(path: &Path, contents: &[u8]) -> Result<()> {
+    #[cfg(windows)]
+    let sealed = seal(contents)?;
+    #[cfg(windows)]
+    let contents = sealed.as_slice();
     let private = dirs::data_local_dir().context("cannot find a private folder for credentials")?;
     if !path.starts_with(&private) {
         anyhow::bail!(
@@ -76,6 +89,22 @@ pub(crate) fn write(path: &Path, contents: &[u8]) -> Result<()> {
     }
     sync_folder(parent);
     Ok(())
+}
+
+/// Sonicly: reads a credential file [`write`] stored. On Windows it is unsealed, and one an older
+/// build left in plaintext is read as it lies and written back sealed.
+pub(crate) fn read(path: &Path) -> Result<Vec<u8>> {
+    let stored = std::fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    #[cfg(windows)]
+    {
+        if let Some(plain) = opened(&stored)? {
+            return Ok(plain);
+        }
+        if let Err(error) = write(path, &stored) {
+            log::warn!("credentials: cannot seal {}: {error:#}", path.display());
+        }
+    }
+    Ok(stored)
 }
 
 /// Restricts an existing credential file to its owner. A missing file is left alone.
@@ -128,9 +157,7 @@ fn migrate() {
                 .and_then(|kept| Ok(kept.modified()? >= cached.modified()?))
                 .unwrap_or(false);
             if !current {
-                let moved = std::fs::read(&from)
-                    .with_context(|| format!("cannot read {}", from.display()))
-                    .and_then(|body| write(&to, &body));
+                let moved = read(&from).and_then(|body| write(&to, &body));
                 if let Err(error) = moved {
                     log::warn!("credentials: cannot move {}: {error:#}", from.display());
                     continue;
@@ -192,4 +219,82 @@ fn sync_folder(folder: &Path) {
     }
     #[cfg(not(unix))]
     let _ = folder;
+}
+
+#[cfg(windows)]
+fn seal(plain: &[u8]) -> Result<Vec<u8>> {
+    let mut sealed = SEALED.to_vec();
+    sealed.extend(dpapi(plain, true)?);
+    Ok(sealed)
+}
+
+/// What a stored file holds once unsealed, or `None` for a plaintext one from an older build.
+#[cfg(windows)]
+fn opened(stored: &[u8]) -> Result<Option<Vec<u8>>> {
+    stored
+        .strip_prefix(SEALED)
+        .map(|sealed| dpapi(sealed, false))
+        .transpose()
+}
+
+/// Seals or unseals `data` with DPAPI under the current user's key, never asking the user
+/// anything. Only that user, on this machine, can unseal what it seals.
+#[cfg(windows)]
+fn dpapi(data: &[u8], seal: bool) -> Result<Vec<u8>> {
+    use windows::Win32::Foundation::{HLOCAL, LocalFree};
+    use windows::Win32::Security::Cryptography::{
+        CRYPT_INTEGER_BLOB, CRYPTPROTECT_UI_FORBIDDEN, CryptProtectData, CryptUnprotectData,
+    };
+
+    let input = CRYPT_INTEGER_BLOB {
+        cbData: u32::try_from(data.len()).context("the credentials are too large to seal")?,
+        pbData: data.as_ptr().cast_mut(),
+    };
+    let mut output = CRYPT_INTEGER_BLOB::default();
+    // SAFETY: `input` points at `data` for the length given and is only read. On success
+    // `output` is a buffer DPAPI allocated, which is copied out and then freed exactly once.
+    unsafe {
+        match seal {
+            true => CryptProtectData(
+                &input,
+                windows::core::PCWSTR::null(),
+                None,
+                None,
+                None,
+                CRYPTPROTECT_UI_FORBIDDEN,
+                &mut output,
+            ),
+            false => CryptUnprotectData(
+                &input,
+                None,
+                None,
+                None,
+                None,
+                CRYPTPROTECT_UI_FORBIDDEN,
+                &mut output,
+            ),
+        }
+        .context("windows refused to seal or unseal the credentials")?;
+        let bytes = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
+        LocalFree(Some(HLOCAL(output.pbData.cast())));
+        Ok(bytes)
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_sealed_file_opens_and_a_plaintext_one_is_told_apart() {
+        let secret = br#"{"password":"hunter2"}"#;
+
+        let sealed = seal(secret).unwrap();
+        assert!(sealed.starts_with(SEALED));
+        assert!(!sealed.windows(7).any(|window| window == b"hunter2"));
+        assert_eq!(opened(&sealed).unwrap().as_deref(), Some(&secret[..]));
+
+        // what an older build wrote is not sealed, so `read` hands it on and seals it
+        assert_eq!(opened(secret).unwrap(), None);
+    }
 }

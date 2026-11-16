@@ -16,8 +16,6 @@ const ICON: Pixels = px(16.);
 /// The title's line height as a multiple of its size, which the icon centres on.
 const LEADING: f32 = 1.4;
 const REACH: Pixels = px(400.);
-/// Where the README says what to install alongside Sonora.
-const INSTALL: &str = "https://github.com/sonorahq/sonora#linux";
 
 type Handler = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
@@ -99,11 +97,7 @@ impl AppNotice {
             silence: Box::new(move |_, _, cx| {
                 silence.update(cx, |requirements, cx| requirements.silence(requirement, cx));
             }),
-            link: Some(link(
-                SharedString::from(format!("{id}-help")),
-                t!("requirement-help"),
-                INSTALL.to_owned(),
-            )),
+            link: None,
             actions: Vec::new(),
         }
     }

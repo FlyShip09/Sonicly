@@ -72,7 +72,6 @@ enum Slot {
     Folders,
     Theme,
     Adaptive,
-    CommunityThemes,
     Icons,
     Corners,
     Typeface,
@@ -126,13 +125,11 @@ enum Slot {
     SpotifyConnectName,
     SpotifyConnectCustom,
     SessionsButton,
-    SessionsOfficial,
     SessionsServer,
     Discord,
     DiscordName,
     DiscordShowPaused,
     DiscordBadge,
-    DiscordUploadCovers,
     DiscordAnonymous,
     DiscordHideOnConnect,
     DiscordButtons,
@@ -173,6 +170,7 @@ enum Slot {
     Channel,
     Log,
     License,
+    Licenses,
     Source,
 }
 
@@ -657,13 +655,7 @@ impl SettingsView {
         match page {
             SettingsPage::About => vec![
                 self.lazy((page.id(), 2_usize), cx, |this, _, cx| {
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(GROUPS)
-                        .child(this.team(cx))
-                        .child(this.notice(cx))
-                        .into_any_element()
+                    this.notice(cx).into_any_element()
                 })
                 .into_any_element(),
             ],
@@ -779,10 +771,6 @@ impl SettingsView {
             Slot::SubsonicLibrary => (t!("settings-subsonic-library"), SharedString::default()),
             Slot::Theme => (t!("settings-theme"), t!("settings-theme-detail")),
             Slot::Adaptive => (t!("settings-adaptive"), t!("settings-adaptive-detail")),
-            Slot::CommunityThemes => (
-                t!("settings-theme-explore"),
-                t!("settings-theme-explore-detail"),
-            ),
             Slot::Ambient => (t!("settings-ambient"), t!("settings-ambient-detail")),
             Slot::AmbientMotion => (
                 t!("settings-ambient-motion"),
@@ -983,9 +971,17 @@ impl SettingsView {
                 t!("settings-spotify-connect-custom-detail"),
             ),
             Slot::SessionsButton => (t!("settings-sessions-button"), SharedString::default()),
-            Slot::SessionsOfficial => (t!("settings-sessions-official"), SharedString::default()),
-            Slot::SessionsServer => (t!("settings-sessions-server"), SharedString::default()),
-            Slot::Discord => (t!("settings-discord"), t!("settings-discord-detail")),
+            Slot::SessionsServer => (
+                t!("settings-sessions-server"),
+                t!("settings-sessions-server-detail"),
+            ),
+            Slot::Discord => (
+                t!("settings-discord"),
+                match state::DISCORD_APPLICATION_ID {
+                    Some(_) => t!("settings-discord-detail"),
+                    None => t!("settings-discord-unavailable"),
+                },
+            ),
             Slot::DiscordName => (
                 t!("settings-discord-name"),
                 t!("settings-discord-name-detail"),
@@ -997,10 +993,6 @@ impl SettingsView {
             Slot::DiscordBadge => (
                 t!("settings-discord-badge"),
                 t!("settings-discord-badge-detail"),
-            ),
-            Slot::DiscordUploadCovers => (
-                t!("settings-discord-upload-covers"),
-                t!("settings-discord-upload-covers-detail"),
             ),
             Slot::ArtworkForLocal => (
                 t!("settings-artwork-for-local-files"),
@@ -1033,6 +1025,7 @@ impl SettingsView {
             ),
             Slot::Log => (t!("settings-log"), t!("settings-log-detail")),
             Slot::License => (t!("settings-license"), t!("settings-license-detail")),
+            Slot::Licenses => (t!("settings-licenses"), t!("settings-licenses-detail")),
             Slot::Source => (t!("settings-source"), t!("settings-source-detail")),
         };
         Some(meta)
@@ -1054,7 +1047,6 @@ impl SettingsView {
             Slot::Folders => self.folders(cx),
             Slot::Theme | Slot::Icons | Slot::Corners => div().into_any_element(),
             Slot::Adaptive => self.adaptive_row(cx),
-            Slot::CommunityThemes => self.community_themes_row(cx),
             Slot::Ambient => self.ambient_row(cx),
             Slot::AmbientMotion => self.ambient_motion_row(cx),
             Slot::Visualizer => div().into_any_element(),
@@ -1125,13 +1117,11 @@ impl SettingsView {
             Slot::SpotifyConnectName => self.spotify_connect_name_row(cx),
             Slot::SpotifyConnectCustom => self.spotify_connect_custom_row(cx),
             Slot::SessionsButton => self.sessions_button_row(cx),
-            Slot::SessionsOfficial => self.sessions_official_row(cx),
             Slot::SessionsServer => self.sessions_server_row(cx),
             Slot::Discord => self.discord_row(cx),
             Slot::DiscordName => self.discord_name_row(cx),
             Slot::DiscordShowPaused => self.discord_show_paused_row(cx),
             Slot::DiscordBadge => self.discord_badge_row(cx),
-            Slot::DiscordUploadCovers => self.discord_upload_covers_row(cx),
             Slot::ArtworkForLocal => self.artwork_for_local_files_row(cx),
             Slot::DiscordAnonymous => self.discord_anonymous_row(cx),
             Slot::DiscordHideOnConnect => self.discord_hide_on_connect_row(cx),
@@ -1148,6 +1138,7 @@ impl SettingsView {
             Slot::Channel => self.channel_row(cx),
             Slot::Log => self.log_row(cx),
             Slot::License => self.license_row(cx),
+            Slot::Licenses => self.licenses_row(cx),
             Slot::Source => self.source_row(cx),
         }
     }

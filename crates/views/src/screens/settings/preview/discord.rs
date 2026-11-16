@@ -129,11 +129,10 @@ pub(in crate::screens::settings) fn preview(
     let settings = view.settings.read(cx);
     let playback = view.playback.read(cx);
     let paused = playback.track().is_some() && !playback.wants_playing();
-    let on = settings.discord_presence();
+    let on = state::DISCORD_APPLICATION_ID.is_some() && settings.discord_presence();
     let name = settings.discord_name();
     let badge = settings.discord_badge();
     let hidden = settings.discord_without_details();
-    let sonora_button = settings.discord_sonora_button();
     let provider_button = settings.discord_provider_button();
     let local_art = settings.artwork_for_local_files();
 
@@ -198,9 +197,6 @@ pub(in crate::screens::settings) fn preview(
         && let Some((_, name, _)) = provider
     {
         buttons.push(t!("settings-discord-preview-listen-on", provider = name));
-    }
-    if sonora_button {
-        buttons.push(t!("get-sonicly"));
     }
 
     let (title, artist, album) = match hidden {

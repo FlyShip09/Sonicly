@@ -52,8 +52,9 @@ pub fn header(device: &str, device_id: &str, token: Option<&str>) -> String {
     header
 }
 
-/// The server address as typed, with a scheme and without a trailing slash. A bare host is taken
-/// to be plain http, the way a server on the local network usually is.
+/// The server address as typed, with a scheme and without a trailing slash. Sonicly: a bare host
+/// is taken to be https, so a password never crosses the network in the clear unless the
+/// listener typed `http://` themselves.
 pub fn normalize_server(raw: &str) -> Result<String> {
     let trimmed = raw.trim().trim_end_matches('/');
     if trimmed.is_empty() {
@@ -61,7 +62,7 @@ pub fn normalize_server(raw: &str) -> Result<String> {
     }
     Ok(match trimmed.contains("://") {
         true => trimmed.to_owned(),
-        false => format!("http://{trimmed}"),
+        false => format!("https://{trimmed}"),
     })
 }
 
@@ -71,7 +72,7 @@ fn path() -> PathBuf {
 
 /// The kept sign-in, or `None` when there is none or it is missing a part.
 pub fn load() -> Option<Credentials> {
-    let bytes = std::fs::read(path()).ok()?;
+    let bytes = credentials::read(&path()).ok()?;
     let mut credentials: Credentials = serde_json::from_slice(&bytes).ok()?;
     credentials.server = normalize_server(&credentials.server).ok()?;
     match credentials.user_id.is_empty() || credentials.token.is_empty() {
@@ -121,7 +122,7 @@ mod tests {
     fn server_gets_a_scheme_and_loses_its_trailing_slash() {
         assert_eq!(
             normalize_server(" media.local:8096/ ").unwrap(),
-            "http://media.local:8096"
+            "https://media.local:8096"
         );
         assert_eq!(
             normalize_server("https://jf.example.org/jellyfin/").unwrap(),

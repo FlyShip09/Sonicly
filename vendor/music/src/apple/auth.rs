@@ -74,7 +74,7 @@ pub(crate) fn load() -> Option<String> {
     {
         return Some(token);
     }
-    let body = std::fs::read(file()).ok()?;
+    let body = credentials::read(&file()).ok()?;
     match serde_json::from_slice::<Credentials>(&body) {
         Ok(stored) => Some(stored.user_token),
         Err(error) => {
@@ -175,7 +175,7 @@ fn held() -> Option<String> {
 
 /// The token the last launch kept, while it is still good for longer than `MARGIN`.
 fn kept() -> Option<String> {
-    let body = std::fs::read(credentials::dir("apple").join(KEPT)).ok()?;
+    let body = credentials::read(&credentials::dir("apple").join(KEPT)).ok()?;
     let token = serde_json::from_slice::<KeptBearer>(&body).ok()?.token;
     let left = expiry(&token)?.duration_since(SystemTime::now()).ok()?;
     (left > MARGIN).then_some(token)

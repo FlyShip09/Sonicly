@@ -11,7 +11,7 @@
 	<key>CFBundleIconName</key>
 	<string>sonicly</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.nolight.sonora</string>
+	<string>io.github.flyship09.sonicly</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -40,14 +40,6 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>spotify</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleURLName</key>
-			<string>Deezer link</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>deezer</string>
 			</array>
 		</dict>
 		<dict>

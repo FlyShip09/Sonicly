@@ -1,4 +1,5 @@
 mod aac;
+#[cfg(feature = "apple-music")]
 pub mod apple;
 pub mod artwork;
 mod audio;
@@ -7,6 +8,7 @@ mod calendar;
 pub mod connect;
 pub mod cover;
 pub mod credentials;
+#[cfg(feature = "deezer")]
 pub mod deezer;
 pub mod drm;
 pub mod engine;
@@ -32,6 +34,11 @@ mod redact;
 pub mod scrobble;
 mod sink;
 pub mod smart;
+#[cfg(feature = "soloist")]
+pub mod soloist;
+// Sonicly: an inert stand-in, see the file.
+#[cfg(not(feature = "soloist"))]
+#[path = "soloist_off.rs"]
 pub mod soloist;
 mod spectrum;
 mod sponsorblock;
