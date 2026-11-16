@@ -104,48 +104,18 @@ impl AppNotice {
 
     fn update(&self, cx: &App) -> Option<Card> {
         let updates = self.updates.read(cx);
-        let state = updates.state().clone();
-        let installable = updates.installable();
-        let (version, page) = match &state {
-            UpdateState::Quiet => return None,
-            UpdateState::Offered(release) => (release.version.clone(), release.page.clone()),
-            _ => (String::new(), String::new()),
+        let UpdateState::Offered(release) = updates.state() else {
+            return None;
         };
-        let working = matches!(state, UpdateState::Fetching);
-        let failed = matches!(state, UpdateState::Failed);
-
-        let title = match failed {
-            true => t!("update-failed"),
-            false => t!("update-available", version = version.as_str()),
-        };
-        let detail = (!failed).then(|| match installable {
-            true => t!("update-detail", running = state::version()),
-            false => t!("update-detail-notes", running = state::version()),
-        });
+        let (version, page) = (release.version.clone(), release.page.clone());
+        let title = t!("update-available", version = version.as_str());
+        let detail = Some(t!("update-detail-notes", running = state::version()));
 
         let close = self.updates.clone();
-        let install = self.updates.clone();
         let silence = self.updates.clone();
         let settings = self.settings.clone();
         let notes = (!page.is_empty())
             .then(|| link(SharedString::from("update-notes"), t!("update-notes"), page));
-        let actions = (installable && !failed)
-            .then(|| {
-                Button::new("update-now")
-                    .primary()
-                    .small()
-                    .disabled(working)
-                    .label(match working {
-                        true => t!("update-working"),
-                        false => t!("update-now"),
-                    })
-                    .on_click(move |_, _, cx| {
-                        install.update(cx, |updates, cx| updates.install(cx));
-                    })
-            })
-            .into_iter()
-            .collect();
-
         Some(Card {
             id: "update",
             icon: "icons/refresh-cw.svg",
@@ -160,7 +130,7 @@ impl AppNotice {
                 silence.update(cx, |updates, cx| updates.dismiss(cx));
             }),
             link: notes,
-            actions,
+            actions: Vec::new(),
         })
     }
 }

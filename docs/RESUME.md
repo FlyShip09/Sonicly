@@ -74,7 +74,7 @@ powershell -ExecutionPolicy Bypass -File scripts/shot.ps1 -Exe target/release/so
 - **Not seen:** the star rows and switch under Settings, About; the star button
   in a narrow window; a settings migration on a real file (there is no step
   yet, only the unit tests).
-- **Before the first public release:** set `state::RELEASE_REPO` only if the
-  self-updater is wanted, since it downloads and runs an installer, which the
-  house rules forbid as it stands. `kakasi` declares `GPL-3.0`, read as GPL-3.0-only, so the binary as a
-  whole is distributed under GPL version 3.
+- **Before the first public release:** setting `state::RELEASE_REPO` turns on a
+  check for a newer release that links to its page. Sonicly never downloads or
+  installs an update; that code is deleted. `kakasi` declares `GPL-3.0`, read as
+  GPL-3.0-only, so the binary as a whole is distributed under GPL version 3.

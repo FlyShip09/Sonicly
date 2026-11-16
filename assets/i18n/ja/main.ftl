@@ -1054,12 +1054,8 @@ lyrics-source-local = ローカルファイルの歌詞
 lyrics-writers = 作詞: { $writers }
 
 update-available = Sonicly { $version } が公開されました
-update-detail = 現在のバージョンは { $running } です。変更点を読むか、今すぐ更新できます。
 update-detail-notes = 現在のバージョンは { $running } です。変更点を読んでから、インストールした方法で Sonicly を更新してください。
 update-notes = 変更点
-update-now = 更新
-update-working = 更新をダウンロードしています…
-update-failed = 更新をインストールできませんでした。リリースページからもう一度お試しください。
 update-never = 更新を確認しない
 notice-never = 今後表示しない
 requirement-audio-bridge-title = Sonicly がサウンドサーバーに接続できません
