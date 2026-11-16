@@ -9,12 +9,21 @@ pub(crate) fn supported() -> bool {
     false
 }
 
+pub(crate) fn plays() -> bool {
+    false
+}
+
 pub(crate) struct Window;
 
 impl Window {
     pub(crate) fn open(_target: &Target) -> Result<Self> {
         bail!("this platform has no sign-in window yet")
     }
+
+    /// Player pages are not built on this platform, so nothing is ever heard.
+    pub(crate) fn listen(&self, _heard: Box<dyn Fn(String)>) {}
+
+    pub(crate) fn mute(&self, _muted: bool) {}
 
     pub(crate) fn closed(&self) -> bool {
         true

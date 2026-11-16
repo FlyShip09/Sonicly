@@ -3,8 +3,9 @@ use gpui::{App, Context, Entity, SharedString, Window, div};
 use i18n::t;
 use input::ShowMembers;
 use music::connect::{DeviceKind, Elsewhere};
+use router::{Destination, SettingsPage};
 use state::{Devices, Listening, Sonicly};
-use ui::{ActiveTheme as _, Menu, MenuItem, Picker, Popovers, SubmenuState};
+use ui::{ActiveTheme as _, Menu, MenuItem, Picker, Popovers, SubmenuState, Text};
 
 use crate::chrome::jam;
 use crate::chrome::members::gathered;
@@ -169,6 +170,22 @@ impl SessionsButton {
         let listening = self.listening.clone();
         let state = listening.read(cx);
         let Some(room) = state.room() else {
+            if !state.has_server(cx) {
+                let theme = cx.theme();
+                return vec![
+                    MenuItem::new("session-server", t!("devices-session-server"))
+                        .icon("icons/users-round-collaboration.svg")
+                        .detail(
+                            div()
+                                .text_color(theme.muted_foreground)
+                                .text_size(theme.text(Text::Small))
+                                .child(t!("devices-session-server-detail")),
+                        )
+                        .on_click(|_, _, cx| {
+                            router::navigate(Destination::Settings(SettingsPage::Playback), cx)
+                        }),
+                ];
+            }
             return vec![
                 MenuItem::new("session-start", t!("devices-session-start"))
                     .icon("icons/users-round-collaboration.svg")

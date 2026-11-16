@@ -233,7 +233,7 @@ pub(crate) fn rising_volume<V: VolumeHost>(
                                     .px(reach)
                                     .mx(Pixels::ZERO - reach)
                                     .child(panel)
-                                    .rising("volume-rise"),
+                                    .rising_from("volume-rise", gpui::point(0.5, 1.)),
                             ),
                     ),
             ))

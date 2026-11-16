@@ -8,7 +8,9 @@
 //! The first job is signing in: the user works through the provider's pages and the proof cookies
 //! are the session. The second is running a script on a page the app cannot reach any other way,
 //! which is how YouTube's proof-of-origin token is minted; that window is hidden and its script
-//! leaves the answer in a cookie the same poll reads.
+//! leaves the answer in a cookie the same poll reads. A third kind of hidden window is a player
+//! page: a service's own web player, handed the session the app holds, which plays by itself and
+//! reports through a message channel instead of cookies.
 //!
 //! An account provider can finish the sign-in on an interstitial of its own — Google's security
 //! check-up, say — that jumps straight to the return url and skips the hop that hands the account
@@ -68,6 +70,14 @@ pub struct Target {
     /// Javascript to run in every page the window loads, before the page's own scripts. A window
     /// with one is a scripted window and is never shown.
     pub script: Option<String>,
+    /// Cookies put into the window's fresh session before the first page loads, as name and
+    /// value, for `domain` and everything under it. This is how a session the app already holds
+    /// reaches a window whose store starts empty.
+    pub cookies: Vec<(String, String)>,
+    /// Makes a scripted window a player page: it may start sound with no click behind it, and
+    /// its scripts can call `window.soniclyPost(text)`, which reaches [`Page::listen`] when the
+    /// top document of `landing` made the call. Only where [`plays`] says so.
+    pub player: bool,
 }
 
 impl Target {
@@ -115,6 +125,13 @@ pub fn supported() -> bool {
     platform::supported()
 }
 
+/// Whether this platform's web view can be a player page: one that plays a service's protected
+/// audio by itself and talks back to the app. Windows only so far. WebKitGTK ships no content
+/// decryption module at all, and the macOS backend has no message channel yet.
+pub fn plays() -> bool {
+    platform::plays()
+}
+
 /// The exit code for a [`PROBE`] launch, zero when webkit2gtk loads, or none when this process was
 /// started for anything else. Check it first thing in `main`.
 pub fn probed() -> Option<i32> {
@@ -133,6 +150,23 @@ impl Page {
             window,
             retried: false,
         })
+    }
+
+    /// Hands every message a player page posts through `window.soniclyPost` to `heard`, on the
+    /// main thread. The text is whatever a web page chose to send, so read it as data.
+    pub fn listen(&self, heard: impl Fn(String) + 'static) {
+        self.window.listen(Box::new(heard));
+    }
+
+    /// Silences a player page at the engine, or lets it sound again. A page that is still
+    /// opening starts out that way, so one opened muted never makes a sound.
+    pub fn mute(&self, muted: bool) {
+        self.window.mute(muted);
+    }
+
+    /// Whether the window is gone.
+    pub fn closed(&self) -> bool {
+        self.window.closed()
     }
 
     /// Reads the cookies of a scripted page and leaves it open, so one page can answer many times.

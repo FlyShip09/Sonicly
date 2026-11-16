@@ -11,7 +11,7 @@ use super::SettingsView;
 type Pick<T> = Rc<dyn Fn(&T, &mut Window, &mut App)>;
 
 /// One row of a group: the label and optional explanation at the start, the control at the end.
-/// It stands at least one list row tall, with no inset, so labels line up with group headings.
+/// It stands at least one row tall, with no inset of its own: the grouped list around it pads it.
 /// The label and explanation are text in the accessibility tree, but nothing ties them to the
 /// control, so the caller names a switch, picker or segmented control after the row as well.
 #[derive(IntoElement)]
@@ -71,11 +71,14 @@ impl RenderOnce for Row {
             .items_center()
             .justify_between()
             .gap_4()
-            .min_h(theme.metrics.list_row)
+            .min_h(theme.metrics.row)
+            .py_1p5()
             .when(disabled, |this| this.text_color(theme.muted_foreground))
             .child(
                 div()
-                    .map(|this| match yielding {
+                    // A yielding row keeps its label whole, unless an explanation under it would
+                    // then take the whole width: the two halves share it and the text wraps.
+                    .map(|this| match yielding && detail.is_none() {
                         true => this.flex_none(),
                         false => this.flex_1().min_w_0(),
                     })
@@ -200,8 +203,8 @@ pub(super) fn outward(
     whole(id, title, value, "icons/external-link.svg", cx)
 }
 
-/// A row that is one button from edge to edge, ending in `trailing`. Its hover reaches a little
-/// past the column on both sides, so the label still lines up with the rows around it.
+/// A row that is one button from edge to edge, ending in `trailing`. Its hover reaches out to
+/// the grouped list's edges, so the label still lines up with the rows around it.
 fn whole(
     id: impl Into<ElementId>,
     title: SharedString,
@@ -216,7 +219,7 @@ fn whole(
         .label(title)
         .when_some(value, Button::detail)
         .trailing(trailing)
-        .h(theme.metrics.list_row)
+        .h(theme.metrics.row)
         .mx_neg_3()
         .px_3()
         .gap_3()

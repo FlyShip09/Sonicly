@@ -6,7 +6,8 @@
 //!
 //! - `--debug-screen=<what>` opens on a page or lays something over it. A page is a screen id
 //!   (`home`, `search`, `history`, `songs`, `albums`, `artists`, `playlists`),
-//!   `settings:<page>` (`settings:lyrics`), or `album:<id>`, `artist:<id>` and `playlist:<id>`.
+//!   `settings:<page>` (`settings:lyrics`), `equalizer`, or `album:<id>`, `artist:<id>` and
+//!   `playlist:<id>`.
 //!   `now-playing` opens the fullscreen view and `lyrics` opens it on its lyrics panel.
 //!   `powerbar` opens the quick search, and `menu`, `album`, `artist` and `playlist` without an
 //!   id open a context menu or the first of that kind Home lists.
@@ -27,10 +28,22 @@
 //! - `--debug-play=<text>` plays the local library's tracks whose id, which holds the file's
 //!   path, contains `<text>`, once no scan is under way: `big.wav` plays the tracks a cue sheet
 //!   splits that file into.
+//! - `--debug-guest=<slug>` signs in to the service `<slug>` with no account, where it has such
+//!   a session. `apple` has one only under this flag: Apple's catalog and, in the hidden web
+//!   player, the 30-second previews Apple gives any visitor, which is how the web player is
+//!   checked without an account. It also turns lyrics off in the profile, so the run looks
+//!   nothing up anywhere else.
+//! - `--debug-play-id=<id>[,<id>]` plays the signed-in service's tracks with those ids, in
+//!   order, once it is signed in.
 //! - `--debug-level=<path>` appends a line to `<path>` twice a second: the position in seconds
 //!   and the loudest band of the music in dBFS, heard ahead of the equalizer and the volume, so
 //!   a muted run can still show that sound reaches the output chain. `-200.0` is silence, and
 //!   `none` means no audio has been pulled yet.
+//! - `--debug-at=<ms>:<step>` does `<step>` that many milliseconds after the window opens, so a
+//!   capture can catch motion. It may be given more than once. A step is a pointer event at
+//!   window coordinates in logical pixels (`move:x,y`, `down:x,y`, `up:x,y`, `click:x,y`,
+//!   `wheel:x,y,lines`), a keystroke (`key:ctrl-k`), `toggle`, `next` or `prev` on the player,
+//!   `back` or `forward` in the history, or `go:<what>` with anything `--debug-screen` takes.
 
 use std::ffi::OsString;
 use std::io::Write as _;
@@ -59,7 +72,10 @@ pub struct Launch {
     folders: Vec<PathBuf>,
     imports: Vec<PathBuf>,
     play: Option<String>,
+    guest: Option<String>,
+    play_ids: Vec<String>,
     level: Option<PathBuf>,
+    steps: Vec<(Duration, String)>,
 }
 
 /// How often `--debug-level` writes a line, and `--debug-import` looks whether the scan is over.
@@ -89,7 +105,20 @@ pub fn take(args: Vec<OsString>) -> (Vec<OsString>, Launch) {
                 "--debug-folder" => launch.folders.push(PathBuf::from(value)),
                 "--debug-import" => launch.imports.push(PathBuf::from(value)),
                 "--debug-play" => launch.play = Some(value.to_owned()),
+                "--debug-guest" => launch.guest = Some(value.to_owned()),
+                "--debug-play-id" => {
+                    launch.play_ids = value.split(',').map(str::to_owned).collect();
+                }
                 "--debug-level" => launch.level = Some(PathBuf::from(value)),
+                "--debug-at" => {
+                    if let Some((at, step)) = value.split_once(':')
+                        && let Ok(at) = at.parse()
+                    {
+                        launch
+                            .steps
+                            .push((Duration::from_millis(at), step.to_owned()));
+                    }
+                }
                 _ => return true,
             }
             false
@@ -100,6 +129,11 @@ pub fn take(args: Vec<OsString>) -> (Vec<OsString>, Launch) {
 }
 
 impl Launch {
+    /// The service `--debug-guest` named.
+    pub fn guest(&self) -> Option<&str> {
+        self.guest.as_deref()
+    }
+
     /// Applies what has to be in place before the window opens: the theme, the volume and the
     /// fullscreen panel. Returns the page to open on, the one `--debug-screen` names by its
     /// address or `start` otherwise.
@@ -112,6 +146,10 @@ impl Launch {
             settings.update(cx, |settings, cx| {
                 settings.set_fullscreen_tab(Some(SideTab::Lyrics), cx)
             });
+        }
+        if self.guest.is_some() {
+            // a check of one service's player then reaches that service and nobody else
+            settings.update(cx, |settings, cx| settings.set_lyrics_enabled(false, cx));
         }
         if self.mute {
             let playback = Sonicly::global(cx).playback.clone();
@@ -203,6 +241,63 @@ impl Launch {
             })
             .detach();
         }
+        if let Some(slug) = self.guest {
+            let session = Sonicly::global(cx).session.clone();
+            session.update(cx, |session, cx| {
+                session.sign_in(&slug, music::SignIn::Anonymous, cx)
+            });
+        }
+        if !self.play_ids.is_empty() {
+            let session = Sonicly::global(cx).session.clone();
+            let playback = Sonicly::global(cx).playback.clone();
+            let io = state::Io::global(cx);
+            let ids = self.play_ids;
+            cx.spawn(async move |cx| {
+                let client = loop {
+                    cx.background_executor().timer(TICK).await;
+                    let client = session.read_with(cx, |session, _| {
+                        session.playback().and_then(|_| session.client())
+                    });
+                    if let Some(client) = client {
+                        break client;
+                    }
+                };
+                let found = io
+                    .spawn(async move {
+                        let mut tracks = Vec::new();
+                        for id in ids {
+                            tracks.push(client.track(&id).await?);
+                        }
+                        anyhow::Ok(tracks)
+                    })
+                    .await;
+                match found {
+                    Ok(Ok(tracks)) => {
+                        playback.update(cx, |playback, cx| playback.start(tracks, 0, None, cx))
+                    }
+                    Ok(Err(error)) => log::warn!("debug: cannot read a track to play: {error:#}"),
+                    Err(error) => log::warn!("debug: cannot read a track to play: {error:#}"),
+                }
+            })
+            .detach();
+        }
+        if !self.steps.is_empty()
+            && let Some(window) = window
+        {
+            let mut steps = self.steps;
+            steps.sort_by_key(|(at, _)| *at);
+            cx.spawn(async move |cx| {
+                let mut waited = Duration::ZERO;
+                for (at, step) in steps {
+                    cx.background_executor()
+                        .timer(at.saturating_sub(waited))
+                        .await;
+                    waited = at;
+                    cx.update(|cx| perform(&step, window, cx));
+                }
+            })
+            .detach();
+        }
         if let Some(path) = self.level {
             let playback = Sonicly::global(cx).playback.clone();
             let watch = std::sync::Arc::new(playback.read(cx).analyzer().watch());
@@ -234,6 +329,91 @@ impl Launch {
     }
 }
 
+/// Does one `--debug-at` step on the main window.
+fn perform(step: &str, window: gpui::WindowHandle<Root>, cx: &mut App) {
+    use gpui::{
+        KeyDownEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent,
+        MouseUpEvent, PlatformInput, ScrollDelta, ScrollWheelEvent, point,
+    };
+
+    let (kind, value) = step.split_once(':').unwrap_or((step, ""));
+    let numbers: Vec<f32> = value.split(',').filter_map(|n| n.parse().ok()).collect();
+    let position = point(
+        px(numbers.first().copied().unwrap_or(0.)),
+        px(numbers.get(1).copied().unwrap_or(0.)),
+    );
+    let modifiers = Modifiers::default();
+    let down = |click_count| {
+        PlatformInput::MouseDown(MouseDownEvent {
+            button: MouseButton::Left,
+            position,
+            modifiers,
+            click_count,
+            first_mouse: false,
+        })
+    };
+    let up = PlatformInput::MouseUp(MouseUpEvent {
+        button: MouseButton::Left,
+        position,
+        modifiers,
+        click_count: 1,
+    });
+    let events = match kind {
+        "move" => vec![PlatformInput::MouseMove(MouseMoveEvent {
+            position,
+            pressed_button: None,
+            modifiers,
+        })],
+        "down" => vec![down(1)],
+        "up" => vec![up],
+        "click" => vec![down(1), up],
+        "wheel" => vec![PlatformInput::ScrollWheel(ScrollWheelEvent {
+            position,
+            delta: ScrollDelta::Lines(point(0., numbers.get(2).copied().unwrap_or(-1.))),
+            modifiers,
+            touch_phase: Default::default(),
+        })],
+        "key" => match Keystroke::parse(value) {
+            Ok(keystroke) => vec![PlatformInput::KeyDown(KeyDownEvent {
+                keystroke,
+                is_held: false,
+                prefer_character_input: false,
+            })],
+            Err(_) => return log::warn!("debug: cannot read the keystroke {value}"),
+        },
+        _ => {
+            let playback = Sonicly::global(cx).playback.clone();
+            match kind {
+                "toggle" => playback.update(cx, |playback, cx| playback.toggle_play(cx)),
+                "next" => playback.update(cx, |playback, cx| playback.next(cx)),
+                "prev" => playback.update(cx, |playback, cx| playback.previous(cx)),
+                "back" => router::back(cx),
+                "forward" => router::forward(cx),
+                "go" if matches!(value, "now-playing" | "lyrics") => {
+                    router::navigate(Destination::Fullscreen, cx)
+                }
+                "go" => match destination(value) {
+                    Some(destination) => router::navigate(destination, cx),
+                    None => {
+                        window
+                            .update(cx, |root, window, cx| root.stage(value, window, cx))
+                            .ok();
+                    }
+                },
+                _ => log::warn!("debug: no step called {step}"),
+            }
+            return;
+        }
+    };
+    window
+        .update(cx, |_, window, cx| {
+            for event in events {
+                window.dispatch_event(event, cx);
+            }
+        })
+        .ok();
+}
+
 /// The window size `--debug-size` asked for, which wins over the size the window was last
 /// closed at.
 pub fn window_size() -> Option<Size<Pixels>> {
@@ -255,6 +435,7 @@ fn destination(what: &str) -> Option<Destination> {
         "settings" => Some(Destination::Settings(
             SettingsPage::from_id(&id).unwrap_or(SettingsPage::General),
         )),
+        "equalizer" => Some(Destination::Equalizer),
         "album" | "artist" | "playlist" if id.is_empty() => None,
         "album" => Some(Destination::Album(id)),
         "artist" => Some(Destination::Artist(id)),

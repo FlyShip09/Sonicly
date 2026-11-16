@@ -186,7 +186,6 @@ enum Slot {
     AdaptiveMenu,
     Version,
     Updates,
-    Channel,
     Log,
     License,
     Licenses,
@@ -418,7 +417,6 @@ impl SettingsView {
         let search = cx.new(|cx| {
             Input::new("settings-search", cx)
                 .icon("icons/search.svg")
-                .blurred()
                 .clearable()
         });
         let filter =
@@ -677,6 +675,15 @@ impl SettingsView {
 
     /// What a page shows between its title and its groups, built only while visible.
     fn header(&self, page: SettingsPage, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // The account card waits on a sign-in with placeholders, and with no account to wait
+        // on, as on local files alone, it stays away rather than loading forever.
+        let account = matches!(
+            self.session.read(cx).state(),
+            SessionState::SignedIn(_) | SessionState::Restoring | SessionState::Authorizing(_)
+        );
+        if page == SettingsPage::Providers && !account {
+            return None;
+        }
         match page {
             SettingsPage::Providers | SettingsPage::About => Some(
                 self.lazy((page.id(), 0_usize), cx, move |this, _, cx| match page {
@@ -704,13 +711,14 @@ impl SettingsView {
 
     /// The live preview above a page's first group, built and animated only while visible.
     fn preview(&self, page: SettingsPage, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !matches!(
-            page,
-            SettingsPage::NowPlaying
-                | SettingsPage::Lyrics
-                | SettingsPage::Sound
-                | SettingsPage::Discord
-        ) {
+        // a build with no Discord application shows no status, so it previews none either
+        let discord = page == SettingsPage::Discord && state::DISCORD_APPLICATION_ID.is_some();
+        if !discord
+            && !matches!(
+                page,
+                SettingsPage::NowPlaying | SettingsPage::Lyrics | SettingsPage::Sound
+            )
+        {
             return None;
         }
         let view = cx.entity();
@@ -1113,10 +1121,6 @@ impl SettingsView {
                 t!("settings-check-updates"),
                 t!("settings-check-updates-detail"),
             ),
-            Slot::Channel => (
-                t!("settings-update-channel"),
-                t!("settings-update-channel-detail"),
-            ),
             Slot::Log => (t!("settings-log"), t!("settings-log-detail")),
             Slot::License => (t!("settings-license"), t!("settings-license-detail")),
             Slot::Licenses => (t!("settings-licenses"), t!("settings-licenses-detail")),
@@ -1246,7 +1250,6 @@ impl SettingsView {
             Slot::KeybindsReset => self.keybinds_reset_row(cx),
             Slot::Version => self.version_row(),
             Slot::Updates => self.updates_row(cx),
-            Slot::Channel => self.channel_row(cx),
             Slot::Log => self.log_row(cx),
             Slot::License => self.license_row(cx),
             Slot::Licenses => self.licenses_row(cx),
@@ -1271,8 +1274,8 @@ impl SettingsView {
         }
     }
 
-    /// One group: the eyebrow with its icon, its option cards, then its rows, all on the page
-    /// itself with no surface around them and nothing between the rows.
+    /// One group: the eyebrow with its icon and its option cards on the page, then its rows as
+    /// one grouped list, a rounded inset sheet with a hairline between each row and the next.
     fn group(&self, group: Group, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let Group {
             title,
@@ -1300,12 +1303,24 @@ impl SettingsView {
                 self.revealing(Reveal::Slot(slot), row, cx)
             })
             .collect::<Vec<_>>();
+        let theme = *cx.theme();
         let rows = (!rows.is_empty()).then(|| {
             div()
                 .flex()
                 .flex_col()
                 .when(carded, |rows| rows.mt_3())
-                .children(rows)
+                .px_3()
+                .rounded(ui::rim(theme.radius))
+                .bg(theme.secondary)
+                .border_1()
+                .border_color(theme.border)
+                .children(rows.into_iter().enumerate().map(|(place, row)| {
+                    div()
+                        .when(place > 0, |this| {
+                            this.border_t_1().border_color(theme.table_row_border)
+                        })
+                        .child(row)
+                }))
         });
 
         div()

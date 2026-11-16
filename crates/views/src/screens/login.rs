@@ -1,20 +1,18 @@
-use std::time::Instant;
-
 use crate::shared::device_code::device_code;
 use crate::shared::popups::{AccountPicker, CookiePrompt, Credentials, CredentialsPrompt};
 use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClipboardItem, Context, Entity, FontWeight, Hsla, IntoElement, Pixels, Point,
-    Render, SharedString, Task, Window, div, hsla, img, point, px, relative, svg,
+    AnyElement, App, ClipboardItem, Context, Entity, IntoElement, Pixels, Render, SharedString,
+    Window, div, img, px, relative, svg,
 };
 use i18n::t;
 use music::{AccountChoices, SignIn, SignInPrompt};
 use state::{ProviderInfo, Session, SessionState};
 use ui::ActiveTheme as _;
-use ui::{Button, Input, LEADING, Lattice, Modal, Scrollbar, Scroller, Separator, Text, mix};
+use ui::{Button, Input, LEADING, Modal, Scrollbar, Scroller, Text};
 
-/// How wide the sign-in card stands.
+/// How wide the welcome card stands.
 const CARD: Pixels = px(400.);
 /// The app icon over the welcome.
 const ICON: Pixels = px(64.);
@@ -24,8 +22,6 @@ const APP_ICON: &str = "brand/sonicly.svg";
 const MARK: Pixels = px(22.);
 /// The space between two provider rows.
 const ROW_GAP: Pixels = px(4.);
-/// How hard the frosted card blurs the lattice behind it.
-const FROST: Pixels = px(28.);
 /// How tall the bands are where the provider list fades out at its ends when the window is
 /// too short to show it whole.
 const FADE: Pixels = px(16.);
@@ -33,22 +29,10 @@ const FADE: Pixels = px(16.);
 const DIALOG: Pixels = px(420.);
 /// How many buttons tall the sign-in choice stands, however few it lists.
 const CHOICES: f32 = 3.;
-/// How many 120 Hz ticks pass between frames while the pools only drift, which makes 30 Hz, and
-/// while a glow fades in or out, which makes 60 Hz.
-const DRIFT_TICKS: u32 = 4;
-const FADE_TICKS: u32 = 2;
-/// How far the glow's strength and colour move toward their targets each frame.
-const EASE: f32 = 0.3;
-/// How close the glow has to come to its target before it counts as settled.
-const SETTLED: f32 = 0.01;
-/// The pools that light the lattice: indigo, violet and a cool teal, so no provider's brand
-/// colour owns the backdrop. The glow behind a hovered provider takes that provider's brand.
-const POOLS: [(f32, f32, f32, f32); 3] = [
-    (0.66, 0.75, 0.62, 0.95),
-    (0.78, 0.70, 0.64, 0.85),
-    (0.50, 0.65, 0.52, 0.7),
-];
 
+/// The welcome screen: the three ways into the app, in the order most people want them. Music
+/// already on this computer first, then signing in to a service, then browsing a service with
+/// no account. Nothing on it moves on its own.
 pub struct LoginView {
     session: Entity<Session>,
     secret: Entity<Input>,
@@ -59,15 +43,6 @@ pub struct LoginView {
     choosing: Option<(&'static str, &'static str)>,
     /// Whether a method picked in that dialog is running, so the dialog closes once it settles.
     choice_running: bool,
-    /// The provider under the pointer, whose brand the glow behind it takes.
-    hovered: Option<&'static str>,
-    /// Where the glow sits: behind the middle of the card at the height the pointer entered
-    /// the hovered row. It stays put while the glow fades out.
-    glow_at: Option<Point<Pixels>>,
-    glow: f32,
-    lamp: Hsla,
-    started: Instant,
-    pacing: Option<Task<()>>,
     scrollbar: Entity<Scrollbar>,
 }
 
@@ -82,12 +57,6 @@ impl LoginView {
             manual_secret: None,
             choosing: None,
             choice_running: false,
-            hovered: None,
-            glow_at: None,
-            glow: 0.,
-            lamp: cx.theme().foreground,
-            started: Instant::now(),
-            pacing: None,
             scrollbar: cx.new(|_| Scrollbar::inset()),
         }
     }
@@ -197,59 +166,6 @@ impl LoginView {
         cx.notify();
     }
 
-    /// Lights the glow behind the card at the height the pointer came into the row, in the
-    /// provider's brand, and lets it fade once the pointer leaves.
-    fn hover(&mut self, slug: &'static str, inside: bool, window: &Window, cx: &mut Context<Self>) {
-        match inside {
-            true => {
-                let entered = window.mouse_position();
-                self.hovered = Some(slug);
-                self.glow_at = Some(point(window.viewport_size().width / 2., entered.y));
-            }
-            false if self.hovered == Some(slug) => self.hovered = None,
-            false => {}
-        }
-        cx.notify();
-    }
-
-    /// Eases the glow one step toward its targets and asks for the lattice's next frame on the
-    /// shared tick, faster while the glow is still moving.
-    fn pace(&mut self, lamp: Hsla, window: &mut Window, cx: &mut Context<Self>) {
-        let target = match self.hovered {
-            Some(_) => 1.,
-            None => 0.,
-        };
-        self.glow += (target - self.glow) * EASE;
-        if self.hovered.is_some() {
-            self.lamp = mix(self.lamp, lamp, EASE);
-        }
-        let fading = (target - self.glow).abs() > SETTLED;
-        if self.pacing.is_some() {
-            return;
-        }
-        let ticks = match fading {
-            true => FADE_TICKS,
-            false => DRIFT_TICKS,
-        };
-        let timer = crate::shared::animation::next(ticks, cx);
-        let handle = window.window_handle();
-        self.pacing = Some(cx.spawn(async move |this, cx| {
-            timer.await;
-            if this
-                .update(cx, |this, cx| {
-                    this.pacing = None;
-                    cx.notify();
-                })
-                .is_err()
-            {
-                return;
-            }
-            handle
-                .update(cx, |_, window, _| window.on_next_frame(|_, _| {}))
-                .ok();
-        }));
-    }
-
     /// The Sonicly icon, the welcome and the line under it saying what the screen is waiting on.
     fn welcome(&self, status: SharedString, cx: &App) -> impl IntoElement {
         let theme = cx.theme();
@@ -267,7 +183,8 @@ impl LoginView {
                     .aria_level(1)
                     .aria_label(title.clone())
                     .text_size(theme.text(Text::Title))
-                    .font_weight(FontWeight::SEMIBOLD)
+                    .letter_spacing(Text::Title.tracking())
+                    .font_weight(ui::title_weight(Text::Title))
                     .child(title),
             )
             .child(
@@ -324,9 +241,6 @@ impl LoginView {
                 .disabled(pending && !busy)
                 .aria_position_in_set(index + 1)
                 .aria_size_of_set(count)
-                .on_hover(cx.listener(move |this, inside: &bool, window, cx| {
-                    this.hover(slug, *inside, window, cx)
-                }))
                 .on_click(cx.listener(move |this, _, _, cx| match busy {
                     true => this.abandon(cx),
                     false => this.pick(slug, cx),
@@ -357,34 +271,66 @@ impl LoginView {
             .into_any_element()
     }
 
-    /// A rule with "or" in its middle, between the providers and guest mode.
-    fn divider(&self, cx: &App) -> impl IntoElement {
+    /// The first way in: a folder of music on this computer. The button asks for one with the
+    /// library's own picker, and the line under it says a folder dropped on the window works too.
+    /// Either way the first scan starts and the library opens on it.
+    fn local(&self, cx: &App) -> impl IntoElement {
         let theme = cx.theme();
         div()
             .flex()
-            .items_center()
-            .gap_3()
-            .w_full()
-            .child(div().flex_1().child(Separator::horizontal()))
+            .flex_col()
+            .flex_none()
+            .gap_2()
+            .child(
+                Button::new("login-local")
+                    .primary()
+                    .large()
+                    .w_full()
+                    .icon("icons/folder-plus.svg")
+                    .label(t!("login-local"))
+                    .on_click(|_, _, cx| crate::shared::local::choose_folder(cx)),
+            )
             .child(
                 div()
-                    .text_size(theme.text(Text::Tiny))
+                    .text_center()
+                    .text_size(theme.text(Text::Small))
                     .text_color(theme.muted_foreground)
-                    .child(t!("login-or")),
+                    .child(t!("login-local-detail")),
             )
-            .child(div().flex_1().child(Separator::horizontal()))
     }
 
-    fn guest_mode(&self, slug: &'static str, pending: bool, cx: &mut Context<Self>) -> Button {
-        Button::new("guest-mode")
-            .label(t!("login-guest-use"))
-            .icon("icons/hat-glasses.svg")
-            .outline()
-            .w_full()
-            .disabled(pending)
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.start(slug, SignIn::Anonymous, cx);
-            }))
+    /// The last way in: one provider's catalogue with no account, named so nobody wonders whose
+    /// music they are browsing.
+    fn guest_mode(
+        &self,
+        slug: &'static str,
+        provider: &'static str,
+        pending: bool,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let theme = cx.theme();
+        div()
+            .flex()
+            .flex_col()
+            .flex_none()
+            .gap_2()
+            .child(
+                Button::new("guest-mode")
+                    .label(t!("login-browse"))
+                    .outline()
+                    .w_full()
+                    .disabled(pending)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.start(slug, SignIn::Anonymous, cx);
+                    })),
+            )
+            .child(
+                div()
+                    .text_center()
+                    .text_size(theme.text(Text::Small))
+                    .text_color(theme.muted_foreground)
+                    .child(t!("login-browse-detail", provider = provider)),
+            )
     }
 
     fn url_prompt(&self, url: String) -> impl IntoElement {
@@ -560,7 +506,7 @@ impl Render for LoginView {
                     .iter()
                     .any(|option| matches!(option, SignIn::Anonymous))
             })
-            .map(|info| info.slug)
+            .map(|info| (info.slug, info.name))
             .next();
         let manual_secret = self.manual_secret.filter(|_| {
             matches!(
@@ -616,29 +562,18 @@ impl Render for LoginView {
         let failure = providers.iter().find_map(|info| info.error.clone());
 
         let theme = *cx.theme();
-        let lamp = match self.hovered {
-            Some(slug) => crate::shared::provider_brand(slug, cx),
-            None => self.lamp,
-        };
-        let animates = ui::motion::animates(cx);
-        match animates {
-            true => self.pace(lamp, window, cx),
-            false => {
-                self.glow = f32::from(u8::from(self.hovered.is_some()));
-                self.lamp = lamp;
-            }
-        }
-        let time = match animates {
-            true => self.started.elapsed().as_secs_f32(),
-            false => 0.,
-        };
 
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         let radius =
             crate::chrome::window_radius(state::Sonicly::global(cx).settings.read(cx), cx, window);
         #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
-        let radius: Option<Pixels> = None;
+        let radius: Option<Pixels> = {
+            let _ = window;
+            None
+        };
 
+        // The card is the page set into the frame, as in the workspace: one opaque surface with
+        // one hairline edge, and no shadow, blur or light behind it.
         let card = div()
             .flex()
             .flex_col()
@@ -649,10 +584,8 @@ impl Render for LoginView {
             .p_8()
             .rounded(ui::corners(theme.radius))
             .border_1()
-            .border_color(theme.border.opacity(0.7))
-            .bg(theme.background.opacity(0.62))
-            .backdrop_blur(FROST)
-            .shadow_lg()
+            .border_color(theme.sidebar_border)
+            .bg(theme.background)
             .child(
                 div()
                     .flex()
@@ -666,21 +599,24 @@ impl Render for LoginView {
                     })
                     .when_some(url, |this, url| this.child(self.url_prompt(url))),
             )
-            .child(self.rows(&providers, pending, waiting, cx))
-            .when_some(guest, |this, slug| {
-                this.child(div().flex_none().child(self.divider(cx)))
-                    .child(div().flex_none().child(self.guest_mode(slug, pending, cx)))
+            .child(self.local(cx))
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .min_h_0()
+                    .flex_shrink(1.)
+                    .child(ui::spoken_eyebrow(
+                        "login-services",
+                        t!("login-providers"),
+                        cx,
+                    ))
+                    .child(self.rows(&providers, pending, waiting, cx)),
+            )
+            .when_some(guest, |this, (slug, name)| {
+                this.child(self.guest_mode(slug, name, pending, cx))
             });
-
-        let backdrop = Lattice::new(POOLS.map(|(h, s, l, a)| hsla(h, s, l, a)))
-            .stage(Hsla {
-                a: 1.,
-                ..theme.background
-            })
-            .lamp(self.lamp)
-            .glow(self.glow_at, self.glow)
-            .time(time)
-            .when_some(radius, |this, radius| this.corner_radius(radius));
 
         div()
             .id("login")
@@ -688,7 +624,7 @@ impl Render for LoginView {
             .size_full()
             .overflow_hidden()
             .when_some(radius, |this, radius| this.rounded(radius))
-            .child(div().absolute().inset_0().child(backdrop))
+            .bg(theme.sidebar)
             // The card never runs past the window: it shrinks to fit, and its provider list scrolls.
             .child(
                 div()

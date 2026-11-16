@@ -63,7 +63,6 @@ impl Render for SettingsHeader {
         let tabs = TabBar::new("settings-tabs")
             .name(i18n::lookup("nav-settings", None))
             .max_w_full()
-            .blurred()
             .reveal(shown)
             .items(SettingsTab::ALL.map(|tab| {
                 Button::new(tab.id())
@@ -109,18 +108,21 @@ impl Render for SettingsHeader {
                     equalizer.update(cx, |_, cx| cx.notify());
                 }
             })
-            // A see-through page has content of its own passing under the header and reads
-            // worse without the haze, so only the flat fallback is dropped there, since a solid
-            // band over a see-through page is a slab.
-            .when(effects() || !theme.transparent, |header| {
-                header.child(veil(
+            // On an opaque page the header is the page's own surface, so rows passing under it
+            // are hidden outright rather than left legible through a haze. A see-through page
+            // keeps the haze, since a solid band over it is a slab, and gets nothing with
+            // effects off.
+            .map(|header| match theme.transparent {
+                false => header.child(div().absolute().inset_0().bg(theme.background)),
+                true if effects() => header.child(veil(
                     VeilEdge::Top,
                     layout.top,
                     BLUR,
                     theme.background,
                     None,
                     window,
-                ))
+                )),
+                true => header,
             })
             .child(
                 div()

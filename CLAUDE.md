@@ -21,7 +21,8 @@ crates/
   i18n/       Fluent localization: the `t!` macro, locale selection, embedded .ftl
   icons/      the icon packs: registry, active pack, path resolution, AssetSource
   embed/      build-script helper that walks a folder and writes include_bytes! literals
-  webview/    a native browser window over a throwaway session, for cookie sign-ins and PO tokens
+  webview/    a native browser window over a throwaway session, for cookie sign-ins, PO tokens
+              and a service's own web player page
 ```
 
 Dependency direction is strict. Do not create a back edge:
@@ -41,8 +42,9 @@ sonicly → views → state → music
 - `music::engine` is the one playback engine and `music::stream` the one progressive download. A
   provider implements `engine::Fetch` and `stream::Body` rather than writing its own. The engine
   applies loudness normalisation, so a provider only reports a track's level through
-  `Fetch::loudness`. Spotify is the one exception, because librespot decodes and normalises
-  inside its own player.
+  `Fetch::loudness`. There are two exceptions. Spotify, because librespot decodes and normalises
+  inside its own player. Apple Music, because its player is Apple's own web page in a hidden
+  web view, commanded through `music::webplayer`: Sonicly never receives its audio.
 
 ## Rules
 
@@ -177,7 +179,10 @@ nobody can see needs none.
 - **Never open, clone, fetch or read github.com/tryliner/desktop**, and never call a Liner API.
   Liner-style features are designed here and logged in `docs/DESIGN.md`.
 - **No DRM circumvention**, nothing that downloads and runs an executable, no telemetry, no
-  calls to servers of our own. Apple Music, Deezer and the Widevine host were removed on purpose.
+  calls to servers of our own. Deezer and the Widevine host were removed on purpose and stay
+  removed. Apple Music plays only inside Apple's own web player in the system web view
+  (`docs/DESIGN.md`, "Apple Music is back"): never add a content decryption module, a licence
+  request, key handling or decryption to Sonicly, and never make its tracks downloadable.
 - **Never ask for or store credentials** in chat or files. Account sign-in happens inside the app.
 - **Windows never pop up in front of the owner.** Launch the app only through
   `scripts/shot.ps1` (`-Exe target/debug/sonicly.exe -Out <png> [-Wait s] [-Size WxH]
@@ -191,8 +196,9 @@ nobody can see needs none.
   `--debug-mini=card|bar`, `--debug-drop=<path>`, `--debug-ask=<path>`, `--debug-covers`, and
   for checks of the library and of playback `--debug-folder=<path>`, `--debug-import=<playlist>`,
   `--debug-play=<text in a track's path>` and `--debug-level=<file>` (the level of the music ahead
-  of the volume, so a muted run still shows sound). Always pass `--debug-mute` when a run plays
-  something.
+  of the volume, so a muted run still shows sound). `--debug-guest=<service>` and
+  `--debug-play-id=<id>[,<id>]` run a service as a signed-out visitor. Always pass `--debug-mute`
+  when a run plays something.
 - **The owner prefers building over test runs.** Verify with `cargo fmt`, `cargo check`,
   `cargo clippy --workspace --all-targets -- -D warnings` and `cargo build -p sonicly`. Write unit
   tests for new non-UI logic; run `cargo test` only when asked.

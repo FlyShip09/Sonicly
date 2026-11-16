@@ -1154,8 +1154,10 @@ impl LibraryView {
             None => ("library-track", display).into(),
         };
 
+        let seed = crate::shared::cards::seed(&track);
         Some(
             Card::new(id, SharedString::from(track.name))
+                .seed(seed)
                 .aria_position_in_set(display + 1)
                 .aria_size_of_set(total)
                 .tile(card)

@@ -54,6 +54,9 @@ enum Status {
 enum Alter {
     Rounded(u8),
     Normalized,
+    /// The service's own player plays the track past Sonicly, so nothing more can be said of
+    /// the sound.
+    Direct,
     Resampled(u32, u32),
     Equalized,
     Volume,
@@ -238,6 +241,7 @@ impl From<Change> for Alter {
         match change {
             Change::Rounded { from } => Self::Rounded(from),
             Change::Normalised(_) | Change::Limited => Self::Normalized,
+            Change::Direct => Self::Direct,
             Change::Resampled { from, to } => Self::Resampled(from, to),
             Change::Equalized => Self::Equalized,
             Change::Volume(_) => Self::Volume,
@@ -265,6 +269,7 @@ fn label(alter: Alter) -> SharedString {
     match alter {
         Alter::Rounded(from) => t!("equalizer-status-bits", from = from, to = FLOAT_BITS),
         Alter::Normalized => t!("equalizer-status-normalized"),
+        Alter::Direct => t!("equalizer-status-direct"),
         Alter::Resampled(from, to) => {
             t!("equalizer-status-rate", from = khz(from), to = khz(to))
         }

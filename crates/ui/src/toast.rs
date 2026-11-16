@@ -347,7 +347,7 @@ impl RenderOnce for Toast {
             .border(BORDER)
             .border_color(theme.border)
             .bg(theme.popover)
-            .shadow_lg()
+            .shadow(crate::glass::lifted(cx))
             .text_size(theme.text(Text::Label))
             .text_color(theme.popover_foreground)
             .child(contents);

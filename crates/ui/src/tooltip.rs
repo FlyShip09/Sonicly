@@ -1,16 +1,17 @@
 use std::cell::Cell;
 use std::panic::Location;
 use std::rc::Rc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
 use gpui::{
     Anchor, AnyElement, App, Bounds, Context, DispatchPhase, Display, ElementId, GlobalElementId,
-    InspectorElementId, LayoutId, MouseMoveEvent, Pixels, Position, SharedString, Style,
+    InspectorElementId, LayoutId, MouseMoveEvent, Pixels, Position, SharedString, Style, Task,
     TextLayout, Window, anchored, canvas, div, point, px,
 };
 
 use crate::metrics::Text;
+use crate::motion::{Motion, Motioned as _};
 use crate::theme::ActiveTheme as _;
 
 const MARGIN: Pixels = px(8.);
@@ -18,6 +19,14 @@ const OFFSET: Pixels = px(6.);
 /// How long the pointer rests on an element before a perched tooltip shows. Long enough that
 /// a pointer pausing on its way to a click raises none.
 const DELAY: Duration = Duration::from_millis(800);
+/// How long after a perched tooltip goes away the next one still shows at once, which is time
+/// enough for the pointer to cross to a neighbouring button.
+const WARM: Duration = Duration::from_millis(500);
+
+thread_local! {
+    /// How many perched tooltips show now, and when the last one went away.
+    static SHOWN: Cell<(usize, Option<Instant>)> = const { Cell::new((0, None)) };
+}
 
 /// Where a tooltip sits relative to the element that owns it.
 #[derive(Clone, Copy, Default, PartialEq)]
@@ -44,6 +53,13 @@ pub struct Tooltip {
     host: Bounds<Pixels>,
     /// Draws nothing, for a clipped tooltip whose text showed in full when the pointer arrived.
     hidden: bool,
+    /// Draws nothing until the pointer has rested long enough, which a tooltip shown at once
+    /// after a neighbour's never waits for.
+    waiting: Option<Task<()>>,
+    /// Whether this one waited, so it fades in. One that followed a neighbour's appears at once.
+    waited: bool,
+    /// Whether this one counts among the tooltips showing now.
+    counted: bool,
 }
 
 /// Attaches a tooltip to an element with the show delay its perch calls for. A tooltip perched
@@ -80,10 +96,61 @@ impl<E: StatefulInteractiveElement + ParentElement> Tipped for E {
     }
 }
 
+impl Tooltip {
+    /// A tooltip perched against `host`. It shows after `DELAY` of rest, or at once while another
+    /// perched tooltip shows or has only just gone. gpui is told no delay of its own for these,
+    /// since the delay it is given is fixed when the element is drawn, and a cached view would
+    /// keep the long one after a neighbour's tooltip had come up.
+    fn perched(
+        text: SharedString,
+        raw: bool,
+        perch: Perch,
+        host: Bounds<Pixels>,
+        hidden: bool,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let warm = SHOWN.get();
+        let warm = warm.0 > 0 || warm.1.is_some_and(|gone| gone.elapsed() < WARM);
+        let waiting = (!warm && !hidden).then(|| {
+            cx.spawn(async move |this, cx| {
+                cx.background_executor().timer(DELAY).await;
+                this.update(cx, |this, cx| {
+                    this.waiting = None;
+                    cx.notify();
+                })
+                .ok();
+            })
+        });
+        Self {
+            text,
+            raw,
+            perch,
+            host,
+            hidden,
+            waited: waiting.is_some(),
+            waiting,
+            counted: false,
+        }
+    }
+}
+
+impl Drop for Tooltip {
+    fn drop(&mut self) {
+        if self.counted {
+            let (showing, _) = SHOWN.get();
+            SHOWN.set((showing.saturating_sub(1), Some(Instant::now())));
+        }
+    }
+}
+
 impl Render for Tooltip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.hidden {
+        if self.hidden || self.waiting.is_some() {
             return div().into_any_element();
+        }
+        if self.perch != Perch::Follow && !std::mem::replace(&mut self.counted, true) {
+            let (showing, gone) = SHOWN.get();
+            SHOWN.set((showing + 1, gone));
         }
         let theme = *cx.theme();
         let follow = self.perch == Perch::Follow;
@@ -101,6 +168,15 @@ impl Render for Tooltip {
                 false => i18n::lookup(&self.text, None),
             })
             .when(follow, |this| this.child(tracker()));
+        // the first tooltip fades in after its wait, and its neighbours then appear at once
+        let bubble = match self.waited {
+            true => bubble
+                .motion("tooltip-in", Motion::Quick, |this, shown| {
+                    this.opacity(shown)
+                })
+                .into_any_element(),
+            false => bubble.into_any_element(),
+        };
 
         match follow {
             true => anchored()
@@ -239,6 +315,9 @@ where
                     perch,
                     host: Bounds::default(),
                     hidden,
+                    waiting: None,
+                    waited: false,
+                    counted: false,
                 })
                 .into()
             }),
@@ -246,21 +325,15 @@ where
             let host = Rc::new(Cell::new(None));
             element
                 .child(recorder(host.clone()))
-                .tooltip_show_delay(DELAY)
+                .tooltip_show_delay(Duration::ZERO)
                 .tooltip(move |window, cx| {
                     let text = text.clone();
                     let hidden = hidden(&text);
                     let host = host.get().unwrap_or_else(|| {
                         Bounds::new(window.mouse_position(), Default::default())
                     });
-                    cx.new(|_| Tooltip {
-                        text,
-                        raw,
-                        perch,
-                        host,
-                        hidden,
-                    })
-                    .into()
+                    cx.new(|cx| Tooltip::perched(text, raw, perch, host, hidden, cx))
+                        .into()
                 })
         }
     }

@@ -21,7 +21,7 @@ use crate::filters::FilterChange;
 use crate::glass::{bar_surface, blurring, popover_surface};
 use crate::menu::{Menu, MenuItem};
 use crate::metrics::{snapped, text_width};
-use crate::motion::Glowing as _;
+use crate::motion::{Glowing as _, glow_fill, glowing};
 use crate::pin::{DraggedPin, Pin, Pinnable, Spot};
 use crate::popup::Popup;
 use crate::skeleton::Skeleton;
@@ -48,6 +48,10 @@ actions!(
 pub const TABLE_CONTEXT: &str = "Table";
 
 const MIN_CELL: Pixels = px(24.);
+/// How far a row's hairline and its hover and selection fill stand in from the table's sides,
+/// so rows read as a list of their own rather than stripes across the page.
+const ROW_INSET: Pixels = px(8.);
+const HAIRLINE: Pixels = px(1.);
 const GRIP: Pixels = px(9.);
 /// Rows kept ready past the visible ones: two below, and one above so a row emerging
 /// from behind the head is already drawn rather than popping in as the head lifts.
@@ -1454,11 +1458,49 @@ impl<S: TableSource> TableState<S> {
                             .rounded_br(self.corners.bottom_right)
                     })
                     .when(!tail || bottom == Pixels::ZERO, |this| {
-                        this.border_b_1().border_color(theme.table_row_border)
+                        this.child(
+                            div()
+                                .absolute()
+                                .bottom_0()
+                                .left(ROW_INSET)
+                                .right(ROW_INSET)
+                                .h(HAIRLINE)
+                                .bg(theme.table_row_border),
+                        )
                     })
-                    .when(playing, |this| this.bg(theme.muted))
-                    .when(selected, |this| this.bg(theme.table_active))
-                    .when(!selected, |this| this.glow(theme.table_hover, window, cx))
+                    // The fill sits inset and rounded under the cells: the selection, the song
+                    // playing, and the hover, which fades out once the pointer leaves.
+                    .map(|this| {
+                        let rest = match (selected, playing) {
+                            (true, _) => Some(theme.table_active),
+                            (false, true) => Some(theme.muted),
+                            (false, false) => None,
+                        };
+                        let (this, level) = glowing(
+                            this,
+                            &gpui::ElementId::from(("row", row)),
+                            false,
+                            1.,
+                            window,
+                            cx,
+                        );
+                        let fill = match selected {
+                            true => rest,
+                            false => glow_fill(rest, theme.table_hover, level).or(rest),
+                        };
+                        this.when_some(fill, |this, fill| {
+                            this.child(
+                                div()
+                                    .absolute()
+                                    .top_0()
+                                    .bottom_0()
+                                    .left(ROW_INSET)
+                                    .right(ROW_INSET)
+                                    .rounded(theme.radius)
+                                    .bg(fill),
+                            )
+                        })
+                    })
                     .when_some(self.delegate.source.pin(row, cx), |this, pin| match moves {
                         RowMoves::Off => this.pin(pin),
                         // Rows only move in the source's order, where a displayed row is its

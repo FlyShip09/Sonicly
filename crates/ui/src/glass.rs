@@ -1,5 +1,5 @@
 use gpui::prelude::*;
-use gpui::{App, Hsla, Pixels, px};
+use gpui::{App, BoxShadow, Hsla, Pixels, point, px};
 
 use crate::theme::{ActiveTheme as _, WindowMaterial};
 
@@ -24,6 +24,17 @@ const FRAME_FILL: f32 = match cfg!(target_os = "windows") {
     true => 0.5,
     false => 0.78,
 };
+
+/// The one soft shadow under a raised surface: how far it drops, how wide it spreads its blur,
+/// and how much of the theme's overlay it keeps on a dark theme and on a light one. Light
+/// pages show a shadow far sooner, so they take less.
+const LIFT_DROP: Pixels = px(8.);
+const LIFT_BLUR: Pixels = px(24.);
+const LIFT_DARK: f32 = 0.5;
+const LIFT_LIGHT: f32 = 0.26;
+/// How many times the theme radius a menu's or popover's corners take: about 10 px at the
+/// default 6, rounder than a button and squarer than a dialog. Capped like a dialog's corners.
+const RIM: f32 = 5. / 3.;
 
 /// Whether a surface that only frosts for the look of it should frost at all. A backdrop blur
 /// is the priciest thing the renderer does per frame, so the setting turns those off and each
@@ -98,6 +109,28 @@ pub fn bar_surface<E: Styled>(element: E, cx: &App) -> E {
     element
         .bg(theme.popover.opacity(fill))
         .backdrop_blur(BAR_BLUR)
+}
+
+/// The one soft shadow every raised surface wears, a menu, a popover, a dialog, a toast and
+/// the floating player bar alike, so nothing raised reads heavier than the rest.
+pub fn lifted(cx: &App) -> Vec<BoxShadow> {
+    let theme = cx.theme();
+    let strength = match theme.background.l < 0.5 {
+        true => LIFT_DARK,
+        false => LIFT_LIGHT,
+    };
+    vec![BoxShadow {
+        color: theme.overlay.opacity(strength),
+        offset: point(Pixels::ZERO, LIFT_DROP),
+        blur_radius: LIFT_BLUR,
+        spread_radius: Pixels::ZERO,
+        inset: false,
+    }]
+}
+
+/// The corner radius of a menu or popover for a theme radius.
+pub fn rim(radius: Pixels) -> Pixels {
+    (radius * RIM).min(crate::Rounding::Rounded.radius() * RIM)
 }
 
 /// Blurs what is behind an element by the glass width and nothing more, for a hover fill

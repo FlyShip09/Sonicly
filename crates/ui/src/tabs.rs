@@ -1,17 +1,19 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Background, Div, ElementId, Hsla, Pixels, ScrollHandle, ScrollWheelEvent,
-    SharedString, Stateful, StyleRefinement, Window, div, ease_in_out, linear_color_stop,
-    linear_gradient, px,
+    AnyElement, App, Background, Bounds, BoxShadow, Div, ElementId, Hsla, Pixels, ScrollHandle,
+    ScrollWheelEvent, SharedString, Stateful, StyleRefinement, Window, canvas, div, ease_in_out,
+    linear_color_stop, linear_gradient, point, px,
 };
 
 use crate::button::Button;
 use crate::glass::{blurring, glass};
 use crate::glide::Glide;
-use crate::motion::{Motion, Motioned as _, animates};
+use crate::motion::{Motion, Motioned as _, Springs, Sprung, animates};
 use crate::theme::ActiveTheme as _;
 
 const LINE: f32 = 1.;
@@ -28,6 +30,22 @@ const EDGE: Pixels = px(1.);
 /// How a fade leaves. There is nothing to ease in: the tabs behind the edge are already there
 /// the moment the row moves, so the gradient arrives with them and only its exit is animated.
 const HUSH: Motion = Motion::Base;
+/// How close in pixels the sliding highlight comes before it counts as landed.
+const SLIDE_REST: f32 = 0.25;
+/// The highlight's own small shadow, which lifts the chosen segment off the track.
+const PILL_DROP: Pixels = px(1.);
+const PILL_BLUR: Pixels = px(2.);
+const PILL_SHADOW: f32 = 0.35;
+
+/// Where a segmented bar and its items last laid out, and where its highlight stands, so the
+/// highlight can slide from the segment chosen before to the one chosen now.
+#[derive(Default)]
+struct Slide {
+    bar: Option<Bounds<Pixels>>,
+    items: HashMap<usize, Bounds<Pixels>>,
+    left: Option<Sprung>,
+    width: Option<Sprung>,
+}
 
 #[derive(IntoElement)]
 pub struct Tabs {
@@ -231,6 +249,20 @@ impl RenderOnce for TabBar {
         let radius = (rounding - rem * PAD).max(px(0.));
         let capped = overrides.max_size.width.is_some();
         let moving = animates(cx);
+        // An uncapped bar draws its selection itself, as one highlight that slides between the
+        // segments. A capped bar scrolls, so its segments keep their own fill.
+        let slide = (!capped && !glassy).then(|| {
+            window
+                .use_keyed_state((id.clone(), "slide"), cx, |_, _| {
+                    Rc::new(RefCell::new(Slide::default()))
+                })
+                .read(cx)
+                .clone()
+        });
+        let chosen = items.iter().position(Button::is_selected);
+        let pill = slide
+            .as_ref()
+            .and_then(|slide| pill(slide, chosen, radius, window, cx));
         let rails = capped.then(|| {
             let rail = window.use_keyed_state((id.clone(), "rail"), cx, |_, _| Rail::new());
             let rail = rail.read(cx);
@@ -289,12 +321,32 @@ impl RenderOnce for TabBar {
             })
             .children({
                 let count = items.len();
+                let slide = slide.clone();
                 items.into_iter().enumerate().map(move |(index, item)| {
-                    item.tab()
+                    let item = item
+                        .tab()
                         .aria_position_in_set(index + 1)
                         .aria_size_of_set(count)
                         .flex_shrink_0()
-                        .rounded(radius)
+                        .rounded(radius);
+                    match slide.clone() {
+                        None => item.into_any_element(),
+                        Some(slide) => div()
+                            .relative()
+                            .flex_shrink_0()
+                            .child(item.slid())
+                            .child(
+                                canvas(
+                                    move |bounds, _, _| {
+                                        slide.borrow_mut().items.insert(index, bounds);
+                                    },
+                                    |_, _, _, _| {},
+                                )
+                                .absolute()
+                                .inset_0(),
+                            )
+                            .into_any_element(),
+                    }
                 })
             });
         // A glass bar has no flat fill to paint a fade with: a wash of its own thin fill hides
@@ -325,6 +377,15 @@ impl RenderOnce for TabBar {
             .border_color(theme.border)
             .when(blurred, |bar| bar.shadow_sm())
             .when(glassy, |bar| glass(bar, cx))
+            .children(slide.map(|slide| {
+                canvas(
+                    move |bounds, _, _| slide.borrow_mut().bar = Some(bounds),
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .inset_0()
+            }))
+            .children(pill)
             .child(row)
             .when_some(rails.filter(|_| !glassy), |bar, rails| {
                 bar.children(
@@ -339,6 +400,71 @@ impl RenderOnce for TabBar {
         bar.style().refine(&overrides);
         bar
     }
+}
+
+/// The highlight under the chosen segment, placed from where the segments laid out the frame
+/// before, which slides to a newly chosen one. Nothing chosen, or nothing laid out yet, draws
+/// nothing; a bar seen for the first time asks for one more frame to measure itself.
+fn pill(
+    slide: &Rc<RefCell<Slide>>,
+    chosen: Option<usize>,
+    radius: Pixels,
+    window: &Window,
+    cx: &App,
+) -> Option<AnyElement> {
+    let mut slide = slide.borrow_mut();
+    let measured = chosen.zip(slide.bar).and_then(|(chosen, bar)| {
+        let item = slide.items.get(&chosen)?;
+        Some((item.origin - bar.origin, item.size))
+    });
+    slide.items.clear();
+    let Some((origin, size)) = measured else {
+        if chosen.is_some() && slide.bar.is_none() {
+            window.request_animation_frame();
+        }
+        slide.left = None;
+        slide.width = None;
+        return None;
+    };
+    let (x, w) = (f32::from(origin.x), f32::from(size.width));
+    let left = slide.left.get_or_insert_with(|| Sprung::at(x)).follow(
+        x,
+        Springs::GLIDE,
+        SLIDE_REST,
+        window,
+        cx,
+    );
+    let width = slide.width.get_or_insert_with(|| Sprung::at(w)).follow(
+        w,
+        Springs::GLIDE,
+        SLIDE_REST,
+        window,
+        cx,
+    );
+    let theme = cx.theme();
+    // a raised segment: lighter than the track on a dark theme, the page's white on a light one
+    let fill = match theme.background.l < 0.5 {
+        true => theme.secondary_active,
+        false => theme.popover,
+    };
+    Some(
+        div()
+            .absolute()
+            .top(origin.y)
+            .left(px(left))
+            .w(px(width))
+            .h(size.height)
+            .rounded(radius)
+            .bg(fill)
+            .shadow(vec![BoxShadow {
+                color: theme.overlay.opacity(PILL_SHADOW),
+                offset: point(Pixels::ZERO, PILL_DROP),
+                blur_radius: PILL_BLUR,
+                spread_radius: Pixels::ZERO,
+                inset: false,
+            }])
+            .into_any_element(),
+    )
 }
 
 /// The gradient over an edge that has tabs behind it: the bar's own fill melting into nothing,

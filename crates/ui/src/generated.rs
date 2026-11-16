@@ -20,8 +20,8 @@ const TILES: usize = 3;
 const SATURATION: f32 = 0.42;
 /// The lightness band a colour is pulled into on a dark page and on a light one, so the theme's
 /// own foreground always reads on the field.
-const DARK: (f32, f32) = (0.2, 0.36);
-const LIGHT: (f32, f32) = (0.7, 0.84);
+pub(crate) const DARK: (f32, f32) = (0.2, 0.36);
+pub(crate) const LIGHT: (f32, f32) = (0.7, 0.84);
 /// How far each tile of the foot row steps its lightness away from the field, so two covers of
 /// one hue still part into separate tiles.
 const STEP: f32 = 0.05;

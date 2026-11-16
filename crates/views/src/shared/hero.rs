@@ -591,6 +591,7 @@ impl RenderOnce for PageHero {
                     .corner_radius(Self::cover_radius(&theme))
                     .into_any_element(),
                     (cover, _) => Artwork::new(cover)
+                        .seed(self.title.clone())
                         .edged()
                         .size(art)
                         .corner_radius(Self::cover_radius(&theme))
@@ -649,7 +650,8 @@ impl RenderOnce for PageHero {
                             .min_w_0()
                             .text_size(theme.text(Text::Display))
                             .line_height(relative(Text::Display.leading()))
-                            .font_weight(FontWeight::SEMIBOLD)
+                            .letter_spacing(Text::Display.tracking())
+                            .font_weight(ui::title_weight(Text::Display))
                             .child(
                                 div()
                                     .id((self.id.clone(), "title"))

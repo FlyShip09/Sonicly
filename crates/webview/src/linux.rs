@@ -240,6 +240,10 @@ pub(crate) fn supported() -> bool {
     })
 }
 
+pub(crate) fn plays() -> bool {
+    false
+}
+
 /// Answers a [`crate::PROBE`] launch with whether webkit2gtk loads, or none for any other launch.
 pub(crate) fn probed() -> Option<bool> {
     std::env::args()
@@ -270,6 +274,11 @@ impl Window {
         gtk(api).submit(session.clone())?;
         Ok(Self { session })
     }
+
+    /// Player pages are not built on this platform, so nothing is ever heard.
+    pub(crate) fn listen(&self, _heard: Box<dyn Fn(String)>) {}
+
+    pub(crate) fn mute(&self, _muted: bool) {}
 
     /// True once the window is gone, whether the user closed it or it never came up.
     pub(crate) fn closed(&self) -> bool {

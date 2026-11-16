@@ -1,8 +1,8 @@
 use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Context, Entity, FontWeight, Pixels, Render, ScrollHandle, SharedString,
-    WeakEntity, Window, div, px,
+    AnyElement, App, Context, Entity, Pixels, Render, ScrollHandle, SharedString, WeakEntity,
+    Window, div, px,
 };
 use i18n::t;
 use state::{AppSettings, GenreDetails, Playback, Sonicly};
@@ -182,7 +182,8 @@ impl Render for GenreView {
                                         .aria_label(name.clone())
                                         .text_size(theme.text(Text::Display))
                                         .line_height(gpui::relative(Text::Display.leading()))
-                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .letter_spacing(Text::Display.tracking())
+                                        .font_weight(ui::title_weight(Text::Display))
                                         .child(name),
                                 )
                             })

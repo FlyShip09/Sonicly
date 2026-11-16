@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use gpui::{KeyBinding, actions};
 use ui::{
-    Activate, Backspace, BackspaceToStart, BackspaceWord, Copy, Cut, Delete, DeleteToEnd,
-    DeleteWord, Deselect, Dismiss, End, FORM_CONTEXT, Home, INPUT_CONTEXT, Left, MENU_CONTEXT,
-    MoveRowDown, MoveRowUp, NextField, Paste, PreviousField, Remove, Right, SelectAll, SelectEnd,
-    SelectHome, SelectLeft, SelectNext, SelectPrevious, SelectRight, SelectWordLeft,
-    SelectWordRight, ShowCharacterPalette, Space, Submit, TABLE_CONTEXT, WordLeft, WordRight,
+    Activate, Backspace, BackspaceToStart, BackspaceWord, CONTROL_CONTEXT, Copy, Cut, Delete,
+    DeleteToEnd, DeleteWord, Deselect, Dismiss, End, FORM_CONTEXT, Home, INPUT_CONTEXT, Left,
+    MENU_CONTEXT, MoveRowDown, MoveRowUp, NextField, Paste, PreviousField, Remove, Right,
+    SelectAll, SelectEnd, SelectHome, SelectLeft, SelectNext, SelectPrevious, SelectRight,
+    SelectWordLeft, SelectWordRight, ShowCharacterPalette, Space, Submit, TABLE_CONTEXT, WordLeft,
+    WordRight,
 };
 
 mod shortcuts;
@@ -64,7 +65,9 @@ actions!(
         Redo,
         ZoomIn,
         ZoomOut,
-        ZoomReset
+        ZoomReset,
+        FocusNext,
+        FocusPrevious
     ]
 );
 
@@ -100,9 +103,9 @@ fn shared() -> Vec<KeyBinding> {
     let menu = Some(MENU_CONTEXT);
     let search = Some(SEARCH_CONTEXT);
     let browsing = format!(
-        "{WORKSPACE_CONTEXT} && !{INPUT_CONTEXT} && !{MENU_CONTEXT} && !{FORM_CONTEXT} && !{TABLE_CONTEXT} && !{SEARCH_CONTEXT}"
+        "{WORKSPACE_CONTEXT} && !{INPUT_CONTEXT} && !{MENU_CONTEXT} && !{FORM_CONTEXT} && !{TABLE_CONTEXT} && !{SEARCH_CONTEXT} && !{CONTROL_CONTEXT}"
     );
-    let results = format!("{SEARCH_CONTEXT} && !{INPUT_CONTEXT}");
+    let results = format!("{SEARCH_CONTEXT} && !{INPUT_CONTEXT} && !{CONTROL_CONTEXT}");
     let typing = format!("{SEARCH_CONTEXT} > {INPUT_CONTEXT}");
 
     vec![
@@ -134,6 +137,9 @@ fn shared() -> Vec<KeyBinding> {
         KeyBinding::new("tab", SelectNext, menu),
         KeyBinding::new("shift-tab", SelectPrevious, menu),
         KeyBinding::new("enter", Submit, menu),
+        // Tab walks the buttons and switches of the window; a menu or a form keeps its own.
+        KeyBinding::new("tab", FocusNext, None),
+        KeyBinding::new("shift-tab", FocusPrevious, None),
         KeyBinding::new("cmd-q", Quit, None),
         KeyBinding::new("ctrl-q", Quit, None),
         KeyBinding::new("down", SelectNext, Some(POWERBAR_CONTEXT)),

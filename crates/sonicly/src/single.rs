@@ -125,7 +125,10 @@ fn serve(
     sender: &UnboundedSender<Vec<String>>,
     commands: &UnboundedSender<Asked>,
 ) {
-    if let Err(error) = connection.set_recv_timeout(Some(PATIENCE)) {
+    // named pipes take no timeout, so on Windows this fails every time and is not worth a line
+    if let Err(error) = connection.set_recv_timeout(Some(PATIENCE))
+        && cfg!(not(windows))
+    {
         log::warn!("single: cannot bound the read: {error:#}");
     }
     let mut reader = BufReader::new(&connection);

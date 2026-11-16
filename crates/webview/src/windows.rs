@@ -2,19 +2,21 @@
 //! window both live on GPUI's main STA thread; its asynchronous setup and cookie callbacks are
 //! dispatched by that thread's existing message loop.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
 use anyhow::{Context as _, Result};
 use webview2_com::Microsoft::Web::WebView2::Win32::{
-    CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2, ICoreWebView2_2,
-    ICoreWebView2Controller, ICoreWebView2Environment10,
+    CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2, ICoreWebView2_2, ICoreWebView2_8,
+    ICoreWebView2Controller, ICoreWebView2CookieManager, ICoreWebView2Environment10,
+    ICoreWebView2EnvironmentOptions,
 };
 use webview2_com::{
     AddScriptToExecuteOnDocumentCreatedCompletedHandler, CoTaskMemPWSTR,
-    CreateCoreWebView2ControllerCompletedHandler, CreateCoreWebView2EnvironmentCompletedHandler,
-    ExecuteScriptCompletedHandler, GetCookiesCompletedHandler,
+    CoreWebView2EnvironmentOptions, CreateCoreWebView2ControllerCompletedHandler,
+    CreateCoreWebView2EnvironmentCompletedHandler, ExecuteScriptCompletedHandler,
+    GetCookiesCompletedHandler, WebMessageReceivedEventHandler,
 };
 use windows::Win32::Foundation::{E_POINTER, HINSTANCE, HWND, LPARAM, LRESULT, RECT, WPARAM};
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -33,6 +35,21 @@ pub(crate) fn supported() -> bool {
     true
 }
 
+/// WebView2 is Chromium with Microsoft's licensed media modules, so a player page plays here.
+pub(crate) fn plays() -> bool {
+    true
+}
+
+/// What lets a player page start sound with no click behind it. Chromium takes it only as a
+/// launch argument, so player pages get a browser process of their own.
+const AUTOPLAY: &str = "--autoplay-policy=no-user-gesture-required";
+
+/// What a player page's scripts call to reach the app.
+const POST: &str = "window.soniclyPost=(text)=>window.chrome.webview.postMessage(String(text));";
+
+/// Whoever listens to a player page.
+type Listener = Rc<RefCell<Option<Box<dyn Fn(String)>>>>;
+
 thread_local! {
     /// Controllers are keyed by their host window so the Win32 callback can resize them.
     static CONTROLLERS: RefCell<HashMap<isize, ICoreWebView2Controller>> = RefCell::new(HashMap::new());
@@ -42,6 +59,18 @@ pub(crate) struct Window {
     hwnd: HWND,
     browser: Rc<RefCell<Option<Browser>>>,
     fetch: Rc<RefCell<Fetch>>,
+    listener: Listener,
+    /// Whether the page is to be silent, which a page that is still opening starts as.
+    muted: Rc<Cell<bool>>,
+}
+
+/// What the asynchronous setup carries from `open` to the finished controller.
+#[derive(Clone)]
+struct Setup {
+    target: Target,
+    browser: Weak<RefCell<Option<Browser>>>,
+    listener: Listener,
+    muted: Rc<Cell<bool>>,
 }
 
 /// COM objects that must stay alive for as long as the sign-in window is usable.
@@ -55,13 +84,15 @@ impl Window {
     pub(crate) fn open(target: &Target) -> Result<Self> {
         let hwnd = create_window(&target.title)?;
         let browser = Rc::new(RefCell::new(None));
-        let begun = begin_environment(
-            hwnd,
-            &target.url,
-            target.script.clone(),
-            Rc::downgrade(&browser),
-        );
-        if let Err(error) = begun {
+        let listener = Listener::default();
+        let muted = Rc::new(Cell::new(false));
+        let setup = Setup {
+            target: target.clone(),
+            browser: Rc::downgrade(&browser),
+            listener: listener.clone(),
+            muted: muted.clone(),
+        };
+        if let Err(error) = begin_environment(hwnd, setup) {
             let _ = unsafe { DestroyWindow(hwnd) };
             return Err(error);
         }
@@ -75,7 +106,22 @@ impl Window {
             hwnd,
             browser,
             fetch: Rc::new(RefCell::new(Fetch::Idle)),
+            listener,
+            muted,
         })
+    }
+
+    /// Hands every message a player page posts to `heard`, on this thread.
+    pub(crate) fn listen(&self, heard: Box<dyn Fn(String)>) {
+        *self.listener.borrow_mut() = Some(heard);
+    }
+
+    /// Silences the page at the engine or lets it sound. A page still opening starts that way.
+    pub(crate) fn mute(&self, muted: bool) {
+        self.muted.set(muted);
+        if let Some(browser) = self.browser.borrow().as_ref() {
+            apply_mute(&browser.view, muted);
+        }
     }
 
     /// True once the user closed and destroyed the host window.
@@ -193,31 +239,33 @@ impl Drop for Window {
 }
 
 /// Starts WebView2 without pumping a nested message loop inside GPUI's click handler.
-fn begin_environment(
-    hwnd: HWND,
-    url: &str,
-    script: Option<String>,
-    browser: Weak<RefCell<Option<Browser>>>,
-) -> Result<()> {
-    let url = url.to_string();
+fn begin_environment(hwnd: HWND, setup: Setup) -> Result<()> {
+    let player = setup.target.player;
     let handler = CreateCoreWebView2EnvironmentCompletedHandler::create(Box::new(
         move |result, environment| {
             let result = result
                 .context("WebView2 could not create an environment")
                 .and_then(|()| environment.context("WebView2 returned no environment"))
-                .and_then(|environment| begin_controller(environment, hwnd, url, script, browser));
+                .and_then(|environment| begin_controller(environment, hwnd, setup));
             if let Err(error) = result {
                 fail(hwnd, error);
             }
             Ok(())
         },
     ));
-    let folder = user_data_folder()?;
+    let folder = user_data_folder(player)?;
+    // Every environment over one folder has to ask for the same arguments, so only the player
+    // pages' folder is started with the autoplay allowance.
+    let options = player.then(|| {
+        let options = CoreWebView2EnvironmentOptions::default();
+        unsafe { options.set_additional_browser_arguments(AUTOPLAY.to_owned()) };
+        ICoreWebView2EnvironmentOptions::from(options)
+    });
     unsafe {
         CreateCoreWebView2EnvironmentWithOptions(
             PCWSTR::null(),
             PCWSTR(folder.as_ptr()),
-            None,
+            options.as_ref(),
             &handler,
         )
     }
@@ -225,12 +273,21 @@ fn begin_environment(
 }
 
 /// Sonicly's own cache folder for WebView2's browser state, as a wide string. WebView2 otherwise
-/// writes beside the executable, which an installed copy under Program Files cannot do.
-fn user_data_folder() -> Result<Vec<u16>> {
+/// writes beside the executable, which an installed copy under Program Files cannot do. Player
+/// pages keep theirs apart, since their browser process runs with other arguments. A separate
+/// profile (`SONICLY_PROFILE`) gets a folder of its own, like the rest of what Sonicly keeps.
+fn user_data_folder(player: bool) -> Result<Vec<u16>> {
+    let profile = match std::env::var("SONICLY_PROFILE") {
+        Ok(profile) if !profile.is_empty() => format!("sonicly-{profile}"),
+        _ => "sonicly".to_owned(),
+    };
     let folder = dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonicly")
-        .join("webview2");
+        .join(profile)
+        .join(match player {
+            true => "webview2-player",
+            false => "webview2",
+        });
     std::fs::create_dir_all(&folder)
         .with_context(|| format!("cannot create {}", folder.display()))?;
     Ok(wide(&folder.to_string_lossy()))
@@ -241,9 +298,7 @@ fn user_data_folder() -> Result<Vec<u16>> {
 fn begin_controller(
     environment: webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Environment,
     hwnd: HWND,
-    url: String,
-    script: Option<String>,
-    browser: Weak<RefCell<Option<Browser>>>,
+    setup: Setup,
 ) -> Result<()> {
     let environment = environment
         .cast::<ICoreWebView2Environment10>()
@@ -262,9 +317,7 @@ fn begin_controller(
             let result = result
                 .context("WebView2 could not create a controller")
                 .and_then(|()| controller.context("WebView2 returned no controller"))
-                .and_then(|controller| {
-                    finish_controller(controller, hwnd, &url, script.as_deref(), &browser)
-                });
+                .and_then(|controller| finish_controller(controller, hwnd, &setup));
             if let Err(error) = result {
                 fail(hwnd, error);
             }
@@ -276,14 +329,10 @@ fn begin_controller(
 }
 
 /// Attaches a completed controller to the live window and starts navigation.
-fn finish_controller(
-    controller: ICoreWebView2Controller,
-    hwnd: HWND,
-    url: &str,
-    script: Option<&str>,
-    browser: &Weak<RefCell<Option<Browser>>>,
-) -> Result<()> {
-    let Some(browser) = browser.upgrade() else {
+fn finish_controller(controller: ICoreWebView2Controller, hwnd: HWND, setup: &Setup) -> Result<()> {
+    let target = &setup.target;
+    let script = target.script.as_deref();
+    let Some(browser) = setup.browser.upgrade() else {
         let _ = unsafe { controller.Close() };
         return Ok(());
     };
@@ -309,12 +358,21 @@ fn finish_controller(
         .context("the installed WebView2 runtime cannot read cookies")?;
     let cookies = unsafe { view2.CookieManager() }.context("cannot open the cookie store")?;
 
-    if let Some(script) = script {
-        inject(&view, script)?;
+    for (name, value) in &target.cookies {
+        set_cookie(&cookies, name, value, &target.domain)?;
+    }
+    match (script, target.player) {
+        (Some(script), true) => {
+            apply_mute(&view, setup.muted.get());
+            hear(&view, &target.landing, setup.listener.clone())?;
+            inject(&view, &format!("{POST}{script}"))?;
+        }
+        (Some(script), false) => inject(&view, script)?,
+        (None, _) => {}
     }
     resize(controller.clone(), hwnd);
     unsafe { controller.SetIsVisible(true) }.context("cannot show the sign-in webview")?;
-    let url = wide(url);
+    let url = wide(&target.url);
     unsafe { view.Navigate(PCWSTR(url.as_ptr())) }.context("cannot load the sign-in url")?;
     CONTROLLERS.with(|controllers| {
         controllers
@@ -327,6 +385,68 @@ fn finish_controller(
         cookies,
     });
     Ok(())
+}
+
+/// Puts one cookie into the view's session for `domain` and everything under it, sent over
+/// https alone. The session is new and private to this window, so nothing is overwritten.
+fn set_cookie(
+    cookies: &ICoreWebView2CookieManager,
+    name: &str,
+    value: &str,
+    domain: &str,
+) -> Result<()> {
+    let (name, value, domain) = (wide(name), wide(value), wide(&format!(".{domain}")));
+    let cookie = unsafe {
+        cookies.CreateCookie(
+            PCWSTR(name.as_ptr()),
+            PCWSTR(value.as_ptr()),
+            PCWSTR(domain.as_ptr()),
+            w!("/"),
+        )
+    }
+    .context("cannot make a session cookie")?;
+    unsafe { cookie.SetIsSecure(true) }.context("cannot restrict a session cookie to https")?;
+    unsafe { cookies.AddOrUpdateCookie(&cookie) }.context("cannot set a session cookie")
+}
+
+/// Hands what the top document of `host` posts to the listener. A page is free to post anything,
+/// and a document of another site is not listened to at all.
+fn hear(view: &ICoreWebView2, host: &str, listener: Listener) -> Result<()> {
+    let host = host.to_owned();
+    let handler = WebMessageReceivedEventHandler::create(Box::new(move |_view, args| {
+        let Some(args) = args else {
+            return Ok(());
+        };
+        let mut source = PWSTR::null();
+        unsafe { args.Source(&mut source) }?;
+        let source = CoTaskMemPWSTR::from(source).to_string();
+        if !source.starts_with("https://") || crate::native::host(&source).as_deref() != Some(&host)
+        {
+            return Ok(());
+        }
+        let mut message = PWSTR::null();
+        // a message that is not a string is not one of ours
+        if unsafe { args.TryGetWebMessageAsString(&mut message) }.is_err() {
+            return Ok(());
+        }
+        let message = CoTaskMemPWSTR::from(message).to_string();
+        if let Some(heard) = listener.borrow().as_ref() {
+            heard(message);
+        }
+        Ok(())
+    }));
+    let mut token = 0;
+    unsafe { view.add_WebMessageReceived(&handler, &mut token) }
+        .context("cannot listen to the player page")
+}
+
+fn apply_mute(view: &ICoreWebView2, muted: bool) {
+    let applied = view
+        .cast::<ICoreWebView2_8>()
+        .and_then(|view| unsafe { view.SetIsMuted(muted) });
+    if let Err(error) = applied {
+        log::warn!("webview: cannot mute the player page: {error}");
+    }
 }
 
 /// Adds a script to run in every page the view loads, before the page's own scripts. WebView2

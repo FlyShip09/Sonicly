@@ -45,6 +45,7 @@ mod toast;
 mod updates;
 mod vault;
 mod wake;
+mod webplayer;
 mod window_shape;
 
 pub use artist::{ArtistDetail, ArtistDetailEvent};
@@ -103,9 +104,7 @@ pub use sponsorblock::SponsorBlock;
 pub use stars::{REPO_URL, Stars};
 pub use tags::{TagState, Tags};
 pub use toast::{Outcome, Target, Toast, ToastAction, Toasts};
-pub use updates::{
-    Channel, RELEASE_REPO, Release, UpdateState, Updates, commit, updates_itself, version,
-};
+pub use updates::{RELEASE_REPO, Release, UpdateState, Updates, commit, version};
 pub use vault::CACHE_GB_RANGE;
 pub use wake::Wake;
 pub use window_shape::{
@@ -263,6 +262,9 @@ pub struct Sonicly {
     pub signal: Entity<Signal>,
     pub updates: Entity<Updates>,
     pub wake: Entity<Wake>,
+    /// The hidden page a service's own web player runs in, where this system has one. Nothing
+    /// reads it; it is held so that it keeps carrying out the providers' orders.
+    pub webplayer: Option<Entity<webplayer::WebPlayer>>,
 }
 
 impl Global for Sonicly {}
@@ -395,6 +397,7 @@ pub fn init(
     });
     let pins = cx.new(|cx| Pins::new(settings.clone(), library.clone(), session.clone(), cx));
     let potoken = potoken::attach(cx);
+    let webplayer = webplayer::attach(cx);
     let signal = cx.new(|cx| Signal::new(playback.clone(), outputs.clone(), equalizer.clone(), cx));
     let wake = cx.new(|cx| Wake::new(settings.clone(), playback.clone(), io.clone(), cx));
     let devices = cx.new(|cx| {
@@ -460,5 +463,6 @@ pub fn init(
         stars,
         updates,
         wake,
+        webplayer,
     });
 }

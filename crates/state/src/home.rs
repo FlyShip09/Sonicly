@@ -68,6 +68,11 @@ impl Home {
             SessionEvent::SignedIn => this.reload(cx),
             SessionEvent::SignedOut => {
                 this.clear();
+                // Signed out with a music folder set is still a way to use the app, and the
+                // local library has a feed of its own.
+                if this.is_local(cx) {
+                    this.feed(cx);
+                }
                 cx.notify();
             }
             SessionEvent::LocalChanged => {
@@ -135,7 +140,7 @@ impl Home {
 
     fn client(&self, cx: &App) -> Option<Arc<dyn MusicApi>> {
         let session = self.session.read(cx);
-        if session.guest() && session.local_client().is_some() {
+        if self.is_local(cx) && session.local_client().is_some() {
             session.local_client()
         } else {
             session.client()
@@ -144,7 +149,7 @@ impl Home {
 
     fn shelf(&self, cx: &App) -> Shelf {
         let session = self.session.read(cx);
-        if session.guest() {
+        if session.guest() || session.local_only() {
             Shelf::Local
         } else {
             Shelf::Streaming
