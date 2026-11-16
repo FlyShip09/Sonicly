@@ -10,7 +10,7 @@ use music::{LyricsLine, LyricsWord, RomanizedText, WritingSystem};
 use state::RomanizationScripts;
 use ui::{ActiveTheme as _, Theme};
 
-use crate::chrome::{VerseLook, verse, verse_gap, verse_sizes};
+use crate::chrome::{Face, VerseLook, verse, verse_gap, verse_sizes};
 use crate::screens::settings::{Layout, SettingsView};
 
 /// How tall the preview stands for its width.
@@ -43,11 +43,12 @@ const ROMANIZED: &str = "settings-lyrics-sample-romanized";
 pub(in crate::screens::settings) struct LyricsPreview;
 
 /// The lyrics settings the preview follows.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Look {
     karaoke: bool,
     blur: bool,
     scripts: Option<RomanizationScripts>,
+    face: Face,
 }
 
 impl LyricsPreview {
@@ -65,9 +66,12 @@ pub(in crate::screens::settings) fn preview(
     cx: &mut Context<SettingsView>,
 ) -> Option<AnyElement> {
     let height = (Layout::of(window, cx).width * ASPECT).round();
-    let field = view.settings.read(cx).ambient().then(|| {
+    let style = view.settings.read(cx).lyrics_style();
+    let painted =
+        view.settings.read(cx).ambient() || style.background != state::LyricsBackground::Waves;
+    let field = painted.then(|| {
         let cover = view.previews.playing_or_picked(cx).large_cover(cx);
-        view.previews.ambient(cover, cx)
+        view.previews.lyrics_ambient(cover, cx)
     });
     // over the field the lines wear what fullscreen would, not the theme around them
     let theme = match &field {
@@ -82,6 +86,7 @@ pub(in crate::screens::settings) fn preview(
         scripts: settings
             .romanized_lyrics()
             .then(|| settings.romanization_scripts()),
+        face: Face::of(&style),
     };
     let sizes = verse_sizes(false, settings.fullscreen_lyrics_scale(), &theme);
     let on = settings.lyrics_enabled();
@@ -103,7 +108,7 @@ pub(in crate::screens::settings) fn preview(
 fn lines(look: Look, sizes: (Pixels, Pixels), height: Pixels, theme: &Theme) -> Div {
     let lines = sample();
     let (size, lane) = sizes;
-    let gap = verse_gap(size);
+    let gap = verse_gap(size) * look.face.spacing();
     let position = lines[SUNG_LINE].start + SUNG.mul_f32(STILL);
     let verse_at = |index: usize| {
         let sung = index == SUNG_LINE;
@@ -121,6 +126,7 @@ fn lines(look: Look, sizes: (Pixels, Pixels), height: Pixels, theme: &Theme) -> 
                 karaoke: look.karaoke,
                 scripts: look.scripts,
                 haze,
+                face: look.face.clone(),
             },
             position,
             theme,

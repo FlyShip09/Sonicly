@@ -90,8 +90,10 @@ pub use search::{AlbumHit, ArtistHit, Hit, Kind, PlaylistHit, Search};
 pub use session::{Failure, ProviderInfo, Session, SessionEvent, SessionState};
 pub use settings::{
     AppSettings, ConnectName, DiscordName, FilterValue, FullscreenControlsAutohide, LYRICS_SOURCES,
-    Placement, PlayerBarLayout, Reloaded, RomanizationScripts, SYSTEM_FONT, SideTab, ThemeFamily,
-    ThemeOffer, ThemeVariant, VisualizerScreens, equalizer_profile_label, mini_player_placement,
+    LYRICS_WEIGHTS, LyricsAlign, LyricsBackground, LyricsEmphasis, LyricsPreset, LyricsStyle,
+    LyricsStyleChange, MAX_DIM, MAX_SPACING, MIN_DIM, MIN_INACTIVE, MIN_SPACING, Placement,
+    PlayerBarLayout, Reloaded, RomanizationScripts, SYSTEM_FONT, SideTab, ThemeFamily, ThemeOffer,
+    ThemeVariant, VisualizerScreens, equalizer_profile_label, mini_player_placement,
     remember_mini_player, remember_window, window_placement,
 };
 pub use signal::{Change, Equalizing, FLOAT_BITS, Following, Signal, SignalPath};

@@ -31,15 +31,7 @@ impl SettingsView {
         if !self.settings.read(cx).lyrics_enabled() {
             return groups;
         }
-        groups.push(
-            Group::new("settings-group-display", "icons/mic-vocal.svg").rows([
-                Slot::Karaoke,
-                Slot::BlurLyrics,
-                Slot::Romanized,
-                Slot::PanelLyricsSize,
-                Slot::FullscreenLyricsSize,
-            ]),
-        );
+        groups.extend(self.lyrics_style_groups(cx));
         groups.push(
             Group::new("settings-group-sources", "icons/list-music.svg")
                 .rows([Slot::LyricsSources, Slot::LyricsForLocal]),

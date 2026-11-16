@@ -130,7 +130,7 @@ impl Adaptive {
     /// field behind the lyrics is dark whatever the cover gave it, so a light theme or a theme
     /// file's own colours would lose their text on it.
     fn plain(&self, cx: &App) -> bool {
-        self.fullscreen && self.settings.read(cx).ambient()
+        self.fullscreen && super::ambient::shown(cx)
     }
 
     /// The kind and overrides to wear. Under the ambient background only the theme file's

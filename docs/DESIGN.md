@@ -260,3 +260,16 @@ Newest last. One entry per decision: what was chosen, and why.
     what is inside. The Recents hero uses it, and the Songs hero for Favorites
     and, before any account, for the local files alone, then titled Local Music.
     A pinned Favorites row in the sidebar keeps its glyph for now.
+28. **The lyrics style lives in `settings.json`, the video is pulled, not pushed.**
+    Decision 10 is built as one `lyrics_style` block plus named `lyrics_presets`,
+    every field defaulted so older files load. The background shows only while
+    the lyrics panel is up in Now playing and fades over the waves; the rest of
+    the app stays neutral. A picture or video lies under a black scrim that never
+    hides less than keeps white lines at 4.5:1 over the brightest 5% of the
+    frame. Video uses Media Foundation's Source Reader on its own thread, the
+    video stream alone (sound is never decoded), the plain converter to 32 bit
+    BGR, one decoder thread, and a box-filtered copy down to 1280x720 at
+    most and 30 fps at most. The thread decodes only while a page keeps asking
+    for frames, so a hidden window, a closed panel or a paused song stops it
+    without any extra plumbing. macOS and Linux get no video until a decoder is
+    added there.

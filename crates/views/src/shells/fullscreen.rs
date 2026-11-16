@@ -15,12 +15,15 @@ use i18n::t;
 use input::{
     ToggleFullscreen, ToggleLyrics, ToggleQueue, ToggleWindowFullscreen, WORKSPACE_CONTEXT,
 };
-use router::{Destination, navigate};
-use state::{AppSettings, Cover, FullscreenControlsAutohide, Playback, Queue, SideTab, Sonicly};
+use router::{Destination, SettingsPage, navigate};
+use state::{
+    AppSettings, Cover, FullscreenControlsAutohide, LyricsBackground, LyricsStyleChange, Playback,
+    Queue, SideTab, Sonicly,
+};
 use ui::{
-    ActiveTheme as _, Artwork, Badge, Button, Flight, InlineLink, InlineLinks, Motion,
-    Motioned as _, Popup, Room, Scrollbar, Scrubber, ScrubberState, Springs, Sprung, TabBar,
-    Tails as _, Text, Visualizer, Zoom, clock, entering, snapped,
+    ActiveTheme as _, Artwork, Badge, Button, Flight, InlineLink, InlineLinks, Menu, MenuItem,
+    Motion, Motioned as _, Popover, Popovers, Popup, Room, Scrollbar, Scrubber, ScrubberState,
+    Springs, Sprung, TabBar, Tails as _, Text, Visualizer, Zoom, clock, entering, snapped,
 };
 
 use crate::chrome::{Aside, PlayerBar, TitleBarOptions};
@@ -164,6 +167,8 @@ pub struct FullscreenView {
     /// How wide the corner drew with everything in it, measured a frame ago. Below `Room::Wide`
     /// the seek bar shares the corner's row and ends this far from it.
     corner_width: Rc<Cell<Pixels>>,
+    /// The lyrics Style popover in the corner, which holds the controls up while it is open.
+    popovers: Popovers,
 }
 
 impl VolumeHost for FullscreenView {
@@ -252,6 +257,7 @@ impl FullscreenView {
             meta_bounds: Rc::new(Cell::new(Bounds::default())),
             dock_natural: Rc::new(Cell::new(Pixels::ZERO)),
             corner_width: Rc::new(Cell::new(Pixels::ZERO)),
+            popovers: Popovers::default(),
         }
     }
 
@@ -388,6 +394,7 @@ impl FullscreenView {
             || self.volume.held
             || self.pending.is_some()
             || self.context_menu.is_some()
+            || self.popovers.any()
             || Sonicly::global(cx).devices.read(cx).invite().is_some()
     }
 
@@ -1164,6 +1171,79 @@ impl FullscreenView {
         rising_volume(&self.volume, &self.playback, ambient::shown(cx), cx)
     }
 
+    /// The lyrics style a click away while the lyrics are up: the backgrounds, the saved looks
+    /// and the default, and the way to every other setting. A background still missing its file
+    /// opens the settings, where it is chosen.
+    fn style(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let frosted = ambient::shown(cx);
+        let settings = self.settings.read(cx);
+        let style = settings.lyrics_style();
+        let worn = settings.worn_lyrics_preset().map(str::to_owned);
+        let backgrounds = LyricsBackground::offered().map(|background| {
+            let ready = match background {
+                LyricsBackground::Image => style.image.is_some(),
+                LyricsBackground::Video => style.video.is_some(),
+                _ => true,
+            };
+            MenuItem::new(
+                SharedString::from(format!("lyrics-style-{}", background.id())),
+                i18n::lookup(background.key(), None),
+            )
+            .checked(style.background == background)
+            .on_click(move |_, _, cx| match ready {
+                true => restyle(LyricsStyleChange::Background(background), cx),
+                false => navigate(Destination::Settings(SettingsPage::Lyrics), cx),
+            })
+        });
+        let saved = settings
+            .lyrics_presets()
+            .iter()
+            .enumerate()
+            .map(|(place, preset)| {
+                let name = preset.name.clone();
+                MenuItem::new(("lyrics-style-look", place), name.clone())
+                    .checked(worn.as_deref() == Some(name.as_str()))
+                    .on_click(move |_, _, cx| {
+                        Sonicly::global(cx)
+                            .settings
+                            .clone()
+                            .update(cx, |settings, cx| settings.apply_lyrics_preset(&name, cx))
+                    })
+            });
+        let menu = Menu::new("lyrics-style-menu")
+            .name(t!("lyrics-style"))
+            .items(backgrounds)
+            .item(MenuItem::separator("lyrics-style-looks"))
+            .items(saved)
+            .item(
+                MenuItem::new("lyrics-style-default", t!("lyrics-style-default")).on_click(
+                    |_, _, cx| {
+                        Sonicly::global(cx)
+                            .settings
+                            .clone()
+                            .update(cx, |settings, cx| settings.reset_lyrics_look(cx))
+                    },
+                ),
+            )
+            .item(MenuItem::separator("lyrics-style-rest"))
+            .item(
+                MenuItem::new("lyrics-style-more", t!("lyrics-style-more"))
+                    .on_click(|_, _, cx| navigate(Destination::Settings(SettingsPage::Lyrics), cx)),
+            );
+
+        Popover::new("lyrics-style", self.popovers.clone())
+            .button(
+                Button::new("lyrics-style-button")
+                    .ghost()
+                    .when(frosted, Button::frosted)
+                    .small()
+                    .icon("icons/sliders-horizontal.svg")
+                    .tooltip_above("lyrics-style"),
+            )
+            .menu(menu)
+            .commands()
+    }
+
     fn menu(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
         let (track, position) = self.context_menu.clone()?;
 
@@ -1233,6 +1313,9 @@ impl FullscreenView {
             .when(narrow && hide < 1., |this| {
                 this.child(sunk(div().child(self.sound(cx)), hide))
             })
+            .when(hide < 1. && self.panel == Some(SideTab::Lyrics), |this| {
+                this.child(sunk(div().child(self.style(cx)), hide))
+            })
             .when(hide < 1., |this| {
                 this.child(sunk(div().child(self.pill(cx)), hide))
             })
@@ -1258,6 +1341,14 @@ impl FullscreenView {
 
 fn open_album(album: &str, cx: &mut App) {
     navigate(Destination::Album(album.into()), cx);
+}
+
+/// Changes one field of the lyrics style.
+fn restyle(change: LyricsStyleChange, cx: &mut App) {
+    Sonicly::global(cx)
+        .settings
+        .clone()
+        .update(cx, |settings, cx| settings.set_lyrics_style(change, cx));
 }
 
 /// What a cover that opens the track's album is called: the album's name, or View album when

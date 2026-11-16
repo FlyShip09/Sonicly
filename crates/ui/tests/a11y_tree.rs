@@ -848,3 +848,22 @@ async fn generated_cover_is_an_image_named_for_its_collection(cx: &mut TestAppCo
         "a generated cover is not named for its collection: {lines:?}"
     );
 }
+
+#[gpui::test]
+async fn fluid_field_stays_out_of_the_tree(cx: &mut TestAppContext) {
+    // The field only paints behind the lyrics, so a screen reader should never land on it.
+    let lines = open_probe(cx, |window, cx| {
+        let color = gpui::Hsla::black();
+        let element = ui::Fluid::new([color; 4])
+            .time(1.)
+            .energy(0.5)
+            .render(window, cx)
+            .into_element();
+        snapshot("fluid", &element)
+    });
+    let lines = rendered(&lines, "fluid");
+    assert!(
+        lines.iter().all(|line| line.contains("NO NODE")),
+        "the fluid field reached the accessibility tree, where it says nothing: {lines:?}"
+    );
+}

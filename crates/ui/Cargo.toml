@@ -20,6 +20,7 @@ unicode-segmentation.workspace = true
 objc2-app-kit.workspace = true
 
 [target.'cfg(windows)'.dependencies]
+windows.workspace = true
 windows-sys.workspace = true
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
