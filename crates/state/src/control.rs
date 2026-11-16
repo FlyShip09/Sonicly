@@ -864,6 +864,13 @@ fn current(playback: &Playback, cx: &App) -> Option<Current> {
         provider,
         liked: id.is_some_and(|id| sonicly.library.read(cx).saved(id)),
         origin: playback.origin(cx).map(wire_origin),
+        stream: playback.stream_info(cx).map(|stream| wire::Stream {
+            codec: stream.codec.map(str::to_owned),
+            sample_rate: stream.sample_rate,
+            bit_depth: stream.bit_depth,
+            channels: stream.channels,
+            bitrate: stream.kbps,
+        }),
     })
 }
 

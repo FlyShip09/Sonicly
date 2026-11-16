@@ -267,6 +267,25 @@ pub struct Current {
     /// The collection the track was queued from, `None` when it was queued on its own.
     #[serde(default)]
     pub origin: Option<Origin>,
+    /// What the engine is decoding, `None` until it has opened the track or while another
+    /// device plays.
+    #[serde(default)]
+    pub stream: Option<Stream>,
+}
+
+/// The stream that plays, as `sonicly current` prints it. Every figure is one the decoder, the
+/// file or the service reported, and one nobody reported is `null`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Stream {
+    /// The codec's name, such as `FLAC` or `AAC`.
+    pub codec: Option<String>,
+    /// In hertz, as the decoder puts it out.
+    pub sample_rate: Option<u32>,
+    /// The bits per sample of a lossless stream.
+    pub bit_depth: Option<u8>,
+    pub channels: Option<u16>,
+    /// The bit rate of a lossy stream in kilobits a second.
+    pub bitrate: Option<u32>,
 }
 
 /// A collection a track plays from, as `sonicly current` prints it.
