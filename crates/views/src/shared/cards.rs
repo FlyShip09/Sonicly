@@ -505,6 +505,15 @@ pub(crate) fn artist_card(
         .when_some(pin, Pinnable::pin)
 }
 
+/// The name a song's missing cover takes its colour from: its album's, so an album and its songs
+/// draw alike, or its own when it has no album.
+pub(crate) fn seed(track: &Track) -> SharedString {
+    match track.album.is_empty() {
+        true => SharedString::from(track.name.clone()),
+        false => SharedString::from(track.album.clone()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -524,14 +533,5 @@ mod tests {
                 ReleaseFilter::Albums,
             ]
         );
-    }
-}
-
-/// The name a song's missing cover takes its colour from: its album's, so an album and its songs
-/// draw alike, or its own when it has no album.
-pub(crate) fn seed(track: &Track) -> SharedString {
-    match track.album.is_empty() {
-        true => SharedString::from(track.name.clone()),
-        false => SharedString::from(track.album.clone()),
     }
 }

@@ -1123,9 +1123,10 @@ impl RenderOnce for Artwork {
         let theme = *cx.theme();
         let muted = theme.muted_foreground;
         // a cover with a seed draws its tile in the seed's colour, any other a veil of grey
-        let fill = seed.map_or(muted.opacity(PLACEHOLDER_FILL), |seed| {
-            seeded(&seed, theme.background.l < 0.5)
-        });
+        let fill = seed.map_or_else(
+            || muted.opacity(PLACEHOLDER_FILL),
+            |seed| seeded(&seed, theme.background.l < 0.5),
+        );
         let ring = edged.then_some(theme.sidebar_border);
         let glyph = match accent {
             true => legible(theme.tint.unwrap_or(theme.primary), theme.background),
