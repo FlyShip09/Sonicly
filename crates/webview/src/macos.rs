@@ -30,6 +30,10 @@ pub(crate) fn supported() -> bool {
     true
 }
 
+pub(crate) fn plays() -> bool {
+    false
+}
+
 pub(crate) struct Window {
     window: Retained<NSWindow>,
     view: Retained<WKWebView>,
@@ -115,6 +119,11 @@ impl Window {
             dismissed: Rc::new(RefCell::new(false)),
         })
     }
+
+    /// Player pages are not built on this platform, so nothing is ever heard.
+    pub(crate) fn listen(&self, _heard: Box<dyn Fn(String)>) {}
+
+    pub(crate) fn mute(&self, _muted: bool) {}
 
     /// True once the window is gone. A window the user can see is gone when it is neither visible
     /// nor miniaturized; one that was never shown is gone only when the app closes it.
