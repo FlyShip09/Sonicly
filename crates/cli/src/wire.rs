@@ -268,9 +268,9 @@ pub struct Current {
     #[serde(default)]
     pub origin: Option<Origin>,
     /// What the engine is decoding, `None` until it has opened the track or while another
-    /// device plays.
+    /// device plays. Boxed, so a reply that carries no track stays small.
     #[serde(default)]
-    pub stream: Option<Stream>,
+    pub stream: Option<Box<Stream>>,
 }
 
 /// The stream that plays, as `sonicly current` prints it. Every figure is one the decoder, the

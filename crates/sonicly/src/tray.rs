@@ -109,7 +109,7 @@ pub fn install(
 
 /// What the tray is to do next, handed to the task that talks to the shell.
 enum Change {
-    Show(Shown),
+    Show(Box<Shown>),
     Place(bool),
 }
 
@@ -202,7 +202,7 @@ impl Tray {
         });
 
         let shown = shown(None, cx);
-        changes.send(Change::Show(shown.clone())).ok();
+        changes.send(Change::Show(Box::new(shown.clone()))).ok();
         crate::dock::menu(&shown, cx);
         let mut tray = Self {
             changes,
@@ -256,7 +256,9 @@ impl Tray {
         if shown == self.shown {
             return;
         }
-        self.changes.send(Change::Show(shown.clone())).ok();
+        self.changes
+            .send(Change::Show(Box::new(shown.clone())))
+            .ok();
         if shown.docked() != self.shown.docked() {
             crate::dock::menu(&shown, cx);
         }
