@@ -41,7 +41,8 @@ pub(crate) fn choose_folder(cx: &mut App) {
     .detach();
 }
 
-/// Asks for an M3U or M3U8 file and reads it into a new local playlist.
+/// Asks for an M3U, M3U8, PLS or XSPF file and reads it into a new local playlist. The format
+/// is told by the file's extension, and anything else is read as an M3U.
 pub(crate) fn import_playlist(cx: &mut App) {
     let receiver = cx.prompt_for_paths(PathPromptOptions {
         files: true,

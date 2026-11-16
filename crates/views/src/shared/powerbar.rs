@@ -7,6 +7,7 @@ use gpui::{
 };
 use i18n::t;
 use input::{POWERBAR_CONTEXT, PowerbarDetails};
+use music::ytdlp;
 use router::{Destination, navigate};
 use state::{Hit, Origin, Playback, Search};
 use ui::{
@@ -16,6 +17,7 @@ use ui::{
 };
 
 use crate::screens::search::hit_card;
+use crate::shared::link_download::LinkDownloadDialog;
 use crate::shared::tracks::{PlaybackStatus, playback_status};
 use crate::shared::trouble;
 
@@ -292,16 +294,28 @@ impl Powerbar {
     }
 
     /// Enter: plays the chosen song at once and opens anything else. With no result chosen it
-    /// opens the search page for what is typed.
+    /// opens the search page for what is typed, or the download dialog when that is a link.
     fn activate(&mut self, _: &Submit, window: &mut Window, cx: &mut Context<Self>) {
-        match self.target() {
-            Some(hit) => enter_hit(&hit, &self.playback, cx),
-            None => {
+        match (self.target(), self.link(cx)) {
+            (Some(hit), _) => enter_hit(&hit, &self.playback, cx),
+            (None, Some(link)) => return self.download(link, window, cx),
+            (None, None) => {
                 let query = self.input.read(cx).text().trim().to_owned();
                 cx.emit(PowerbarEvent::Search(query));
             }
         }
         self.close(window, cx);
+    }
+
+    /// What is typed, when it is a link a download could start from.
+    fn link(&self, cx: &App) -> Option<String> {
+        ytdlp::link(self.input.read(cx).text())
+    }
+
+    /// Closes the panel and opens the download dialog on `link`.
+    fn download(&mut self, link: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.close(window, cx);
+        LinkDownloadDialog::open(Some(link), window, cx);
     }
 
     /// Ctrl+Enter: opens the page of the chosen result, a song's included.
@@ -468,6 +482,7 @@ impl Powerbar {
         let enter = match target {
             Some(Hit::Song(_)) => t!("common-play"),
             Some(_) => t!("powerbar-open"),
+            None if self.link(cx).is_some() => t!("powerbar-download-link"),
             None => t!("search-submit"),
         };
         let hint = |id: &'static str, keystroke: &'static str, label: SharedString| {
@@ -538,6 +553,24 @@ impl Render for Powerbar {
             .flex()
             .flex_col()
             .w_full()
+            // A pasted link is offered for download ahead of whatever the search makes of it.
+            .when_some(self.link(cx), |this, link| {
+                this.child(
+                    div()
+                        .flex()
+                        .px(theme.metrics.pad)
+                        .pt(theme.metrics.pad)
+                        .child(
+                            Button::new("powerbar-download-link")
+                                .ghost()
+                                .icon("icons/link.svg")
+                                .label(t!("powerbar-download-link"))
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.download(link.clone(), window, cx);
+                                })),
+                        ),
+                )
+            })
             .when(self.recalling(cx) && !self.hits.is_empty(), |this| {
                 let label = t!("search-recent");
                 this.child(

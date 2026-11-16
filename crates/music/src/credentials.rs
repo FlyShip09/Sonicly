@@ -105,21 +105,6 @@ pub(crate) fn read(path: &Path) -> Result<Vec<u8>> {
     Ok(stored)
 }
 
-/// Restricts an existing credential file to its owner. A missing file is left alone.
-pub(crate) fn secure(path: &Path) {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt as _;
-        if let Err(error) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
-            && error.kind() != std::io::ErrorKind::NotFound
-        {
-            log::warn!("credentials: cannot restrict {}: {error}", path.display());
-        }
-    }
-    #[cfg(not(unix))]
-    let _ = path;
-}
-
 /// Deletes a credential file, treating one that is already gone as success.
 pub(crate) fn remove(path: &Path) {
     if let Err(error) = std::fs::remove_file(path)

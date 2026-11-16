@@ -8,11 +8,11 @@ use gpui::{Action, KeyBinding, Keystroke};
 use ui::{FORM_CONTEXT, INPUT_CONTEXT, MENU_CONTEXT, TABLE_CONTEXT};
 
 use crate::{
-    DecreaseFontSize, IncreaseFontSize, NavigateBack, NavigateForward, OpenFilter, OpenSearch,
-    OpenSettings, POWERBAR_CONTEXT, Refresh, ResetFontSize, SEARCH_CONTEXT, SeekBack, SeekForward,
-    SongNext, SongPrevious, ToggleFullscreen, ToggleLyrics, TogglePlayback, TogglePowerbar,
-    ToggleQueue, ToggleRepeat, ToggleShuffle, ToggleWindowFullscreen, VolumeDown, VolumeUp,
-    WORKSPACE_CONTEXT,
+    DecreaseFontSize, DownloadFromLink, IncreaseFontSize, NavigateBack, NavigateForward,
+    OpenFilter, OpenSearch, OpenSettings, POWERBAR_CONTEXT, Refresh, ResetFontSize, SEARCH_CONTEXT,
+    SeekBack, SeekForward, SongNext, SongPrevious, ToggleFullscreen, ToggleLyrics, TogglePlayback,
+    TogglePowerbar, ToggleQueue, ToggleRepeat, ToggleShuffle, ToggleWindowFullscreen, VolumeDown,
+    VolumeUp, WORKSPACE_CONTEXT,
 };
 
 /// The modifiers that make a keystroke a command rather than typing. A key pressed without any
@@ -259,6 +259,15 @@ const SHORTCUTS: &[Shortcut] = &[
         scope: Scope::Anywhere,
         bind: bind::<Refresh>,
         defaults: &["cmd-r", "ctrl-r"],
+        mac: &[],
+    },
+    Shortcut {
+        id: "download-from-link",
+        key: "keybind-download-from-link",
+        section: Section::Navigation,
+        scope: Scope::Anywhere,
+        bind: bind::<DownloadFromLink>,
+        defaults: &["cmd-shift-d", "ctrl-shift-d"],
         mac: &[],
     },
     Shortcut {

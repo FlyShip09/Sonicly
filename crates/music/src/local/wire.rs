@@ -4,6 +4,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::ffi::OsStr;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::picture::{MimeType, Picture, PictureType};
@@ -17,6 +18,7 @@ use symphonia::core::meta::{MetadataOptions, StandardTagKey};
 use symphonia::core::probe::Hint;
 
 use super::id3;
+use crate::trim::Trim;
 use crate::{
     Album, ArtistRef, Credit, LOCAL_ALBUM_PREFIX, LOCAL_ARTIST_PREFIX, LOCAL_TRACK_PREFIX,
     ReleaseType, Track,
@@ -59,6 +61,12 @@ const PLAYABLE_EXTENSIONS: &[&str] = &[
     "mka", "wv", "ape",
 ];
 
+/// What separates a file's path from a cue sheet track's place in it, in a track id.
+const CUE_MARK: &str = "#cue=";
+
+/// The frames a cue sheet counts in a second, the sectors a CD plays in one.
+pub const CUE_FRAMES: f64 = 75.0;
+
 /// Chooses the track or album artist keys when reading a tag's list of names.
 enum Field {
     TrackArtist,
@@ -77,8 +85,48 @@ pub fn track_id(path: &Path) -> String {
     format!("{LOCAL_TRACK_PREFIX}{}", path.display())
 }
 
+/// The id of a track a cue sheet cuts out of the file at `path`: the file's own id, then where
+/// the track starts and ends in it. Both are counted in the sheet's own unit, the 75 frames a
+/// second of a CD, so nothing is rounded on the way to the decoder. No `end` means the track
+/// runs to the end of the file.
+pub fn cue_track_id(path: &Path, start: u64, end: Option<u64>) -> String {
+    let end = end.map(|end| end.to_string()).unwrap_or_default();
+    format!("{}{CUE_MARK}{start}-{end}", track_id(path))
+}
+
+/// The file a track id names. A cue sheet track names the file it is cut from.
 pub fn path_from_track_id(id: &str) -> Option<&Path> {
-    id.strip_prefix(LOCAL_TRACK_PREFIX).map(Path::new)
+    let id = id.strip_prefix(LOCAL_TRACK_PREFIX)?;
+    Some(Path::new(cue_window(id).map_or(id, |(path, _)| path)))
+}
+
+/// The part of its file a cue sheet track plays, or `None` for a track that is a whole file.
+pub fn window(id: &str) -> Option<Trim> {
+    cue_window(id).map(|(_, window)| window)
+}
+
+/// How long `frames` cue sheet frames last.
+pub fn cue_time(frames: u64) -> Duration {
+    Duration::from_secs_f64(frames as f64 / CUE_FRAMES)
+}
+
+/// Splits what [`cue_track_id`] put together. An id that only happens to hold the mark, as a
+/// file named `a#cue=b.flac` would, does not end in two frame counts and is left whole.
+fn cue_window(id: &str) -> Option<(&str, Trim)> {
+    let (path, span) = id.rsplit_once(CUE_MARK)?;
+    let (start, end) = span.split_once('-')?;
+    let start: u64 = start.parse().ok()?;
+    let end = match end.is_empty() {
+        true => None,
+        false => Some(end.parse::<u64>().ok().filter(|end| *end > start)?),
+    };
+    Some((
+        path,
+        Trim {
+            skip: cue_time(start),
+            take: end.map(|end| cue_time(end - start)),
+        },
+    ))
 }
 
 /// Byte offset where a leading ID3v2 tag ends, or 0 if `path` doesn't start with one.

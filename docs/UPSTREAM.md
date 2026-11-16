@@ -52,6 +52,8 @@ the root `Cargo.toml` still point at the `sonorahq` forks, pinned by revision.
 | --- | --- | --- |
 | `music/src/spotify/pathfinder/hashes.rs` | GraphQL operation hashes are read from the web player's own scripts: the page on `open.spotify.com`, the main bundle on `open.spotifycdn.com`, and for an operation the bundle leaves out, the lazily loaded chunks its chunk map names. Redirects off those two hosts are refused, at most 8 chunks of 2 MiB are read, and a hash must be 64 hex digits | upstream asked a personal third-party server for them |
 | `music/src/credentials.rs` | on Windows a stored sign-in is sealed with DPAPI for the current user (`sonicly-dpapi-1` prefix); a plaintext file is read once and written back sealed | the files were plaintext |
+| `music/src/spotify/auth.rs` | librespot keeps the Spotify credential in memory only (`Cache::with_memory_credentials`); Sonicly reads and writes `credentials.json` itself, through `credentials.rs` | librespot wrote it as plain JSON |
+| `music/src/youtube/mod.rs` | YouTube's rotating `cookies.json` is sealed through `credentials.rs`. The `ytmusic` crate can only read and write a plain file, so it is given `cookies.live.json`: laid out for the moment a client loads it, and sealed and deleted after every rotation and at least once a minute (`docs/DESIGN.md`, decision 16) | the crate wrote it as plain JSON |
 | `music/src/subsonic/auth.rs`, `jellyfin/auth.rs` | an address with no scheme is taken as `https://`; a typed `http://` is kept | a password should not cross the network in the clear by default |
 | `music/src/binimum`, `state/src/settings.rs` | the lyrics source upstream labelled "Apple Music" is named Binimum, in its id and its credit, and starts switched off | it is a third-party proxy |
 | `music/src/{artwork,binimum,kugou,lrclib,netease}` | the user agent is `sonicly/<version>` with no repository url | not upstream's client |
@@ -59,8 +61,10 @@ the root `Cargo.toml` still point at the `sonorahq` forks, pinned by revision.
 
 ## Left as it is
 
-- Spotify's `credentials.json` is written by librespot and YouTube's `cookies.json` by the
-  `ytmusic` crate, so neither is sealed on Windows.
+- The `ytmusic` crate writes YouTube's cookies to a plain file whenever Google sets one, and
+  has no hook to do otherwise. Sonicly seals and deletes that file within a minute, so the
+  cookies can sit unsealed on disk for up to that long, or until the next launch if Sonicly is
+  closed inside that minute. Closing the gap needs a change to the crate.
 - A self-hosted server on plain http needs `http://` typed in front of its address.
 - YouTube playback loads a hidden YouTube page to satisfy its bot check, and Tidal sign-in uses
   client ids taken from Tidal's own apps (`docs/DESIGN.md`, decision 12).

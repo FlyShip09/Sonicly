@@ -12,6 +12,7 @@ pub(crate) mod device_code;
 pub(crate) mod device_menu;
 pub(crate) mod equalizer;
 pub(crate) mod hero;
+pub(crate) mod link_download;
 pub(crate) mod local;
 pub(crate) mod menus;
 pub(crate) mod nav;

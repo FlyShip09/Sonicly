@@ -339,6 +339,9 @@ impl ItemMenu {
         let many = count > 1;
         let held: Vec<String> = tracks.iter().filter_map(|track| track.id.clone()).collect();
         let imported = !held.is_empty() && held.iter().all(|id| music::is_local_id(id));
+        // A track a cue sheet cuts out of a longer file has no file or tags of its own to
+        // change, so a selection holding one offers neither.
+        let files = imported && !held.iter().any(|id| music::is_cue_track(id));
         let ids: Vec<String> = match imported {
             true => held,
             false => held
@@ -472,14 +475,14 @@ impl ItemMenu {
         };
 
         let pinnable = (!many).then(|| track.pin()).flatten();
-        let edit = (!many && imported).then(|| {
+        let edit = (!many && files).then(|| {
             let track = track.clone();
             MenuItem::new("edit-tags", t!("menu-edit-tags"))
                 .icon("icons/pencil.svg")
                 .on_click(move |_, window, cx| TagEditor::open(track.clone(), window, cx))
         });
 
-        let delete_files = imported.then(|| {
+        let delete_files = files.then(|| {
             let ids = ids.clone();
             MenuItem::new(
                 "delete-track-files",

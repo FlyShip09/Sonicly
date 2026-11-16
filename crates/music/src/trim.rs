@@ -6,8 +6,9 @@
 
 use std::time::Duration;
 
-/// What to drop from the front of a decode, and how much of the rest is music.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// What to drop from the front of a decode, and how much of the rest is music. An MP4's edit
+/// list says so for its priming samples, and a cue sheet for each track inside one long file.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Trim {
     pub skip: Duration,
     pub take: Option<Duration>,

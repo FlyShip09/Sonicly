@@ -34,12 +34,14 @@ scripts/check --no-test  # the same without the test run
 
 Sonicly has no telemetry, no update pings, and no servers of its own. It
 contacts only the music, lyrics, artwork and scrobbling services you use. Saved
-logins are sealed with your Windows account's key. What was removed from the
-upstream code, and why, is listed in `docs/UPSTREAM.md`.
+logins are sealed with your Windows account's key. What Sonicly contacts and
+stores is in `docs/PRIVACY.md`, and what was removed from the upstream code,
+and why, in `docs/UPSTREAM.md`.
 
 ## Documents
 
 - `docs/DESIGN.md` — every design decision and its reason
 - `docs/PARITY.md` — each upstream feature and its status here
+- `docs/PRIVACY.md` — what Sonicly contacts and what it stores
 - `docs/BRAND.md` — the mark, colors and icon rules
 - `docs/RESUME.md` — where work stands

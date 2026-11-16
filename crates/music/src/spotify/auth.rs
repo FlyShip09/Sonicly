@@ -63,7 +63,8 @@ impl AuthConfig {
         config
     }
 
-    /// The stored credential librespot writes after a successful connect.
+    /// The stored sign-in, which [`keep`] writes sealed after a successful connect. librespot
+    /// holds the credential in memory only and never writes this file itself.
     pub fn file(&self) -> PathBuf {
         self.cache_dir.join(credentials::FILE)
     }
@@ -97,15 +98,44 @@ fn socket_address(uri: &str) -> Option<String> {
 }
 
 pub async fn restore(config: &AuthConfig) -> Result<Option<Session>> {
-    let session = session(config)?;
-    let Some(credentials) = session.cache().and_then(|cache| cache.credentials()) else {
+    let Some(credentials) = stored(config) else {
         return Ok(None);
     };
+    let session = session(config)?;
 
-    session.connect(credentials, true).await.map_err(denied)?;
-    credentials::secure(&config.file());
+    session
+        .connect(credentials.clone(), true)
+        .await
+        .map_err(denied)?;
+    keep(config, &session, Some(&credentials));
     premium(&session).await?;
     Ok(Some(session))
+}
+
+/// The sign-in kept on disk. `credentials::read` unseals it, and a plaintext file librespot
+/// wrote before Sonicly sealed sign-ins is read as it lies and sealed on the way.
+fn stored(config: &AuthConfig) -> Option<Credentials> {
+    let body = credentials::read(&config.file()).ok()?;
+    serde_json::from_slice(&body)
+        .inspect_err(|error| log::warn!("auth: cannot read the stored spotify sign-in: {error}"))
+        .ok()
+}
+
+/// Seals the reusable credential Spotify answered the connect with, which librespot holds in
+/// memory, into the sign-in file. Nothing is written when it is what the file already holds.
+fn keep(config: &AuthConfig, session: &Session, held: Option<&Credentials>) {
+    let Some(reusable) = session.cache().and_then(|cache| cache.credentials()) else {
+        return;
+    };
+    if held == Some(&reusable) {
+        return;
+    }
+    let kept = serde_json::to_vec(&reusable)
+        .context("cannot encode the spotify sign-in")
+        .and_then(|body| credentials::write(&config.file(), &body));
+    if let Err(error) = kept {
+        log::warn!("auth: cannot store the spotify sign-in: {error:#}");
+    }
 }
 
 pub async fn login(config: &AuthConfig, prompt: PromptSink) -> Result<Session> {
@@ -120,7 +150,7 @@ pub async fn login(config: &AuthConfig, prompt: PromptSink) -> Result<Session> {
         .connect(Credentials::with_access_token(access_token), true)
         .await
         .map_err(denied)?;
-    credentials::secure(&config.file());
+    keep(config, &session, None);
     premium(&session).await?;
     Ok(session)
 }
@@ -248,13 +278,16 @@ pub(crate) fn session(config: &AuthConfig) -> Result<Session> {
     // librespot keeps each file as the CDN sent it, still under the key Spotify hands out
     // again on every play, so a kept file is no easier to play than the stream.
     let audio = Vault::foreign("spotify");
+    // The credential stays in memory: librespot would write it to disk as plain JSON, so
+    // `stored` and `keep` read and write the sealed file instead.
     let cache = Cache::new(
         Some(config.cache_dir.as_path()),
         None,
         audio.as_ref().map(|(folder, _)| folder.as_path()),
         audio.as_ref().map(|(_, room)| *room),
     )
-    .with_context(|| format!("cannot open cache at {}", config.cache_dir.display()))?;
+    .with_context(|| format!("cannot open cache at {}", config.cache_dir.display()))?
+    .with_memory_credentials();
 
     let session_config = SessionConfig {
         client_id: config.client_id.clone(),

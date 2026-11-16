@@ -1,8 +1,9 @@
 //! Playback for files on disk: what [`crate::engine`] needs that is local's own.
 //!
 //! A track id names a file, so a load only reads its header for the length and its tags for the
-//! ReplayGain, and a decoder opens over the file itself. The threads, the queue, the preload, the
-//! gapless join and the loudness gain are the engine's.
+//! ReplayGain, and a decoder opens over the file itself. A cue sheet track names its file and
+//! the part of it to play, which the decoder is trimmed to. The threads, the queue, the preload,
+//! the gapless join and the loudness gain are the engine's.
 
 use std::fs::File;
 use std::io::{self, BufReader, Read, Seek, SeekFrom};
@@ -14,6 +15,7 @@ use rodio::Source as _;
 
 use super::{tags, wire};
 use crate::aac::Aac;
+use crate::audio::Trimmed;
 use crate::engine::{self, Fetch, Loudness};
 use crate::{Encoding, PlaybackConfig, PlaybackEvents, PlaybackFactory, Player};
 
@@ -25,6 +27,12 @@ pub struct Loaded {
     loudness: Option<Loudness>,
     encoding: Option<Encoding>,
 }
+
+/// A decoder over a local file, kept to the part of the file its track plays. That is all of it
+/// unless the track is one a cue sheet cuts out, whose id carries where it starts and ends. A
+/// seek and the length are then counted from the track's own start, so the engine never learns
+/// that the file goes on.
+type Opened = Trimmed<rodio::Decoder<BufReader<Audio>>>;
 
 #[derive(Default)]
 pub struct Factory;
@@ -40,7 +48,7 @@ struct Local;
 #[async_trait]
 impl Fetch for Local {
     type Loaded = Loaded;
-    type Source = rodio::Decoder<BufReader<Audio>>;
+    type Source = Opened;
 
     fn name(&self) -> &'static str {
         "local"
@@ -83,7 +91,9 @@ impl Fetch for Local {
                 return None;
             }
         };
-        if !at.is_zero()
+        // A cue sheet track is sought even to its own start, which lies well into the file.
+        // Left alone the trim would get there by decoding everything in front of it.
+        if (!at.is_zero() || wire::window(id).is_some())
             && let Err(error) = decoder.try_seek(at)
         {
             log::warn!("playback: cannot start {id} at {}s: {error}", at.as_secs());
@@ -116,8 +126,8 @@ impl Seek for Audio {
     }
 }
 
-/// Opens a local file and builds its decoder.
-fn decode(id: &str) -> Result<rodio::Decoder<BufReader<Audio>>> {
+/// Opens the file a local track id names and builds its decoder, trimmed to the track.
+fn decode(id: &str) -> Result<Opened> {
     let path =
         wire::path_from_track_id(id).ok_or_else(|| anyhow!("{id} is not a local track id"))?;
     let mut file =
@@ -140,5 +150,7 @@ fn decode(id: &str) -> Result<rodio::Decoder<BufReader<Audio>>> {
     if let Some(length) = length {
         builder = builder.with_byte_len(length.saturating_sub(skip));
     }
-    builder.build().context("cannot decode audio")
+    let decoder = builder.build().context("cannot decode audio")?;
+    let window = wire::window(id).unwrap_or_default();
+    Ok(Trimmed::new(decoder, window.skip, window.take))
 }

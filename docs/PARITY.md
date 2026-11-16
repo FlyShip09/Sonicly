@@ -13,7 +13,8 @@ running Sonicly.
 | Sound | Spectrum and analyzer | Ported |
 | Sources | Local files, tags, embedded art, `.lrc`/`.ttml` | Ported |
 | Sources | Local playlists: M3U | Ported |
-| Sources | Local playlists: CUE, PLS, XSPF | Not in upstream; planned |
+| Sources | Local playlists: PLS, XSPF | Not in upstream; built, imported like M3U; not yet seen |
+| Sources | CUE sheets: one file shown and played as its tracks | Not in upstream; built; not yet seen or heard |
 | Sources | YouTube Music (guest and signed in) | Ported; guest home seen |
 | Sources | Spotify (Premium, librespot) | Ported; search/genre lookup rewritten, not yet seen |
 | Sources | Tidal, Subsonic/Navidrome, Jellyfin | Ported |
@@ -23,7 +24,8 @@ running Sonicly.
 | Queue | Shuffle, repeat, reorder, play next/last | Ported |
 | Lyrics | Synced, word-level, romanization, source priority | Ported; third-party proxy off by default |
 | Offline | Sealed download cache | Ported |
-| Offline | Download from a link via the user's yt-dlp | Planned |
+| Offline | Download from a link via the user's yt-dlp | Not in upstream; built; never run against a real yt-dlp |
+| Accounts | Sign-ins sealed at rest on Windows | Spotify and YouTube now sealed too; YouTube's rotating cookies can be unsealed for up to a minute (`docs/PRIVACY.md`); not yet seen |
 | Integrations | Last.fm, ListenBrainz, Maloja scrobbling | Ported |
 | Integrations | Discord Rich Presence | Ported, disabled until Sonicly has an application id |
 | Integrations | Shared listening sessions | Ported; needs a user-supplied server |
