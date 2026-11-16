@@ -36,6 +36,8 @@ actions!(
         OpenSearch,
         OpenSettings,
         ToggleFullscreen,
+        ToggleMiniPlayer,
+        LeaveMiniPlayer,
         ToggleQueue,
         ToggleLyrics,
         TogglePowerbar,

@@ -32,6 +32,8 @@ pub enum Event {
     #[cfg_attr(target_os = "linux", allow(dead_code))]
     Window,
     Song,
+    /// Open the mini player, or focus it when it is open.
+    Mini,
     Toggle,
     Previous,
     Next,
@@ -62,6 +64,7 @@ pub struct Shown {
     pub repeat: SharedString,
     pub repeat_on: bool,
     pub show: SharedString,
+    pub mini: SharedString,
     pub quit: SharedString,
     pub playing: bool,
 }
@@ -136,6 +139,7 @@ impl Tray {
                         show(cx);
                         open(cx);
                     }
+                    Event::Mini => crate::mini::open(cx),
                     Event::Quit => cx.quit(),
                     Event::Toggle
                     | Event::Previous
@@ -355,6 +359,7 @@ fn shown(artwork: Option<Arc<Art>>, cx: &App) -> Shown {
         repeat: t!("player-repeat"),
         repeat_on,
         show: t!("tray-show"),
+        mini: t!("tray-mini-player"),
         quit: t!("app-quit"),
         playing,
     }

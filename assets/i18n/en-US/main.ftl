@@ -97,6 +97,7 @@ window-restore = Restore
 
 # tray menu
 tray-show = Show Sonicly
+tray-mini-player = Mini player
 tray-play = Play
 tray-pause = Pause
 
@@ -307,6 +308,11 @@ player-previous = Previous track
 player-next = Next track
 player-fullscreen = Now playing
 player-fullscreen-leave = Leave Now playing
+player-mini = Mini player
+mini-player-title = Sonicly mini player
+mini-player-return = Back to the full window
+mini-player-bar = Fold into a bar
+mini-player-card = Show the cover
 player-time-left = -{ $time }
 player-time-left-spoken = { $time } left
 devices-this-computer = This computer
@@ -520,6 +526,8 @@ powerbar-title = Quick search
 powerbar-placeholder = What do you want to listen to?
 powerbar-open = Open
 powerbar-song = Go to song
+powerbar-commands = Command
+powerbar-command-mini-player = Open the mini player
 
 # search page
 search-placeholder = What do you want to listen to?
@@ -690,6 +698,7 @@ keybind-open-filter = Filter the page
 keybind-open-settings = Open settings
 keybind-refresh = Refresh
 keybind-toggle-fullscreen = Now playing
+keybind-toggle-mini-player = Mini player
 keybind-toggle-queue = Show the queue
 keybind-toggle-lyrics = Show lyrics
 keybind-toggle-window-fullscreen = Full screen window
