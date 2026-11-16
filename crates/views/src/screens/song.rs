@@ -586,6 +586,7 @@ impl Render for SongView {
             .size_full()
             .child(
                 Scroller::new("song-page", &self.scrollbar)
+                    .page()
                     .hold()
                     .bottom_inset(crate::chrome::Chrome::bottom(cx))
                     .px(theme.metrics.inset + crate::chrome::Chrome::margin(window, cx))

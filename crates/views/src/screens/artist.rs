@@ -1358,7 +1358,20 @@ impl Render for ArtistView {
             weak.update(cx, |_, cx| cx.notify()).ok();
         });
         let rails = self.recommended(window, &notify, cx);
+        // once the banner and the name under it have scrolled away, the title bar carries it
+        let (title, portrait) = self
+            .detail
+            .read(cx)
+            .artist()
+            .map(|artist| {
+                (
+                    SharedString::from(artist.name.clone()),
+                    artist.cover_large.clone().map(SharedString::from),
+                )
+            })
+            .unwrap_or_default();
         let page = Scroller::new("artist-page", &self.scrollbar)
+            .headed(inset + rise + cover, title, portrait)
             .bottom_inset(crate::chrome::Chrome::bottom(cx))
             .px(inset)
             .pt(inset)

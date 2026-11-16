@@ -1,7 +1,7 @@
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Axis, Div, ElementId, Entity, Interactivity, MouseButton, MouseMoveEvent,
-    Pixels, ScrollWheelEvent, StyleRefinement, Window, div, px,
+    AnyElement, App, Axis, Div, ElementId, Entity, Global, Interactivity, MouseButton,
+    MouseMoveEvent, Pixels, ScrollWheelEvent, SharedString, StyleRefinement, Window, div, px,
 };
 
 use crate::button::Button;
@@ -16,11 +16,70 @@ const REACH: f32 = 3.;
 /// How far a perched control floats off the bottom of its region.
 const PERCH: Pixels = px(12.);
 
+/// A page's title and cover, as its compact heading shows them.
+type PageHeading = (SharedString, Option<SharedString>);
+
+/// Where the page on show stands under the title bar: whether anything has scrolled beneath it,
+/// and whether the page's own heading has scrolled away, with that heading's title and cover.
+/// The page's scroller keeps it current as it scrolls, and only a change wakes anyone.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PageEdge {
+    /// Whether the page has scrolled at all, so content now passes under the title bar.
+    pub under: bool,
+    /// Whether the page's heading has scrolled out of sight.
+    pub past: bool,
+    /// The page's title and cover, for a compact heading to show once `past` holds.
+    pub heading: Option<(SharedString, Option<SharedString>)>,
+}
+
+struct EdgeInstalled(Entity<PageEdge>);
+
+impl Global for EdgeInstalled {}
+
+impl PageEdge {
+    /// The one page edge of the app, made the first time it is asked for.
+    pub fn entity(cx: &mut App) -> Entity<PageEdge> {
+        if cx.try_global::<EdgeInstalled>().is_none() {
+            let edge = cx.new(|_| PageEdge::default());
+            cx.set_global(EdgeInstalled(edge));
+        }
+        cx.global::<EdgeInstalled>().0.clone()
+    }
+
+    pub fn get(cx: &App) -> PageEdge {
+        cx.try_global::<EdgeInstalled>()
+            .map(|installed| installed.0.read(cx).clone())
+            .unwrap_or_default()
+    }
+
+    /// Forgets the page that was on show, for a new page that may not scroll at all.
+    pub fn reset(cx: &mut App) {
+        Self::publish(PageEdge::default(), cx);
+    }
+
+    /// Records `next` and wakes the window when it differs. A page publishes while it draws,
+    /// where a notify alone schedules nothing, so the change asks for a refresh as well.
+    fn publish(next: PageEdge, cx: &mut App) {
+        let edge = Self::entity(cx);
+        if *edge.read(cx) == next {
+            return;
+        }
+        edge.update(cx, |edge, cx| {
+            *edge = next;
+            cx.notify();
+        });
+        cx.refresh_windows();
+    }
+}
+
 #[derive(IntoElement)]
 pub struct Scroller {
     base: Div,
     id: ElementId,
     bar: Entity<Scrollbar>,
+    /// Whether this is the page's own scroller, which reports where the page stands under the
+    /// title bar, and the heading it reports once it scrolls past `heading`'s offset.
+    page: Option<Option<(Pixels, PageHeading)>>,
     children: Vec<AnyElement>,
     present_surface: bool,
     owns_scroll: bool,
@@ -51,7 +110,27 @@ impl Scroller {
             fade_ends: Pixels::ZERO,
             hold: None,
             reflowed: false,
+            page: None,
         }
+    }
+
+    /// Makes this the page's own scroller, which tells the title bar whether anything has
+    /// scrolled beneath it.
+    pub fn page(mut self) -> Self {
+        self.page = Some(self.page.flatten());
+        self
+    }
+
+    /// The page's scroller, which also reports `title` and `cover` as the page's heading once
+    /// the page has scrolled `past` pixels, where its large header is out of sight.
+    pub fn headed(
+        mut self,
+        past: Pixels,
+        title: SharedString,
+        cover: Option<SharedString>,
+    ) -> Self {
+        self.page = Some(Some((past, (title, cover))));
+        self
     }
 
     /// Keeps what is at the top of the region in place when the region changes width and its
@@ -149,6 +228,7 @@ impl RenderOnce for Scroller {
             fade_ends,
             hold,
             reflowed,
+            page,
         } = self;
         let hold = hold.filter(|_| owns_scroll);
         let children: Vec<AnyElement> = match hold {
@@ -169,6 +249,18 @@ impl RenderOnce for Scroller {
 
         bar.update(cx, |bar, cx| bar.set_track_bottom(bottom_inset, cx));
         let scroll = bar.read(cx).scroll().clone();
+        if let Some(heading) = page {
+            let at = -scroll.offset().y;
+            let past = heading.as_ref().is_some_and(|(past, _)| at > *past);
+            PageEdge::publish(
+                PageEdge {
+                    under: at > px(0.5),
+                    past,
+                    heading: heading.map(|(_, heading)| heading),
+                },
+                cx,
+            );
+        }
         // The offset runs negative as the content moves up, so it sits between minus the furthest
         // it can go and zero. Half a pixel of slack keeps a rounded offset from fading an end.
         let (above, below) = {
