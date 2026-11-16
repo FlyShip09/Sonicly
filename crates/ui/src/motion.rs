@@ -74,6 +74,9 @@ impl Springs {
     /// A swapped icon growing a little past its size and settling, for a toggle turning on that
     /// deserves a moment of its own, such as a like. One swing, never a wobble.
     pub const POP: SpringConfig = spring(0.4, 0.55);
+    /// A selection gliding from one row to another, such as the sidebar's highlight following
+    /// the page that opened. Barely a swing, so it lands where the eye already is.
+    pub const GLIDE: SpringConfig = spring(0.26, 0.06);
     /// A belt of icons moving on by one icon.
     pub const BELT: SpringConfig = spring(0.4, 0.);
     /// The icon it replaced shrinking away, a little quicker.

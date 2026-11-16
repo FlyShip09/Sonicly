@@ -1,16 +1,18 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use ui::{
     ActiveTheme as _, Card, Deck, DraggedPin, Edge, MenuItem, Panel, Picker, Pin, PinKind,
-    Pinnable as _, Popup, SNUG, Scroller, Shield, Side, Spot, Text, Vacancy, drop_gap, drop_into,
-    drop_marker,
+    Pinnable as _, Popup, SNUG, Scroller, Shield, Side, Spot, Springs, Sprung, Text, Vacancy,
+    drop_gap, drop_into, drop_marker,
 };
 
 use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Context, DragMoveEvent, Entity, FontWeight, MouseButton, MouseDownEvent,
-    Pixels, Point, Render, ScrollHandle, SharedString, svg,
+    AnyElement, App, Bounds, Context, DragMoveEvent, Entity, MouseButton, MouseDownEvent, Pixels,
+    Point, Render, ScrollHandle, SharedString, canvas, svg,
 };
 use gpui::{Window, div, px};
 use music::Shape;
@@ -80,8 +82,27 @@ const ROW_GAP: Pixels = px(4.);
 const RAIL_INSET: f32 = 0.5;
 const BORDER: Pixels = px(1.);
 /// The side padding of a navigation row, which the library heading lines up with. It matches
-/// the regular `ui::Button`.
-const ROW_INSET: Pixels = px(12.);
+/// the row's `px_2`.
+const ROW_INSET: Pixels = px(8.);
+/// The space between two navigation rows.
+const NAV_GAP: Pixels = px(2.);
+/// How close in pixels the highlight comes to the current row before it counts as there.
+const GLIDE_REST: f32 = 0.25;
+
+/// Where the navigation rows and the column holding them last laid out, in window coordinates,
+/// so the highlight under the current row can travel between them.
+#[derive(Default)]
+struct Slots {
+    column: Option<Bounds<Pixels>>,
+    rows: HashMap<usize, Bounds<Pixels>>,
+}
+
+/// The highlight under the current navigation row and where it stands.
+struct Selection {
+    top: Sprung,
+    /// Whether a frame has been asked for to measure a row that had not laid out yet.
+    asked: bool,
+}
 
 pub(crate) struct SidebarLeft {
     settings: Entity<AppSettings>,
@@ -112,6 +133,8 @@ pub(crate) struct SidebarLeft {
     context_menu: Option<(Pin, Point<Pixels>)>,
     scrollbar: Entity<ui::Scrollbar>,
     popovers: ui::Popovers,
+    slots: Rc<RefCell<Slots>>,
+    selection: Option<Selection>,
 }
 
 impl SidebarLeft {
@@ -169,6 +192,8 @@ impl SidebarLeft {
             context_menu: None,
             scrollbar,
             popovers: ui::Popovers::default(),
+            slots: Rc::default(),
+            selection: None,
         }
     }
 
@@ -370,7 +395,7 @@ impl SidebarLeft {
             .h(theme.metrics.control_small)
             .pl(ROW_INSET)
             .mt(theme.metrics.pad)
-            .child(ui::eyebrow(i18n::lookup(key, None), cx).font_weight(FontWeight::MEDIUM))
+            .child(ui::eyebrow(i18n::lookup(key, None), cx))
             .into_any_element()
     }
 
@@ -723,16 +748,90 @@ impl SidebarLeft {
         };
         let row = match self.folded() {
             true => nav_icon(index, key, icon, tint, accent),
-            false => nav_row(index, key, tint, accent).icon(icon),
+            false => nav_row(index, key, tint, accent, cx).icon(icon),
         };
+        let slots = self.slots.clone();
 
-        row.lit(active, accent)
-            .when(active, |button| button.aria_selected(true))
-            .on_click(move |_, _, cx| match destination.in_settings() {
-                true => open_settings(cx),
-                false => navigate(destination.clone(), cx),
-            })
+        div()
+            .relative()
+            .w_full()
+            .child(
+                row.when(active, |button| button.aria_selected(true))
+                    .on_click(move |_, _, cx| match destination.in_settings() {
+                        true => open_settings(cx),
+                        false => navigate(destination.clone(), cx),
+                    }),
+            )
+            .child(
+                canvas(
+                    move |bounds, _, _| {
+                        slots.borrow_mut().rows.insert(index, bounds);
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .inset_0(),
+            )
             .into_any_element()
+    }
+
+    /// The highlight under the current navigation row, placed from where the rows laid out the
+    /// frame before. It glides to a new row as the page changes and stands still otherwise. A
+    /// row that has not laid out yet gets one more frame to do so.
+    fn selection(&mut self, window: &Window, cx: &App) -> Option<AnyElement> {
+        let current = self.trail.read(cx).current();
+        let settings = self.settings.read(cx);
+        let row = (0..NAV.len()).find(|index| {
+            entry_shown(NAV[*index].0, settings) && NAV[*index].2.same_section(&current)
+        });
+        let measured = {
+            let mut slots = self.slots.borrow_mut();
+            let measured = row.zip(slots.column).and_then(|(row, column)| {
+                let bounds = *slots.rows.get(&row)?;
+                Some((bounds.origin - column.origin, bounds.size))
+            });
+            // the rows laid out this frame put themselves back as they paint
+            slots.rows.clear();
+            measured
+        };
+        if row.is_none() {
+            self.selection = None;
+            return None;
+        }
+        let Some((origin, size)) = measured else {
+            let selection = self.selection.get_or_insert(Selection {
+                top: Sprung::at(0.),
+                asked: false,
+            });
+            if !std::mem::replace(&mut selection.asked, true) && self.is_open() {
+                window.request_animation_frame();
+            }
+            return None;
+        };
+        let target = f32::from(origin.y);
+        let selection = self.selection.get_or_insert(Selection {
+            top: Sprung::at(target),
+            asked: false,
+        });
+        // the first row measured after none was current is where the highlight starts
+        if std::mem::take(&mut selection.asked) {
+            selection.top.jump(target);
+        }
+        let top = selection
+            .top
+            .follow(target, Springs::GLIDE, GLIDE_REST, window, cx);
+        let theme = cx.theme();
+        Some(
+            div()
+                .absolute()
+                .top(px(top))
+                .left(origin.x)
+                .w(size.width)
+                .h(size.height)
+                .rounded(theme.radius)
+                .bg(theme.sidebar_accent)
+                .into_any_element(),
+        )
     }
 
     /// Whether `target` takes the dragged `song`: a playlist the listener may edit, on the same
@@ -814,8 +913,10 @@ impl Render for SidebarLeft {
         }
         let closing = self.closing;
 
+        let selection = self.selection(window, cx);
         let mut rows = self.navigation(cx);
         rows.extend(self.pins(window, cx));
+        let slots = self.slots.clone();
 
         let overlaid = self.overlays();
         let rail = self.folded();
@@ -883,9 +984,10 @@ impl Render for SidebarLeft {
                                 div()
                                     .id("sidebar-navigation")
                                     .role(Role::Navigation)
+                                    .relative()
                                     .flex()
                                     .flex_col()
-                                    .gap_1()
+                                    .gap(NAV_GAP)
                                     .w_full()
                                     .py_3()
                                     .map(|column| match rail {
@@ -895,6 +997,17 @@ impl Render for SidebarLeft {
                                     // Leave the last row somewhere to go, clear of the
                                     // button that floats over the bottom.
                                     .pb(ui::perch_room(cx))
+                                    .child(
+                                        canvas(
+                                            move |bounds, _, _| {
+                                                slots.borrow_mut().column = Some(bounds);
+                                            },
+                                            |_, _, _, _| {},
+                                        )
+                                        .absolute()
+                                        .inset_0(),
+                                    )
+                                    .children(selection)
                                     .children(rows),
                             ),
                     )
