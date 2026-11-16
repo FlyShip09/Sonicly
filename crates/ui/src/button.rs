@@ -71,7 +71,7 @@ type Hover = Box<dyn Fn(&bool, &mut Window, &mut App) + 'static>;
 /// click never takes the keys away from the list or page that had them.
 pub fn keyboard_control<E: InteractiveElement>(element: E, cx: &App) -> E {
     let ring = BoxShadow {
-        color: cx.theme().muted_foreground.opacity(RING),
+        color: cx.theme().primary.opacity(RING),
         offset: point(Pixels::ZERO, Pixels::ZERO),
         blur_radius: Pixels::ZERO,
         spread_radius: RING_WIDTH,
