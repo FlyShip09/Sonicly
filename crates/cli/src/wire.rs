@@ -373,6 +373,8 @@ pub enum Failure {
     NothingFound(String),
     /// The provider, by name, is open as a guest, and the request needs an account.
     NeedsAccount(String),
+    /// No Sessions server is set, so no session can be started or joined.
+    NoSessionsServer,
 }
 
 /// Why a line could not be read off the socket.

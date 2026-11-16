@@ -306,7 +306,7 @@ fn describe(failure: &Failure) -> String {
             "the running Sonicly could not read the command; if it is older, restart it".to_owned()
         }
         Failure::Unsupported => "this command is not supported yet".to_owned(),
-        Failure::SignedOut => "no provider is signed in".to_owned(),
+        Failure::SignedOut => "no streaming service is signed in".to_owned(),
         Failure::NoCurrentTrack => "there is no current track".to_owned(),
         Failure::MissingTrackId => "the current track has no provider id".to_owned(),
         Failure::OtherProvider { link, current } => {
@@ -327,6 +327,9 @@ fn describe(failure: &Failure) -> String {
             "could not update the current track's favorite state".to_owned()
         }
         Failure::NothingFound(query) => format!("nothing found for '{query}'"),
+        Failure::NoSessionsServer => {
+            "sessions need a server; save your server's address in Settings first".to_owned()
+        }
         Failure::NeedsAccount(name) => {
             format!("{name} is open without an account; sign in to it in Settings, Providers")
         }
