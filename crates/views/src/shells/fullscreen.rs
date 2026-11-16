@@ -512,13 +512,20 @@ impl FullscreenView {
         };
         let pad = px(COVER_LAYER_PAD);
         let inset = (layout_side - raster_side) / 2. - pad;
-        let (album, small, local_id, named) = match self.playback.read(cx).shown_track(cx) {
+        let (album, small, local_id, named, seed) = match self.playback.read(cx).shown_track(cx) {
             Some(track) => {
                 let local = track.id.as_deref().is_some_and(music::is_local_id);
                 let named = album_name(&track);
-                (track.album_id, track.cover, local, named)
+                let seed = crate::shared::cards::seed(&track);
+                (track.album_id, track.cover, local, named, seed)
             }
-            None => (None, None, false, SharedString::default()),
+            None => (
+                None,
+                None,
+                false,
+                SharedString::default(),
+                SharedString::default(),
+            ),
         };
         let cover = self.cover.read(cx);
         let cover_large = album.as_deref().and_then(|album| cover.large_for(album));
@@ -568,6 +575,7 @@ impl FullscreenView {
                     .child(
                         div().absolute().top(pad).left(pad).child(
                             Artwork::new(small)
+                                .seed(seed)
                                 .size(raster_side)
                                 .corner_radius(radius)
                                 .soft(waiting),
@@ -793,7 +801,11 @@ impl FullscreenView {
                             .cursor_pointer()
                             .on_click(move |_, _, cx| open_album(&album, cx))
                     })
-                    .child(Artwork::new(track.and_then(|t| t.cover.clone())).size(cover)),
+                    .child(
+                        Artwork::new(track.and_then(|t| t.cover.clone()))
+                            .when_some(track.map(crate::shared::cards::seed), Artwork::seed)
+                            .size(cover),
+                    ),
             )
             .child(
                 div()

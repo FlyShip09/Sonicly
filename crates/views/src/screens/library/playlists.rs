@@ -238,7 +238,9 @@ impl TableSource for PlaylistSource {
         }
 
         match cell.field {
-            PlaylistField::Cover => cells::artwork(&cell, playlist.cover.clone()),
+            PlaylistField::Cover => {
+                cells::artwork(&cell, playlist.cover.clone(), playlist.name.clone())
+            }
             PlaylistField::Name => cells::name(
                 &cell,
                 playlist.name.clone(),

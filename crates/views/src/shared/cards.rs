@@ -48,6 +48,7 @@ pub(crate) fn told_album_card(
     let warmed = playback.clone();
 
     Card::new(id, SharedString::from(album.name.clone()))
+        .seed(album.name.clone())
         .aria_description(spoken_caption([
             year_label(album.year, Some(album.release_type)).unwrap_or_default(),
             SharedString::from(album.artists.clone()),
@@ -93,6 +94,7 @@ pub(crate) fn playlist_card(
     let warmed = playback.clone();
 
     Card::new(id, SharedString::from(playlist.name.clone()))
+        .seed(playlist.name.clone())
         .aria_description(SharedString::from(playlist.owner.clone()))
         .cover(playlist.cover.clone())
         .weight(FontWeight::SEMIBOLD)
@@ -132,6 +134,7 @@ pub(crate) fn track_card(
     Card::new(id, SharedString::from(track.name.clone()))
         .aria_description(track_caption(None, track))
         .cover(track.cover.clone())
+        .seed(seed(track))
         .tint(tint)
         .hint()
         .when(track.explicit, Card::explicit)
@@ -481,6 +484,7 @@ pub(crate) fn artist_card(
 
     Card::new(id, SharedString::from(artist.name.clone()))
         .cover(artist.cover.clone())
+        .seed(artist.name.clone())
         .aria_description(i18n::lookup("artist-eyebrow", None))
         .circle()
         .weight(FontWeight::SEMIBOLD)
@@ -520,5 +524,14 @@ mod tests {
                 ReleaseFilter::Albums,
             ]
         );
+    }
+}
+
+/// The name a song's missing cover takes its colour from: its album's, so an album and its songs
+/// draw alike, or its own when it has no album.
+pub(crate) fn seed(track: &Track) -> SharedString {
+    match track.album.is_empty() {
+        true => SharedString::from(track.name.clone()),
+        false => SharedString::from(track.album.clone()),
     }
 }

@@ -28,6 +28,8 @@ use std::time::{Duration, Instant};
 const PLACEHOLDER_FILL: f32 = 0.12;
 /// How much of a missing cover's tile its glyph spans.
 const PLACEHOLDER_GLYPH: f32 = 0.36;
+/// The saturation a cover drawn from a name takes, low enough to read as a quiet tint of grey.
+const SEEDED_SATURATION: f32 = 0.2;
 const FILE_PREFIX: &str = "file://";
 
 const FALLBACK_ICON: &str = "icons/music.svg";
@@ -933,6 +935,12 @@ impl Avatar {
         self.art = self.art.size(size);
         self
     }
+
+    /// Colours a missing picture from `seed`, as `Artwork::seed`.
+    pub fn seed(mut self, seed: impl Into<SharedString>) -> Self {
+        self.art = self.art.seed(seed);
+        self
+    }
 }
 
 impl Styled for Avatar {
@@ -963,6 +971,8 @@ pub struct Artwork {
     /// The size the image is decoded for, when it differs from the size it is drawn at.
     sample: Option<Pixels>,
     edged: bool,
+    /// The name a missing cover takes its colour from.
+    seed: Option<SharedString>,
     interactivity: Interactivity,
 }
 
@@ -982,8 +992,18 @@ impl Artwork {
             fit: ObjectFit::Cover,
             sample: None,
             edged: false,
+            seed: None,
             interactivity: Interactivity::new(),
         }
+    }
+
+    /// Draws a missing or unreadable cover in a quiet colour taken from `seed`, rather than the
+    /// plain grey tile, so covers without art still tell apart. An album and its tracks pass the
+    /// album's name, so they draw the same colour. The colour is computed, never an image, and
+    /// an empty seed keeps the grey tile.
+    pub fn seed(mut self, seed: impl Into<SharedString>) -> Self {
+        self.seed = Some(seed.into()).filter(|seed| !seed.is_empty());
+        self
     }
 
     /// Rings the cover with the theme's hairline, so a sleeve as light or as dark as the page
@@ -1097,11 +1117,16 @@ impl RenderOnce for Artwork {
             fit,
             sample,
             edged,
+            seed,
             interactivity,
         } = self;
         let theme = *cx.theme();
-        let ring = edged.then_some(theme.sidebar_border);
         let muted = theme.muted_foreground;
+        // a cover with a seed draws its tile in the seed's colour, any other a veil of grey
+        let fill = seed.map_or(muted.opacity(PLACEHOLDER_FILL), |seed| {
+            seeded(&seed, theme.background.l < 0.5)
+        });
+        let ring = edged.then_some(theme.sidebar_border);
         let glyph = match accent {
             true => legible(theme.tint.unwrap_or(theme.primary), theme.background),
             false => muted.opacity(0.5),
@@ -1118,7 +1143,7 @@ impl RenderOnce for Artwork {
             let fallback = fallback.clone();
             move || match overlay {
                 true => div().w(size).h(tall).into_any_element(),
-                false => blank(size, tall, rounded, muted, glyph, fallback.clone(), None)
+                false => blank(size, tall, rounded, fill, glyph, fallback.clone(), None)
                     .into_any_element(),
             }
         };
@@ -1205,7 +1230,7 @@ impl RenderOnce for Artwork {
                 .into_any_element()
             }
             None => refined(
-                blank(size, tall, rounded, muted, glyph, fallback, ring),
+                blank(size, tall, rounded, fill, glyph, fallback, ring),
                 interactivity,
             )
             .into_any_element(),
@@ -1223,11 +1248,12 @@ fn refined<T: Styled + InteractiveElement>(mut element: T, mut caller: Interacti
 
 /// The placeholder a missing cover shows: a quiet tile with the glyph of what the cover would
 /// be, a third of the tile across, so it reads as a sleeve still to come rather than an icon.
+/// The tile is `fill`: a seed's colour, or a veil of grey.
 fn blank(
     size: Pixels,
     tall: Pixels,
     rounded: Pixels,
-    muted: Hsla,
+    fill: Hsla,
     glyph: Hsla,
     fallback: SharedString,
     edge: Option<Hsla>,
@@ -1236,7 +1262,7 @@ fn blank(
         .w(size)
         .h(tall)
         .rounded(rounded)
-        .bg(muted.opacity(PLACEHOLDER_FILL))
+        .bg(fill)
         .when_some(edge, |this, edge| this.border_1().border_color(edge))
         .flex()
         .items_center()
@@ -1249,10 +1275,48 @@ fn blank(
         )
 }
 
+/// The quiet colour a cover without art takes from `seed`, the same for the same name on every
+/// launch: a hue and a lightness read from a hash of the name, the lightness inside the band the
+/// drawn covers of Favorites and Local Music use, and the colour held close to grey.
+fn seeded(seed: &str, dark: bool) -> Hsla {
+    let hash = fnv1a(seed.trim().to_lowercase().as_bytes());
+    let (low, high) = match dark {
+        true => crate::generated::DARK,
+        false => crate::generated::LIGHT,
+    };
+    let light = ((hash >> 16) % 100) as f32 / 100.;
+    Hsla {
+        h: (hash % 360) as f32 / 360.,
+        s: SEEDED_SATURATION,
+        l: low + light * (high - low),
+        a: 1.,
+    }
+}
+
+/// FNV-1a over `bytes`: a hash that never changes between runs or builds, unlike the standard
+/// library's, so a cover keeps its colour.
+fn fnv1a(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use image::{Delay, Rgba, codecs::gif::GifEncoder};
+
+    #[test]
+    fn a_seed_draws_the_same_quiet_colour_every_time() {
+        let album = seeded("Kitchen Demos", true);
+
+        assert_eq!(album, seeded("  kitchen demos ", true));
+        assert_ne!(album, seeded("Late Bloom", true));
+        assert!(album.s <= SEEDED_SATURATION);
+        assert!((crate::generated::DARK.0..=crate::generated::DARK.1).contains(&album.l));
+        let light = seeded("Kitchen Demos", false);
+        assert!((crate::generated::LIGHT.0..=crate::generated::LIGHT.1).contains(&light.l));
+    }
 
     #[test]
     fn artwork_loader_targets_the_requested_edge() {

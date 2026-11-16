@@ -60,6 +60,7 @@ impl RenderOnce for Glyph {
 struct Thumb {
     row: usize,
     url: Option<String>,
+    seed: SharedString,
 }
 
 impl RenderOnce for Thumb {
@@ -67,6 +68,7 @@ impl RenderOnce for Thumb {
         let theme = cx.theme();
 
         Artwork::new(self.url)
+            .seed(self.seed)
             .edged()
             .id(("artwork", self.row))
             .size(theme.metrics.thumb)
@@ -76,13 +78,16 @@ impl RenderOnce for Thumb {
 #[derive(IntoElement)]
 struct Face {
     url: Option<String>,
+    seed: SharedString,
 }
 
 impl RenderOnce for Face {
     fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = cx.theme();
 
-        Avatar::new(self.url).size(theme.metrics.thumb)
+        Avatar::new(self.url)
+            .seed(self.seed)
+            .size(theme.metrics.thumb)
     }
 }
 
@@ -470,14 +475,33 @@ pub(crate) fn title<F>(
         .into_any_element()
 }
 
-pub(crate) fn artwork<F>(cell: &Cell<F>, url: Option<String>) -> AnyElement {
+/// A row's cover, its missing art coloured from `seed` as `Artwork::seed` says.
+pub(crate) fn artwork<F>(
+    cell: &Cell<F>,
+    url: Option<String>,
+    seed: impl Into<SharedString>,
+) -> AnyElement {
     cell.middle()
-        .child(Thumb { row: cell.row, url })
+        .child(Thumb {
+            row: cell.row,
+            url,
+            seed: seed.into(),
+        })
         .into_any_element()
 }
 
-pub(crate) fn avatar<F>(cell: &Cell<F>, url: Option<String>) -> AnyElement {
-    cell.middle().child(Face { url }).into_any_element()
+/// A row's portrait, its missing picture coloured from `seed` as `Artwork::seed` says.
+pub(crate) fn avatar<F>(
+    cell: &Cell<F>,
+    url: Option<String>,
+    seed: impl Into<SharedString>,
+) -> AnyElement {
+    cell.middle()
+        .child(Face {
+            url,
+            seed: seed.into(),
+        })
+        .into_any_element()
 }
 
 fn portrait(added: &Contributor, row: usize) -> Stateful<Div> {

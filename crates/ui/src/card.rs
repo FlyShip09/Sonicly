@@ -54,6 +54,8 @@ pub struct Card {
     trailing: Option<AnyElement>,
     cover: Option<String>,
     fallback: Option<SharedString>,
+    /// The name a missing cover takes its colour from, as `Artwork::seed`.
+    seed: Option<SharedString>,
     accent: bool,
     art: Option<Pixels>,
     art_radius: Option<Pixels>,
@@ -101,6 +103,7 @@ impl Card {
             trailing: None,
             cover: None,
             fallback: None,
+            seed: None,
             accent: false,
             art: None,
             art_radius: None,
@@ -199,6 +202,13 @@ impl Card {
 
     pub fn cover(mut self, cover: Option<String>) -> Self {
         self.cover = cover;
+        self
+    }
+
+    /// Colours a missing cover from `seed`, as `Artwork::seed` does: the album's name for an
+    /// album and its songs, the name for an artist or playlist.
+    pub fn seed(mut self, seed: impl Into<SharedString>) -> Self {
+        self.seed = Some(seed.into());
         self
     }
 
@@ -368,6 +378,7 @@ impl RenderOnce for Card {
             trailing,
             cover,
             fallback,
+            seed,
             accent,
             art,
             art_radius,
@@ -432,8 +443,12 @@ impl RenderOnce for Card {
                 .size(art)
                 .when(circle, Skeleton::circle)
                 .into_any_element(),
-            false if circle => Avatar::new(cover).size(art).into_any_element(),
+            false if circle => Avatar::new(cover)
+                .size(art)
+                .when_some(seed, Avatar::seed)
+                .into_any_element(),
             false => Artwork::new(cover)
+                .when_some(seed, Artwork::seed)
                 .edged()
                 .size(art)
                 .when_some(art_radius, Artwork::corner_radius)
