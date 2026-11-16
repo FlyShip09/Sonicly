@@ -273,3 +273,25 @@ Newest last. One entry per decision: what was chosen, and why.
     for frames, so a hidden window, a closed panel or a paused song stops it
     without any extra plumbing. macOS and Linux get no video until a decoder is
     added there.
+29. **The star count is the one request Sonicly makes unasked.** Narrows
+    decision 4 by one exception the brief asked for. `state::Stars` sends one
+    unauthenticated GET to `api.github.com/repos/FlyShip09/Sonicly` at startup,
+    at most once in 24 hours, with `sonicly/<version>` as the user agent and
+    nothing else. The answer and the time of the ask live in `cache.sqlite`; a
+    failed ask is recorded too, so a dead network is tried once a day. Offline
+    mode and a connection already known lost ask nothing. "Show the star count"
+    under Settings, About turns it off, and the button then stays without a
+    number. Upstream had nothing like it, so this is new code, not a revival.
+    The star glyph is Lucide's and the other icon packs borrow it until
+    `scripts/fetch-icons.py` is run again. `docs/PRIVACY.md` carries the
+    user-facing wording.
+30. **`settings.json` carries a version; a broken file stays where it is.**
+    `settings/version.rs` stamps `version` as the first key and runs a list of
+    steps on an older file before it is read, one step per change of shape. A
+    file with no `version` is version 1. Unknown keys are ignored, and a file
+    from a newer Sonicly is copied to `settings.v<version>.json` before this
+    build can save over it. A file that does not parse is not renamed aside:
+    the port already leaves it in place, refuses to save over it, names the
+    line in a toast and reloads the moment it is fixed, which loses nothing and
+    keeps the fix a one-line edit. The runtime blob in `state.sqlite` has no
+    version yet; a blob that stops decoding falls back to defaults.
