@@ -290,6 +290,10 @@ impl TitleBar {
                     .selected(true),
             );
         }
+        // with no service to switch between, the menu starts at its own rows, not a rule
+        if !services.is_empty() {
+            services.push(MenuItem::separator("account-services"));
+        }
 
         div()
             .flex()
@@ -302,7 +306,6 @@ impl TitleBar {
                     .tooltip("tool-account")
                     .width(Picker::REGULAR)
                     .items(services)
-                    .item(MenuItem::separator("account-services"))
                     .item(
                         MenuItem::new("account-manage", t!("account-manage"))
                             .icon("icons/user-round.svg")
