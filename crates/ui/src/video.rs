@@ -8,7 +8,9 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use gpui::RenderImage;
-use image::{Frame, RgbaImage};
+use image::Frame;
+#[cfg(target_os = "windows")]
+use image::RgbaImage;
 
 /// The largest a video frame is decoded at. A background under a scrim and a blur gains nothing
 /// from more, and each frame is uploaded whole.
@@ -24,6 +26,7 @@ const DEMAND: Duration = Duration::from_millis(400);
 #[cfg(target_os = "windows")]
 const DECODE_THREADS: u32 = 1;
 /// How often the brightness of the playing frame is measured again.
+#[cfg(target_os = "windows")]
 const MEASURE: Duration = Duration::from_secs(1);
 /// The relative luminance white lines may sit over and keep a contrast of 4.5 to 1.
 const LEGIBLE: f32 = 0.183;
@@ -212,6 +215,7 @@ impl Shared {
     }
 
     /// Waits until the page wants frames or the video stops. Returns false once it stops.
+    #[cfg(target_os = "windows")]
     fn wait_for_demand(&self) -> bool {
         let mut slot = self
             .slot
@@ -233,6 +237,7 @@ impl Shared {
     }
 
     /// Hands the page a new frame, measuring its brightness when the last measure is old.
+    #[cfg(target_os = "windows")]
     fn publish(&self, pixels: RgbaImage, measured: &mut Option<Instant>) {
         let luma = match measured.is_none_or(|at| at.elapsed() >= MEASURE) {
             true => {
@@ -259,6 +264,7 @@ impl Shared {
 
 /// How many times smaller a `width` by `height` frame is copied so it fits within `VIDEO_MAX`, a
 /// whole number so each copied pixel averages a whole block.
+#[cfg(any(target_os = "windows", test))]
 fn thinning(width: u32, height: u32) -> u32 {
     let (most_wide, most_high) = VIDEO_MAX;
     width
