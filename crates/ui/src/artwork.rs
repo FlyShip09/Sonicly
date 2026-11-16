@@ -1,4 +1,5 @@
 use crate::metrics::snapped;
+use crate::motion::{Motion, css_ease_out};
 use crate::palette::{CoverPalette, of_image};
 use crate::skeleton::Skeleton;
 use crate::theme::{ActiveTheme as _, legible};
@@ -335,6 +336,9 @@ struct Cached {
     value: Result<Arc<RenderImage>, ImageCacheError>,
     bytes: usize,
     used: Instant,
+    /// When the cover first landed with no other decode of it held, which is when it fades in
+    /// over its skeleton. `None` for a failed load or one that replaced a size already shown.
+    landed: Option<Instant>,
 }
 
 struct ArtworkCache {
@@ -394,12 +398,14 @@ impl ArtworkCache {
         let value = decoded.map(|decoded| decoded.image);
         let bytes = value.as_ref().map_or(0, |image| image_bytes(image));
         self.bytes = self.bytes.saturating_add(bytes);
+        let fresh = value.is_ok() && !self.items.keys().any(|(held, _)| *held == resource.0);
         self.items.insert(
             resource,
             Cached {
                 value,
                 bytes,
                 used: Instant::now(),
+                landed: fresh.then(Instant::now),
             },
         );
 
@@ -714,6 +720,11 @@ impl ArtworkCache {
                 held == resource && near(*size, edge) && cached.value.is_ok()
             }),
         }
+    }
+
+    /// When the cover at `edge` landed, if it was the first decode of it.
+    fn landed(&self, resource: &Resource, edge: u32) -> Option<Instant> {
+        self.items.get(&(resource.clone(), edge))?.landed
     }
 
     /// The largest decode the cache holds of the same cover at no less than half of `edge`, to
@@ -1165,6 +1176,20 @@ impl RenderOnce for Artwork {
                 // Drawn at once rather than after `img`'s loading delay, and under the cover,
                 // so a cover that lands mid-pulse simply covers it.
                 let waiting = !overlay && !cache.read(cx).holds(&resource, edge, soft);
+                // A cover that has just decoded fades in over its skeleton rather than popping.
+                // One already held when its page came back shows at once.
+                let shown = match overlay || soft || cx.reduce_motion() {
+                    true => 1.,
+                    false if waiting => 0.,
+                    false => cache.read(cx).landed(&resource, edge).map_or(1., |landed| {
+                        let span = Motion::Base.span().as_secs_f32().max(f32::EPSILON);
+                        let progress = landed.elapsed().as_secs_f32() / span;
+                        if progress < 1. {
+                            window.request_animation_frame();
+                        }
+                        css_ease_out(progress)
+                    }),
+                };
                 let source = ImageSource::Custom(Arc::new({
                     let cache = cache.clone();
                     move |window, cx| {
@@ -1196,7 +1221,7 @@ impl RenderOnce for Artwork {
                         .relative()
                         .w(size)
                         .h(tall)
-                        .when(waiting, |this| {
+                        .when(shown < 1., |this| {
                             this.child(
                                 Skeleton::new()
                                     .absolute()
@@ -1214,6 +1239,7 @@ impl RenderOnce for Artwork {
                                 .h(tall)
                                 .object_fit(fit)
                                 .rounded(rounded)
+                                .when(shown < 1., |this| this.opacity(shown))
                                 .with_fallback(placeholder),
                         )
                         .when_some(ring, |this, ring| {
