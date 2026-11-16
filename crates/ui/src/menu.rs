@@ -827,7 +827,7 @@ impl RenderOnce for Menu {
             .filter_map(|item| item.submenu.as_ref().map(|submenu| submenu.state.clone()))
             .collect();
         let viewport_width = window.viewport_size().width;
-        let tucked = crate::metrics::tucked(theme.radius, window);
+        let tucked = crate::metrics::tucked(crate::glass::rim(theme.radius), window);
 
         let keys = search.map(|search| Keys {
             search,
@@ -1268,12 +1268,12 @@ impl RenderOnce for Menu {
             .text_size(theme.text(crate::Text::Body))
             .line_height(phi())
             .p_1()
-            .rounded(theme.radius)
+            .rounded(crate::glass::rim(theme.radius))
             .border_1()
             .gap_1()
             .border_color(theme.border)
             .bg(fill)
-            .shadow_md()
+            .shadow(crate::glass::lifted(cx))
             .text_color(theme.popover_foreground)
             .key_context(MENU_CONTEXT)
             .when_some(keys, |this, keys| keys.bind(this))

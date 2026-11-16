@@ -91,8 +91,8 @@ pub use fluid::Fluid;
 pub use form::{FORM_CONTEXT, Field, Form, NextField, PreviousField, Submit, step_focus};
 pub use generated::GeneratedCover;
 pub use glass::{
-    GLASS_BLUR, GLASS_FILL, bar_surface, blurring, frame_fill, frost, glass, material,
-    popover_fill, popover_surface,
+    GLASS_BLUR, GLASS_FILL, bar_surface, blurring, frame_fill, frost, glass, lifted, material,
+    popover_fill, popover_surface, rim,
 };
 pub use glide::{Glide, ScrollPosition};
 pub use hold::{Held, Hold, held};

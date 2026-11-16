@@ -285,7 +285,7 @@ impl RenderOnce for Modal {
                     .border_1()
                     .border_color(theme.border)
                     .bg(theme.popover)
-                    .shadow_lg()
+                    .shadow(crate::glass::lifted(cx))
                     .overflow_hidden()
                     .child(
                         div()

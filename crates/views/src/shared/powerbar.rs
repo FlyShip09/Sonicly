@@ -750,7 +750,7 @@ impl Render for Powerbar {
             .border_color(theme.border)
             .bg(popover_fill(cx))
             .text_color(theme.popover_foreground)
-            .shadow_lg()
+            .shadow(ui::lifted(cx))
             .overflow_hidden()
             .child(
                 div()
