@@ -529,7 +529,7 @@ artist-followers = { $count ->
    *[other] { $value } followers
 }
 artist-popular = Popular
-artist-popular-eyebrow = Explore this artist
+artist-songs = Songs
 artist-popular-empty = Nothing to play from this artist yet
 artist-popular-more = Show all
 artist-popular-less = Show less
@@ -538,13 +538,8 @@ artist-favorite-songs-count = { $count ->
     [one] { $count } song in your Favorites
    *[other] { $count } songs in your Favorites
 }
-artist-releases = Releases
-artist-releases-more = Show all
-artist-releases-less = Show less
-artist-filter-all = All
-artist-filter-albums = Albums
-artist-filter-singles = Singles
-artist-filter-eps = EPs
+artist-albums = Albums
+artist-singles = Singles and EPs
 artist-appears-on = Appears on
 album-also-like = You might also like
 album-tab-albums = Albums
@@ -672,6 +667,11 @@ count-songs =
     { $count ->
         [one] { $count } song
        *[other] { $count } songs
+    }
+count-albums =
+    { $count ->
+        [one] { $count } album
+       *[other] { $count } albums
     }
 count-tracks =
     { $count ->

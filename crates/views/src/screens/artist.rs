@@ -1,33 +1,32 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use gpui::accesskit::{Role, Toggled};
+use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, ClickEvent, Context, Entity, Pixels, Point, Render, ScrollHandle,
-    ScrollWheelEvent, SharedString, WeakEntity, Window, div, linear_color_stop, linear_gradient,
-    point, px, relative,
+    SharedString, WeakEntity, Window, div, linear_color_stop, linear_gradient, px, relative,
 };
 
 use crate::chrome::Chrome;
 use crate::shared::blend::Joined;
 use crate::shared::cells;
 use i18n::t;
-use music::{SavedArtist, Track};
+use music::{Album, ReleaseType, SavedArtist, Track};
 use state::{AppSettings, ArtistDetail, Origin, Playback, Sonicly};
 use ui::ActiveTheme as _;
 use ui::Listing as _;
 use ui::{
-    Artwork, Button, Card, Deck, MIN_CONTENT, Modal, Mode, Pending, Picker, Pin, PinKind, Popovers,
-    Popup, Scrollbar, Scroller, TableDelegate, TableEvent, TableState, effects, scrolled, snapped,
-    spoken, table,
+    Artwork, Button, Deck, MIN_CONTENT, Modal, Mode, Pending, Picker, Pin, PinKind, Popovers,
+    Popup, Scrollbar, Scroller, TableDelegate, TableEvent, TableState, effects, snapped, spoken,
+    table,
 };
 
 use crate::chrome::tools;
 use crate::chrome::{Toolbar, Tooled};
 use crate::shared::about::{AboutArtist, about_modal};
 use crate::shared::album_grid::CardGrid;
-use crate::shared::cards::{self, ReleaseFilter};
+use crate::shared::cards;
 use crate::shared::confirm::Confirm;
 use crate::shared::cover_viewer::CoverViewer;
 use crate::shared::hero::{HeroMetaStrip, HeroPlayButton, PageHero};
@@ -39,7 +38,6 @@ use crate::shared::tracks::{PlaybackStatus, TrackSource, Tracks, drop_picked, pl
 use crate::shared::trouble;
 
 const SECTION: &str = "artist";
-const RELEASE_ROWS: usize = 2;
 const LISTED: usize = 5;
 const LISTED_MAX: usize = 10;
 /// The favorites dialog gives two song columns enough room for titles and controls.
@@ -121,10 +119,6 @@ pub(crate) struct ArtistView {
     playback: Entity<Playback>,
     playback_status: PlaybackStatus,
     artist_id: Option<String>,
-    release_filter: ReleaseFilter,
-    releases_expanded: bool,
-    release_padding: Pixels,
-    release_padding_offset: Pixels,
     width: Pixels,
     scrollbar: Entity<Scrollbar>,
     about_bar: Entity<Scrollbar>,
@@ -142,15 +136,7 @@ pub(crate) struct ArtistView {
     toolbar: Entity<Toolbar>,
     me: WeakEntity<Self>,
     popovers: Popovers,
-    /// Where the releases grid's leading edge landed last frame, in window coordinates, or
-    /// none until it has been laid out once. `hold_releases` needs it to tell how deep the
-    /// page is scrolled into the grid.
-    release_lead: Rc<Cell<Option<Pixels>>>,
-    /// The packing the grid was laid out with last frame, so a change of width can hold its
-    /// place rather than slide the cards under the user.
-    release_columns: usize,
-    release_tile: Pixels,
-    /// The recommendation rails under the releases, in page order: appears-on.
+    /// The rails under the songs, in page order: albums, singles and EPs, appears on.
     rails: Vec<Rail>,
     cover_viewer: Entity<CoverViewer>,
 }
@@ -224,10 +210,6 @@ impl ArtistView {
             let artist_id = detail.read(cx).id().map(str::to_owned);
             if this.artist_id != artist_id {
                 this.artist_id = artist_id;
-                this.release_filter = ReleaseFilter::All;
-                this.releases_expanded = false;
-                this.release_padding = Pixels::ZERO;
-                this.release_padding_offset = Pixels::ZERO;
                 this.about_open = false;
                 this.favorites_open = false;
                 this.rails.clear();
@@ -290,10 +272,6 @@ impl ArtistView {
             playback,
             playback_status: current_playback,
             artist_id,
-            release_filter: ReleaseFilter::All,
-            releases_expanded: false,
-            release_padding: Pixels::ZERO,
-            release_padding_offset: Pixels::ZERO,
             width,
             scrollbar,
             about_bar: cx.new(|_| Scrollbar::new(ScrollHandle::new()).watching(id)),
@@ -310,9 +288,6 @@ impl ArtistView {
             toolbar,
             me: me.downgrade(),
             popovers: Popovers::default(),
-            release_lead: Rc::new(Cell::new(None)),
-            release_columns: 0,
-            release_tile: Pixels::ZERO,
             rails: Vec::new(),
             cover_viewer,
         }
@@ -360,6 +335,18 @@ impl ArtistView {
             let value = cells::count(count);
             t!("artist-followers", count = count, value = &value)
         });
+        // A local artist has no listener counts; what the library holds of it is the fact.
+        let library = self
+            .detail
+            .read(cx)
+            .id()
+            .filter(|id| music::is_local_id(id))
+            .and(artist)
+            .map(|artist| {
+                HeroMetaStrip::new()
+                    .text(t!("count-albums", count = artist.albums.len()))
+                    .text(t!("count-songs", count = artist.top_tracks.len()))
+            });
         let overflow = self.saved_artist(cx).map(|artist| {
             Picker::icon("artist-overflow", &self.popovers, "icons/ellipsis.svg")
                 .tooltip("common-more")
@@ -417,9 +404,13 @@ impl ArtistView {
             .cover(cover)
             .cover_away(self.cover_viewer.read(cx).is_open())
             .when_some(view_cover, |hero, on_cover| hero.on_cover_click(on_cover))
-            .when(listeners.is_some() || followers.is_some(), |hero| {
-                hero.meta(artist_meta(listeners, followers))
-            })
+            .map(
+                |hero| match (listeners.is_some() || followers.is_some(), library) {
+                    (true, _) => hero.meta(artist_meta(listeners, followers)),
+                    (false, Some(library)) => hero.meta(library),
+                    (false, None) => hero,
+                },
+            )
             .actions(actions)
             .circle()
             .into_any_element()
@@ -593,311 +584,10 @@ impl ArtistView {
         )
     }
 
-    fn release_height(
-        &self,
-        filter: ReleaseFilter,
-        expanded: bool,
-        columns: usize,
-        window: &Window,
-        cx: &App,
-    ) -> Pixels {
-        let count = self
-            .detail
-            .read(cx)
-            .albums()
-            .iter()
-            .filter(|album| filter.matches(album.release_type))
-            .count();
-        let visible = match expanded {
-            true => count,
-            false => count.min(columns * RELEASE_ROWS),
-        };
-        let rows = visible.div_ceil(columns.max(1));
-        if rows == 0 {
-            return Pixels::ZERO;
-        }
-
-        let grid = CardGrid::layout(self.width);
-        let card = Card::tile_height(grid.card, window, cx);
-        card * rows as f32 + release_gap(window) * rows.saturating_sub(1) as f32
-    }
-
-    fn set_release_view(
-        &mut self,
-        filter: ReleaseFilter,
-        expanded: bool,
-        columns: usize,
-        window: &Window,
-        cx: &mut Context<Self>,
-    ) {
-        let old = self.release_height(
-            self.release_filter,
-            self.releases_expanded,
-            columns,
-            window,
-            cx,
-        );
-        let new = self.release_height(filter, expanded, columns, window, cx);
-        let offset = scrolled(self.scrollbar.read(cx).scroll());
-        self.release_padding = match old > new {
-            true => self.release_padding + (old - new).min(offset),
-            false => (self.release_padding - (new - old)).max(Pixels::ZERO),
-        };
-        self.release_padding_offset = offset;
-        self.release_filter = filter;
-        self.releases_expanded = expanded;
-        cx.notify();
-    }
-
-    fn settle_release_padding(&mut self, offset: Pixels) {
-        if offset < self.release_padding_offset {
-            self.release_padding =
-                (self.release_padding - (self.release_padding_offset - offset)).max(Pixels::ZERO);
-        }
-        self.release_padding_offset = offset;
-    }
-
-    fn release_scroll(
-        &mut self,
-        event: &ScrollWheelEvent,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let upward = event.delta.pixel_delta(window.line_height()).y;
-        if upward <= Pixels::ZERO || self.release_padding <= Pixels::ZERO {
-            return;
-        }
-        cx.notify();
-    }
-
-    /// How many releases the grid lists at a given packing: every one that passes the filter
-    /// while it is expanded, and the first two rows of them while it is not.
-    fn shown_releases(&self, columns: usize, cx: &App) -> usize {
-        let count = self
-            .detail
-            .read(cx)
-            .albums()
-            .iter()
-            .filter(|album| self.release_filter.matches(album.release_type))
-            .count();
-
-        match self.releases_expanded {
-            true => count,
-            false => count.min(columns * RELEASE_ROWS),
-        }
-    }
-
-    /// Holds the releases grid still when the page changes width. A narrower page packs the
-    /// cards into fewer columns and more rows, which slides whatever the user was looking at
-    /// down the page; this moves the scroll by as much as the row under the top edge moved,
-    /// so the same releases stay where they were. The row heights are uniform here, so the
-    /// anchor is the first card of that row and nothing but the packing has to be remembered.
-    fn hold_releases(&mut self, window: &Window, cx: &mut Context<Self>) {
-        let grid = CardGrid::layout(self.width);
-        let columns = grid.columns.max(1);
-        let tile = Card::tile_height(grid.card, window, cx);
-        let (was_columns, was_tile) = (self.release_columns, self.release_tile);
-        self.release_columns = columns;
-        self.release_tile = tile;
-        if was_columns == 0 || (was_columns == columns && (was_tile - tile).abs() < px(0.5)) {
-            return;
-        }
-        let Some(lead) = self.release_lead.get() else {
-            return;
-        };
-
-        let scroll = self.scrollbar.read(cx).scroll().clone();
-        let depth = scroll.bounds().origin.y - lead;
-        if depth <= Pixels::ZERO {
-            return;
-        }
-        let gap = release_gap(window);
-        let before = self.shown_releases(was_columns, cx).div_ceil(was_columns);
-        let (row, into) = Deck::at(&vec![was_tile; before], gap, depth);
-        let share = match was_tile > Pixels::ZERO {
-            true => into / was_tile,
-            false => 0.,
-        };
-
-        let after = self.shown_releases(columns, cx).div_ceil(columns);
-        let landed = (row * was_columns / columns).min(after.saturating_sub(1));
-        let top = Deck::tops(&vec![tile; after], gap)
-            .get(landed)
-            .copied()
-            .unwrap_or_default();
-        let moved = top + tile * share - depth;
-        if moved.abs() < px(0.5) {
-            return;
-        }
-
-        let at = (-scroll.offset().y + moved).max(Pixels::ZERO);
-        scroll.set_offset(point(Pixels::ZERO, -at));
-    }
-
-    /// The Releases grid. The rows go into a `Deck`, so an artist with a long discography
-    /// builds only the rows on screen once the list is expanded, and the section still takes
-    /// the height `release_height` reports, which is what the collapse padding is measured
-    /// against.
-    fn releases(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let detail = self.detail.read(cx);
-        let albums = detail.albums();
-        // A discography still on its way reads as loading only while nothing of it is up.
-        let loading = detail.is_loading() || (albums.is_empty() && detail.is_filling());
-        if albums.is_empty() && !loading {
-            return None;
-        }
-        let local = detail.id().is_some_and(music::is_local_id);
-        let filters = match loading {
-            true => Vec::new(),
-            false => cards::release_filters(local, albums.iter().map(|album| album.release_type)),
-        };
-
-        let grid = CardGrid::layout(self.width);
-        let gap = release_gap(window);
-        let releases = match loading {
-            true => div()
-                .flex()
-                .flex_col()
-                .gap(gap)
-                .children((0..RELEASE_ROWS).map(|row| {
-                    CardGrid::new(self.width).children((0..grid.columns).map(move |column| {
-                        let index = row * grid.columns + column;
-                        Card::skeleton(("artist-release-skeleton", index))
-                            .tile(grid.card)
-                            .into_any_element()
-                    }))
-                }))
-                .into_any_element(),
-            false => {
-                let columns = grid.columns.max(1);
-                let shown: Rc<[usize]> = albums
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, album)| self.release_filter.matches(album.release_type))
-                    .map(|(index, _)| index)
-                    .take(match self.releases_expanded {
-                        true => usize::MAX,
-                        false => columns * RELEASE_ROWS,
-                    })
-                    .collect();
-                let rows = shown.len().div_ceil(columns);
-                let total = shown.len();
-                let height = Card::tile_height(grid.card, window, cx);
-                let width = self.width;
-                let card = grid.card;
-                let opened = cx.entity().downgrade();
-                let lead = self.release_lead.clone();
-
-                Deck::new("artist-releases-deck")
-                    .rows(std::iter::repeat_n(height, rows))
-                    .gap(gap)
-                    .on_measure(move |top, _, _| lead.set(Some(top)))
-                    .draw(move |row, _, cx| {
-                        let Some(view) = opened.upgrade() else {
-                            return div().into_any_element();
-                        };
-                        let start = row * columns;
-                        let end = (start + columns).min(shown.len());
-                        // The cards are built straight off the shelf's albums. A row is
-                        // rebuilt on every frame a scroll asks for, so cloning a release,
-                        // its credits and all of its strings to get here would be the whole
-                        // cost of scrolling a long discography.
-                        let held = view.read(cx);
-                        let listed = held.detail.read(cx).albums();
-                        let cards = (start..end).filter_map(|seat| {
-                            let album = listed.get(shown[seat])?;
-                            let id = SharedString::from(format!("artist-release-{}", album.id));
-
-                            Some(
-                                cards::album_card(id, album, &held.playback, cx)
-                                    .tile(card)
-                                    .flat()
-                                    .aria_position_in_set(seat + 1)
-                                    .aria_size_of_set(total)
-                                    .into_any_element(),
-                            )
-                        });
-
-                        CardGrid::new(width).children(cards).into_any_element()
-                    })
-                    .into_any_element()
-            }
-        };
-
-        Some(
-            div()
-                .flex()
-                .flex_col()
-                .gap_3()
-                .pt_6()
-                .child({
-                    ui::spoken_heading("artist-releases-heading", t!("artist-releases"), 2, cx)
-                })
-                .when(!filters.is_empty(), |this| {
-                    this.child(
-                        div()
-                            .flex()
-                            .gap_1()
-                            .children(filters.into_iter().map(|filter| {
-                                Button::new(filter.id())
-                                    .label(filter.label())
-                                    .small()
-                                    .outline()
-                                    .selected(self.release_filter == filter)
-                                    .aria_toggled(Toggled::from(self.release_filter == filter))
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        if this.release_filter == filter {
-                                            return;
-                                        }
-                                        this.set_release_view(
-                                            filter,
-                                            false,
-                                            grid.columns,
-                                            window,
-                                            cx,
-                                        );
-                                    }))
-                            })),
-                    )
-                })
-                .child(releases)
-                .children(self.release_toggle(grid.columns, cx))
-                .into_any_element(),
-        )
-    }
-
-    fn release_toggle(&self, columns: usize, cx: &mut Context<Self>) -> Option<Button> {
-        let count = self
-            .detail
-            .read(cx)
-            .albums()
-            .iter()
-            .filter(|album| self.release_filter.matches(album.release_type))
-            .count();
-        if count <= columns * RELEASE_ROWS {
-            return None;
-        }
-        let expanded = self.releases_expanded;
-
-        Some(
-            Button::new("artist-releases-more")
-                .label(match expanded {
-                    true => t!("artist-releases-less"),
-                    false => t!("artist-releases-more"),
-                })
-                .trailing(chevron(expanded))
-                .small()
-                .ghost()
-                .aria_expanded(expanded)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.set_release_view(this.release_filter, !expanded, columns, window, cx);
-                })),
-        )
-    }
-
-    /// The recommendation rail under the releases: what the artist guests on. A rail
-    /// still on its way reads as skeletons only while nothing of it is up.
-    fn recommended(
+    /// The rails under the songs, each drawn only when the artist has something for it: the
+    /// albums, the singles and EPs, and what the artist guests on. A discography still on its
+    /// way reads as skeletons only while nothing of it is up.
+    fn sections(
         &self,
         window: &Window,
         notify: &Rc<dyn Fn(&mut App)>,
@@ -907,26 +597,56 @@ impl ArtistView {
         let card = grid.card;
         let columns = grid.columns.max(1);
         let detail = self.detail.read(cx);
+        let loading = detail.is_loading() || (detail.albums().is_empty() && detail.is_filling());
+        let singles =
+            |album: &Album| matches!(album.release_type, ReleaseType::Single | ReleaseType::Ep);
+        let albums: Rc<[usize]> = (0..detail.albums().len())
+            .filter(|&index| !singles(&detail.albums()[index]))
+            .collect();
+        let short: Rc<[usize]> = (0..detail.albums().len())
+            .filter(|&index| singles(&detail.albums()[index]))
+            .collect();
+        let appears: Rc<[usize]> = (0..detail.appears_on().len()).collect();
         let filling = detail.is_filling();
-        let appears = detail.appears_on().len();
 
-        vec![match appears {
-            0 if filling => Some(Rail::pending(
+        let shelves = [
+            (
+                Shelf::Albums,
+                "artist-albums",
+                t!("artist-albums"),
+                albums,
+                loading,
+            ),
+            (
+                Shelf::Singles,
+                "artist-singles",
+                t!("artist-singles"),
+                short,
+                false,
+            ),
+            (
+                Shelf::Appears,
+                "artist-appears",
                 t!("artist-appears-on"),
-                card,
-                columns,
-                window,
-                cx,
-            )),
-            0 => None,
-            _ => {
+                appears,
+                filling,
+            ),
+        ];
+        shelves
+            .into_iter()
+            .enumerate()
+            .filter_map(|(place, (shelf, tag, title, shown, pending))| {
+                if shown.is_empty() {
+                    return pending.then(|| Rail::pending(title, card, columns, window, cx));
+                }
                 let opened = self.me.clone();
-                Some(self.rails[0].render(
+                let count = shown.len();
+                Some(self.rails[place].render(
                     RailSpec {
-                        tag: "artist-appears",
+                        tag,
                         place: 0,
-                        title: t!("artist-appears-on"),
-                        count: appears,
+                        title,
+                        count,
                         tile: card,
                         columns,
                         tabs: None,
@@ -940,24 +660,25 @@ impl ArtistView {
                         };
                         let held = view.read(cx);
                         let detail = held.detail.read(cx);
-                        let Some(album) = detail.appears_on().get(index) else {
+                        let listed = match shelf {
+                            Shelf::Appears => detail.appears_on(),
+                            Shelf::Albums | Shelf::Singles => detail.albums(),
+                        };
+                        let Some(album) = shown.get(index).and_then(|&at| listed.get(at)) else {
                             return div().into_any_element();
                         };
-                        let id = SharedString::from(format!("artist-appears-{}", album.id));
+                        let id = SharedString::from(format!("{tag}-{}", album.id));
                         cards::album_card(id, album, &held.playback, cx)
                             .tile(card)
                             .flat()
                             .aria_position_in_set(index + 1)
-                            .aria_size_of_set(appears)
+                            .aria_size_of_set(count)
                             .into_any_element()
                     },
                 ))
-            }
-        }]
-        .into_iter()
-        .flatten()
-        .map(|rail| div().pt_6().child(rail).into_any_element())
-        .collect()
+            })
+            .map(|rail| div().pt_6().child(rail).into_any_element())
+            .collect()
     }
 
     fn listed(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -997,6 +718,15 @@ impl ArtistView {
             .into_any_element()
     }
 
+    /// What the songs at the top are called: Popular where the provider ranks them, Songs for
+    /// a local artist, whose songs are simply the ones the library holds.
+    fn songs_title(&self, cx: &App) -> &'static str {
+        match self.detail.read(cx).id().is_some_and(music::is_local_id) {
+            true => "artist-songs",
+            false => "artist-popular",
+        }
+    }
+
     fn playing_from(&self, cx: &App) -> Option<Origin> {
         let detail = self.detail.read(cx);
         let name = detail.artist()?.name.clone();
@@ -1019,8 +749,7 @@ impl ArtistView {
             self.width,
             self.popular_page,
         )
-        .title("artist-popular")
-        .eyebrow(i18n::lookup("artist-popular-eyebrow", None))
+        .title(self.songs_title(cx))
         .vacancy("artist-popular-empty")
         .detailed()
         .loading(self.detail.read(cx).is_loading())
@@ -1164,6 +893,11 @@ impl ArtistView {
 
     fn about(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let artist = self.detail.read(cx).artist()?;
+        // An artist the provider says nothing about gets no card, rather than a stock line.
+        artist
+            .biography
+            .as_deref()
+            .filter(|bio| !bio.trim().is_empty())?;
         let card = AboutArtist::new("artist-about", artist.name.clone())
             .cover(artist.cover_large.clone())
             .biography(artist.biography.clone())
@@ -1289,8 +1023,6 @@ impl Render for ArtistView {
         page::resize(&self.table, &mut self.width, inset, window, cx);
 
         let scroll = self.scrollbar.read(cx).scroll().clone();
-        self.settle_release_padding(scrolled(&scroll));
-        self.hold_releases(window, cx);
         if self.width != previous {
             self.scrollbar
                 .update(cx, |bar, cx| bar.set_max_offset(None, cx));
@@ -1323,7 +1055,7 @@ impl Render for ArtistView {
         });
 
         let listed = self.mode == Mode::List;
-        let release_padding = self.release_padding;
+        let songs_title = self.songs_title(cx);
         let head = self.header(cx);
         let cover = theme.metrics.cover;
         let banner_shown = self
@@ -1345,9 +1077,8 @@ impl Render for ArtistView {
             Mode::List => self.listed(cx),
         };
         let favorites = self.favorites_link(cx);
-        let grid = self.releases(window, cx);
         let about = self.about(cx);
-        while self.rails.is_empty() {
+        while self.rails.len() < Shelf::COUNT {
             self.rails.push(Rail::new(cx.entity_id()));
         }
         for rail in &self.rails {
@@ -1357,7 +1088,7 @@ impl Render for ArtistView {
         let notify: Rc<dyn Fn(&mut App)> = Rc::new(move |cx: &mut App| {
             weak.update(cx, |_, cx| cx.notify()).ok();
         });
-        let rails = self.recommended(window, &notify, cx);
+        let rails = self.sections(window, &notify, cx);
         // once the banner and the name under it have scrolled away, the title bar carries it
         let (title, portrait) = self
             .detail
@@ -1376,7 +1107,6 @@ impl Render for ArtistView {
             .px(inset)
             .pt(inset)
             .pb(inset)
-            .on_scroll_wheel(cx.listener(Self::release_scroll))
             .child(
                 div()
                     .relative()
@@ -1386,7 +1116,7 @@ impl Render for ArtistView {
                     .child(head)
                     .children(favorites)
                     .when(listed, |this| {
-                        let label = t!("artist-popular");
+                        let label = i18n::lookup(songs_title, None);
                         this.child(
                             ui::spoken_heading("artist-popular-heading", label, 2, cx).pb_3(),
                         )
@@ -1396,13 +1126,9 @@ impl Render for ArtistView {
                 div()
                     .px(margin)
                     .child(tracks)
-                    .children(grid)
                     .children(rails)
                     .children(about),
-            )
-            .when(release_padding > Pixels::ZERO, |this| {
-                this.child(div().h(release_padding).flex_none())
-            });
+            );
 
         div()
             .relative()
@@ -1430,13 +1156,21 @@ fn artist_meta(listeners: Option<SharedString>, followers: Option<SharedString>)
     }
 }
 
-fn release_gap(window: &Window) -> Pixels {
-    snapped(window.rem_size() * 1.5, window)
-}
-
 fn chevron(expanded: bool) -> &'static str {
     match expanded {
         true => "icons/chevron-up.svg",
         false => "icons/chevron-down.svg",
     }
+}
+
+/// The rails of an artist page, in page order.
+#[derive(Clone, Copy)]
+enum Shelf {
+    Albums,
+    Singles,
+    Appears,
+}
+
+impl Shelf {
+    const COUNT: usize = 3;
 }
