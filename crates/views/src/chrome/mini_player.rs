@@ -241,15 +241,17 @@ impl Render for MiniPlayer {
         let metrics = theme.metrics;
         let shape = Self::size(self.bar, cx);
         let (width, height) = (shape.width, shape.height);
-        let cover = self
-            .playback
-            .read(cx)
-            .shown_track(cx)
-            .and_then(|track| track.cover);
+        let track = self.playback.read(cx).shown_track(cx);
+        let seed = track
+            .as_ref()
+            .map(crate::shared::cards::seed)
+            .unwrap_or_default();
+        let cover = track.and_then(|track| track.cover);
         // The backdrop is the cover again, stretched over the whole window under the frost.
         // It reuses the decode of the cover drawn above it, since the blur hides the detail.
         let side = width.max(height);
         let backdrop = Artwork::new(cover.clone())
+            .seed(seed.clone())
             .size(side)
             .corner_radius(Pixels::ZERO)
             .sampled_at(match self.bar {
@@ -278,6 +280,7 @@ impl Render for MiniPlayer {
                         .px(metrics.pad)
                         .child(
                             Artwork::new(cover)
+                                .seed(seed)
                                 .size(snapped(metrics.row, window))
                                 .flex_none(),
                         )
@@ -294,6 +297,7 @@ impl Render for MiniPlayer {
                 .flex_col()
                 .child(
                     Artwork::new(cover)
+                        .seed(seed)
                         .size(width)
                         .corner_radius(Pixels::ZERO)
                         .flex_none(),

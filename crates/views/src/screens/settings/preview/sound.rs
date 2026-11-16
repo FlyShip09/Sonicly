@@ -94,7 +94,8 @@ pub(in crate::screens::settings) fn preview(
         .track()
         .and_then(|track| track.id.as_deref())
         .and_then(|id| session.slug_for(id))
-        .or_else(|| session.provider_slug());
+        // with nothing playing, the service in use, and none when no account is signed in
+        .or_else(|| session.client().and_then(|_| session.provider_slug()));
     let name = view
         .playback
         .read(cx)
@@ -102,7 +103,7 @@ pub(in crate::screens::settings) fn preview(
         .and_then(|track| track.id.as_deref())
         .and_then(|id| session.provider_for(id))
         .map(|provider| provider.name())
-        .or_else(|| session.provider_name());
+        .or_else(|| session.client().and_then(|_| session.provider_name()));
 
     let mut steps = Vec::new();
     steps.push(Step {

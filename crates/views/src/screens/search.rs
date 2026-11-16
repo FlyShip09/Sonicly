@@ -1412,6 +1412,7 @@ pub(crate) fn hit_card(
     let card = match hit {
         Hit::Song(track) => Card::new(("song", place), track.name.clone())
             .cover(track.cover.clone())
+            .seed(crate::shared::cards::seed(track))
             .fallback("icons/music.svg")
             .when(current, |card| card.tint(theme.primary))
             .when(track.explicit, |card| card.explicit())
@@ -1426,15 +1427,18 @@ pub(crate) fn hit_card(
             ),
         Hit::Artist(artist) => Card::new(("artist", place), artist.name.clone())
             .cover(artist.cover.clone())
+            .seed(artist.name.clone())
             .fallback("icons/user.svg")
             .circle()
             .underline(),
         Hit::Album(album) => Card::new(("album", place), album.name.clone())
             .cover(album.cover.clone())
+            .seed(album.name.clone())
             .fallback("icons/disc-3.svg")
             .underline(),
         Hit::Playlist(list) => Card::new(("playlist", place), list.name.clone())
             .cover(list.cover.clone())
+            .seed(list.name.clone())
             .fallback("icons/list.svg")
             .underline(),
     };

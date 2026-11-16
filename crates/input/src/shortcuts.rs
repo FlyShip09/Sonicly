@@ -5,7 +5,7 @@
 use std::collections::BTreeMap;
 
 use gpui::{Action, KeyBinding, Keystroke};
-use ui::{FORM_CONTEXT, INPUT_CONTEXT, MENU_CONTEXT, TABLE_CONTEXT};
+use ui::{CONTROL_CONTEXT, FORM_CONTEXT, INPUT_CONTEXT, MENU_CONTEXT, TABLE_CONTEXT};
 
 use crate::{
     DecreaseFontSize, DownloadFromLink, IncreaseFontSize, NavigateBack, NavigateForward,
@@ -541,10 +541,10 @@ fn bind<A: Action + Default>(keystroke: &str, context: Option<&str>) -> KeyBindi
 }
 
 /// The context of a [`Scope::Browsing`] shortcut: the workspace with no text field, list, menu,
-/// form, search or powerbar in the focus path.
+/// form, search, powerbar or focused button in the focus path.
 fn browsing_context() -> String {
     format!(
-        "{WORKSPACE_CONTEXT} && !{INPUT_CONTEXT} && !{MENU_CONTEXT} && !{FORM_CONTEXT} && !{TABLE_CONTEXT} && !{SEARCH_CONTEXT} && !{POWERBAR_CONTEXT}"
+        "{WORKSPACE_CONTEXT} && !{INPUT_CONTEXT} && !{MENU_CONTEXT} && !{FORM_CONTEXT} && !{TABLE_CONTEXT} && !{SEARCH_CONTEXT} && !{POWERBAR_CONTEXT} && !{CONTROL_CONTEXT}"
     )
 }
 

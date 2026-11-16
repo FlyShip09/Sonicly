@@ -4,6 +4,7 @@ use i18n::t;
 use state::Sonicly;
 use ui::{Button, Field, Form, Picker, Switch};
 
+use super::rows::Row;
 use super::{Group, SettingsView, Slot};
 
 impl SettingsView {
@@ -36,7 +37,8 @@ impl SettingsView {
     /// The address of the listener's own server and the button that saves it. Saving checks the
     /// server first and keeps it only once it answers, and a toast says how it went. The field is
     /// compact and the button small, so the two stand the same height. On a narrow page the field
-    /// narrows and the label stays whole.
+    /// narrows and the label stays whole. The line under the label says plainly that nothing
+    /// connects without one, since Sonicly has no server of its own.
     pub(super) fn sessions_server_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let saving = Sonicly::global(cx).listening.read(cx).saving();
         let save = Button::new("sessions-server-save")
@@ -47,7 +49,7 @@ impl SettingsView {
             .disabled(saving)
             .on_click(cx.listener(|this, _, _, cx| this.save_sessions_server(cx)));
 
-        self.yielding_row(
+        Row::new(
             t!("settings-sessions-server"),
             div()
                 .flex_1()
@@ -68,6 +70,9 @@ impl SettingsView {
                 )
                 .into_any_element(),
         )
+        .yielding()
+        .detail(t!("settings-sessions-server-detail"))
+        .into_any_element()
     }
 
     /// Checks that the server typed in the field answers and keeps it once it does.

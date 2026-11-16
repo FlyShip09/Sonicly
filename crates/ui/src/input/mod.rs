@@ -9,7 +9,7 @@ use gpui::{
 };
 use unicode_segmentation::UnicodeSegmentation;
 
-mod element;
+pub(crate) mod element;
 
 actions!(
     input,

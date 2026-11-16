@@ -241,7 +241,7 @@ impl TableSource for ArtistSource {
         }
 
         match cell.field {
-            ArtistField::Cover => cells::avatar(&cell, artist.cover.clone()),
+            ArtistField::Cover => cells::avatar(&cell, artist.cover.clone(), artist.name.clone()),
             ArtistField::Name => cells::name(
                 &cell,
                 artist.name.clone(),

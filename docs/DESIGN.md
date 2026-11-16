@@ -295,3 +295,73 @@ Newest last. One entry per decision: what was chosen, and why.
     line in a toast and reloads the moment it is fixed, which loses nothing and
     keeps the fix a one-line edit. The runtime blob in `state.sqlite` has no
     version yet; a blob that stops decoding falls back to defaults.
+31. **A first run asks where the music comes from (M8).** Until now a first run never
+    showed the welcome screen: with nothing stored, the session fell straight to a
+    YouTube Music guest session (`docs/screenshots/m8/before-firstrun-dark.png`). Now a
+    session with nothing stored anywhere (no account, no guest) ends signed out, and the
+    welcome screen offers three ways in, most wanted first: *Play music on this
+    computer* (the filled button, the library's own folder picker, "Choose a folder, or
+    drop one on this window"), *Sign in to a service* (the provider rows as before), and
+    *Browse without an account*, which names whose catalogue it browses. A stored
+    account or guest session that fails still falls back as before.
+32. **Local files alone are a way to use the app.** The workspace stands in for the
+    welcome screen whenever no account is signed in and a music folder is set or its
+    first scan is running (`Session::local_only`). A folder picked or dropped on the
+    welcome screen opens Songs at once, where the scan's progress shows and the songs
+    land; later launches open straight into the library. Home mixes its picks from the
+    local shelf in that state, and the account card in Settings stays away instead of
+    showing placeholders forever. Songs appear when the scan finishes, not one by one:
+    the local provider scans the whole folder before it hands over a catalogue, and
+    making it stream tracks is a change to `music::local` left for later. A drop over
+    the welcome screen reuses the window's drop flow; its sheet covers the whole window
+    there, since there are no sidebars to keep clear.
+33. **The welcome screen is one still card.** The dot lattice lit by indigo, violet and
+    teal pools, drifting at 30 Hz, and the glow in a provider's brand colour behind the
+    hovered row are gone, and with them `ui::Lattice` and its shader. The card is the
+    page set into the frame, as in the workspace: `theme.background` with one
+    `sidebar_border` hairline on `theme.sidebar`, no frost, no shadow. A provider's mark
+    still takes its brand colour under the pointer, which answers the pointer and moves
+    nothing.
+34. **Buttons, switches and option cards are Tab stops.** gpui's fork already turns
+    Enter and Space on a focused element with a click handler into a click, and keeps a
+    keyboard-only focus style (`focus_visible`). `ui::keyboard_control` makes an element
+    a tab stop in paint order, gives it the soft 2 px ring a focused text field wears
+    (`muted_foreground` at 40%), and keeps a pointer press from taking the focus, so a
+    click never takes the keys away from the list that had them. Tab and Shift+Tab move
+    the focus from the root (`FocusNext`, `FocusPrevious`); menus and forms keep their
+    own Tab. A focused control carries the `Control` key context, which the browsing
+    shortcuts exclude, so Space presses the button instead of playing or pausing.
+    Decision 23's note that buttons are not Tab stops no longer holds. Not yet driven
+    from a real keyboard: captures cannot type.
+35. **Covers without art are coloured from their album's name.** An album, artist,
+    playlist or song with no cover drew the same grey tile, and a library without
+    embedded art read as a wall of them. `Artwork::seed` (and `Card::seed`,
+    `Avatar::seed`, the table cover cells) colours the missing cover's tile from a name:
+    a hue and a lightness from a stable FNV-1a hash, saturation 0.2, lightness inside
+    the band the drawn covers of decision 27 use, with the kind's glyph as before.
+    Songs pass their album's name, so an album and its songs draw the same colour. It is
+    a fill, never an image, so it costs no memory: Home measured 114 MB before and
+    119 MB after (working set, debug, launch-to-launch noise). Real art always wins; a
+    cover that fails to load falls back to the same tile.
+36. **Settings pass.** Each category was opened in a capture and checked against the
+    rules. Changed: Discord, which has no application id, is one muted row saying Rich
+    Presence is not available in this build, with no switch, preview or local-artwork
+    toggle; the Sessions server row shows on screen that nothing connects without a
+    server of your own; the settings header's search field and tab bar no longer blur
+    on top of the header's own blur (glass on glass), and neither does the window under
+    the quick search, which is now a flat dim under the one frosted panel; theme
+    previews draw the current frame (title bar and sidebar one surface, the page set in
+    with a hairline, a full-width player bar); the sound chain no longer names a service
+    nobody signed in to. Copy: "Keybinds" is "Shortcuts", "Blur UI" is "Blur behind
+    menus", "Provider" is "Service on startup", "Throttle inactive window" is "Limit
+    frame rate in the background", "Traffic light controls" is "Round window buttons",
+    "Session" is lower case except as the feature's name, "Remove all" downloads is
+    "Delete all", both folder buttons read "Add folder…", the lyrics samples are plain
+    lines instead of jokes, the lyrics empty state says what happened and that an
+    `.lrc` file beside a local song is read, error lines say what to do, and spelling is
+    American throughout. Judged fine as they are: General, About (the licences row is
+    disabled only in unpackaged builds, which ship no notices), Lyrics and its sources,
+    Storage, Shortcuts, Scrobbling, Music folders and the equalizer. Not changed and
+    worth a later look: the Now playing preview animates its visualizer while nothing
+    plays, and the player bar menu still offers to start or join a session when no
+    server is saved.

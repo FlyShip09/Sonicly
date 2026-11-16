@@ -21,7 +21,6 @@ mod inline_links;
 mod input;
 mod kbd;
 mod label;
-mod lattice;
 mod layout;
 mod lazy;
 mod level_meter;
@@ -73,7 +72,7 @@ pub use arrow_ring::ArrowRing;
 pub use artwork::{
     Artwork, Avatar, PREFETCH_REACH, Prefetch, artwork_usage, cover_palette, prefetch, prefetching,
 };
-pub use button::{Button, SMALL_INSET};
+pub use button::{Button, CONTROL_CONTEXT, SMALL_INSET, keyboard_control};
 pub use card::CARD_GROUP;
 pub use card::Card;
 pub use checkbox::Checkbox;
@@ -110,7 +109,6 @@ pub use label::{
     Tails, eyebrow, eyebrow_with, faint, heading, section_heading, spoken, spoken_eyebrow,
     spoken_heading, spoken_vacant, vacant,
 };
-pub use lattice::Lattice;
 pub use layout::{ALWAYS, MIN_CONTENT, ROOMY, Room, SNUG, VAST, WIDE};
 pub use lazy::Lazy;
 pub use level_meter::LevelMeter;

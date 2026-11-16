@@ -365,9 +365,11 @@ impl PlayerBar {
                 // while that one is in the air.
                 Flight::new(
                     "now-playing-cover",
-                    div()
-                        .when(away, |this| this.invisible())
-                        .child(Artwork::new(cover).size(artwork)),
+                    div().when(away, |this| this.invisible()).child(
+                        Artwork::new(cover)
+                            .size(artwork)
+                            .when_some(track.map(crate::shared::cards::seed), Artwork::seed),
+                    ),
                 )
                 .seen_as(COVER_FLIGHT),
             )

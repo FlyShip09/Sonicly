@@ -4,13 +4,14 @@ use std::sync::Arc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClickEvent, Div, ElementId, FontWeight, HoverListenerMode, Hsla,
+    AnyElement, App, BoxShadow, ClickEvent, Div, ElementId, FontWeight, HoverListenerMode, Hsla,
     Interactivity, MouseButton, Pixels, SharedString, Stateful, StyleRefinement, Svg,
     TextStyleRefinement, Transformation, Window, canvas, div, point, px, radians, relative, size,
     svg,
 };
 
 use crate::glass::{GLASS_BLUR, blurring, frost};
+use crate::input::element::{RING, RING_WIDTH};
 use crate::metrics::{Text, text_width};
 use crate::motion::{Glow, PRESS_SCALE, Springs, Sprung, glow_fill, pressing, solid_fill};
 use crate::panel::Side;
@@ -50,8 +51,31 @@ const POP_REST: f32 = 1e-3;
 /// still count as the content's. Further off, something else sizes the button.
 const FIT_SLACK: f32 = 3.;
 
+/// The key context of a control that holds the keyboard focus, so plain Enter and Space press
+/// it rather than reaching the shortcuts bound around it.
+pub const CONTROL_CONTEXT: &str = "Control";
+
 type Click = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 type Hover = Box<dyn Fn(&bool, &mut Window, &mut App) + 'static>;
+
+/// Makes a clickable element a Tab stop that Enter and Space press, as gpui turns those keys
+/// into a click on a focused element. It wears the ring a focused text field wears, only while
+/// the keyboard brought the focus there. A pointer press leaves the focus where it was, so a
+/// click never takes the keys away from the list or page that had them.
+pub fn keyboard_control<E: InteractiveElement>(element: E, cx: &App) -> E {
+    let ring = BoxShadow {
+        color: cx.theme().muted_foreground.opacity(RING),
+        offset: point(Pixels::ZERO, Pixels::ZERO),
+        blur_radius: Pixels::ZERO,
+        spread_radius: RING_WIDTH,
+        inset: false,
+    };
+    element
+        .tab_index(0)
+        .key_context(CONTROL_CONTEXT)
+        .focus_visible(move |style| style.shadow(vec![ring]))
+        .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+}
 
 enum Variant {
     Ghost,
@@ -999,7 +1023,8 @@ impl RenderOnce for Button {
             .when(interactive, |this| {
                 this.when_some(on_click, |this, handler| {
                     let shape = shape.clone();
-                    this.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    keyboard_control(this, cx)
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(move |event, window, cx| {
                             if belt.is_some() {
                                 shape.update(cx, |shape, cx| {

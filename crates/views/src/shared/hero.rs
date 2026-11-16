@@ -591,6 +591,7 @@ impl RenderOnce for PageHero {
                     .corner_radius(Self::cover_radius(&theme))
                     .into_any_element(),
                     (cover, _) => Artwork::new(cover)
+                        .seed(self.title.clone())
                         .edged()
                         .size(art)
                         .corner_radius(Self::cover_radius(&theme))

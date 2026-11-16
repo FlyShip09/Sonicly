@@ -797,7 +797,11 @@ impl TableSource for TrackSource {
         };
 
         match cell.field {
-            TrackField::Cover => cells::artwork(&cell, track.cover.clone()),
+            TrackField::Cover => cells::artwork(
+                &cell,
+                track.cover.clone(),
+                crate::shared::cards::seed(track),
+            ),
             TrackField::Title => self.title_cell(&cell, track, title, cx),
             TrackField::Artists => self.artist_cell(&cell, track, detail),
             TrackField::Album => self.album_cell(&cell, track, detail),

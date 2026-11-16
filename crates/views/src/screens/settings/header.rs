@@ -63,7 +63,6 @@ impl Render for SettingsHeader {
         let tabs = TabBar::new("settings-tabs")
             .name(i18n::lookup("nav-settings", None))
             .max_w_full()
-            .blurred()
             .reveal(shown)
             .items(SettingsTab::ALL.map(|tab| {
                 Button::new(tab.id())

@@ -22,9 +22,9 @@ use crate::theme::ActiveTheme as _;
 /// muted foreground and of the danger colour the ring a focused or turned down field wears.
 const FILL: f32 = 0.045;
 const EDGE: f32 = 0.15;
-const RING: f32 = 0.4;
+pub(crate) const RING: f32 = 0.4;
 /// How far that ring reaches past the field.
-const RING_WIDTH: Pixels = px(2.);
+pub(crate) const RING_WIDTH: Pixels = px(2.);
 
 struct Text {
     input: Entity<Input>,

@@ -143,6 +143,23 @@ async fn button_advertises_role_and_name(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+async fn clickable_button_takes_the_keyboard_focus(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |window, cx| {
+        let element = Button::new("play")
+            .label("Play")
+            .on_click(|_, _, _| {})
+            .render(window, cx)
+            .into_element();
+        snapshot("clickable-button", &element)
+    });
+    let lines = rendered(&lines, "clickable-button");
+    assert!(
+        lines.iter().any(|line| line.contains("focus=true")),
+        "clickable button is no Tab stop, keyboard users cannot reach it: {lines:?}"
+    );
+}
+
+#[gpui::test]
 async fn icon_only_button_names_itself_from_tooltip(cx: &mut TestAppContext) {
     let lines = open_probe(cx, |window, cx| {
         let element = Button::new("play")

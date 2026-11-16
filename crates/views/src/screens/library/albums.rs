@@ -352,7 +352,7 @@ impl TableSource for AlbumSource {
         }
 
         match cell.field {
-            AlbumField::Cover => cells::artwork(&cell, album.cover.clone()),
+            AlbumField::Cover => cells::artwork(&cell, album.cover.clone(), album.name.clone()),
             AlbumField::Name => cells::name(
                 &cell,
                 album.name.clone(),

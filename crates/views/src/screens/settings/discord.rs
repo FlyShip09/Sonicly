@@ -1,22 +1,26 @@
 use gpui::prelude::*;
-use gpui::{AnyElement, App, Context};
+use gpui::{AnyElement, App, Context, div};
 use i18n::t;
 use state::{DiscordName, Sonicly};
 use ui::{Button, MenuItem, Picker, Switch, TabBar};
 
+use super::rows::Row;
 use super::{Group, SettingsView, Slot};
 
 const DISCORD_NAME: &str = "discord-name";
 
 impl SettingsView {
     /// The Discord page. While the status is off only the master switch and the local files
-    /// row stand, since the rest shapes a status nobody sees.
+    /// row stand, since the rest shapes a status nobody sees. A build with no Discord application
+    /// has no status at all, so the page is one row saying so.
     pub(super) fn discord_groups(&self, cx: &App) -> Vec<Group> {
         let settings = self.settings.read(cx);
-        // without an application id there is no status, so only the switch stands, disabled
         let available = state::DISCORD_APPLICATION_ID.is_some();
         let mut groups = vec![Group::untitled().rows([Slot::Discord])];
-        if available && settings.discord_presence() {
+        if !available {
+            return groups;
+        }
+        if settings.discord_presence() {
             // the choice only means something while Spotify is signed in and listed as a device
             let connect = settings.spotify_connect()
                 && Sonicly::global(cx).devices.read(cx).supported()
@@ -44,14 +48,18 @@ impl SettingsView {
     }
 
     pub(super) fn discord_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let available = state::DISCORD_APPLICATION_ID.is_some();
-        let on = available && self.settings.read(cx).discord_presence();
+        if state::DISCORD_APPLICATION_ID.is_none() {
+            return Row::new(t!("settings-discord"), div().into_any_element())
+                .detail(t!("settings-discord-unavailable"))
+                .disabled(true)
+                .into_any_element();
+        }
+        let on = self.settings.read(cx).discord_presence();
 
         self.row(
             t!("settings-discord"),
             Switch::new("discord", on)
                 .name(t!("settings-discord"))
-                .disabled(!available)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.settings
                         .update(cx, |settings, cx| settings.set_discord_presence(!on, cx));

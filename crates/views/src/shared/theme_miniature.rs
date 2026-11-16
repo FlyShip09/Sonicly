@@ -24,23 +24,25 @@ const BAR: f32 = 0.2;
 const ACTIVE_BAR: f32 = 0.4;
 const ACCENT: f32 = 0.9;
 
-/// The sidebar's width. It runs the full height, so it alone carries the left corners.
+/// The sidebar's width, the title bar's height and the player bar's height. The title bar and the
+/// sidebar are one surface, the frame, which the page is set into.
 const SIDEBAR: f32 = 38.;
+const TITLE: f32 = 8.;
+const PLAYER: f32 = 14.;
 /// The columns a cut between two palettes may run down: the sidebar's edge and the middle of
 /// each gap between two tiles, so a cut never splits a tile or the play button.
 const SEAMS: [f32; 3] = [SIDEBAR, 76., 110.];
 /// How far a slice runs on under the slice after it.
 const SEAM_OVERLAP: f32 = 1.;
-/// The sidebar's entries and the content's heading, as left, top, width and height.
-const ENTRIES: [[f32; 4]; 3] = [[8., 14., 22., 5.], [8., 25., 16., 5.], [8., 36., 19., 5.]];
-const HEADING: [f32; 4] = [45., 14., 34., 5.];
+/// The sidebar's entries and the page's heading, as left, top, width and height.
+const ENTRIES: [[f32; 4]; 3] = [[8., 16., 22., 5.], [8., 27., 16., 5.], [8., 38., 19., 5.]];
+const HEADING: [f32; 4] = [45., 16., 34., 5.];
 /// The row of tiles under the heading by their left edges, the first one in the accent.
 const TILES: [f32; 3] = [45., 79., 113.];
-const TILE_TOP: f32 = 27.;
+const TILE_TOP: f32 = 28.;
 const TILE: f32 = 28.;
-/// The player floating at the foot of the content, and its play button.
-const PLAYER: [f32; 4] = [45., 66., 96., 14.];
-const PLAY: [f32; 4] = [50., 70., 6., 6.];
+/// The play button in the player bar, kept just left of the middle seam.
+const PLAY: [f32; 4] = [68., 84., 6., 6.];
 
 /// The size of the card that holds a miniature drawn at `scale`, its border included. At a scale
 /// of 1 it is `CARD` by `THUMB`.
@@ -70,10 +72,9 @@ pub(crate) fn sliced(palettes: &[Theme], radius: Pixels, scale: f32) -> Div {
         .chain(std::iter::once(WIDTH))
         .collect();
     let mark = (radius * RADIUS_SCALE * scale).floor();
-    // the card does not clip to its corners, so the miniature rounds its own inside the border
-    let outer = (radius - EDGE)
-        .max(Pixels::ZERO)
-        .min(px(SIDEBAR * scale / 2.));
+    // the card does not clip to its corners, so the miniature rounds its own inside the border,
+    // no further than the title bar reaches, past which the page's square corner would show
+    let outer = (radius - EDGE).max(Pixels::ZERO).min(px(TITLE * scale));
 
     div().relative().size_full().children(
         palettes
@@ -95,15 +96,18 @@ pub(crate) fn sliced(palettes: &[Theme], radius: Pixels, scale: f32) -> Div {
     )
 }
 
-/// The Sonicly window in `palette`'s colours as a few soft, flat shapes, `WIDTH` by `HEIGHT`
-/// pixels times `scale`: the sidebar with three entries, a heading over a row of tiles, the first
-/// in the accent, and a floating player with its play button. Nothing is outlined. The window
-/// and the sidebar round the outer corners by `outer`, and `mark` rounds the tiles.
+/// The Sonicly window in `palette`'s colours as a few flat shapes, `WIDTH` by `HEIGHT` pixels
+/// times `scale`, laid out as the window is: the frame (title bar and sidebar, one surface) with
+/// three sidebar entries, the page set into it under one hairline along the sides it shares with
+/// the frame, holding a heading over a row of tiles with the first in the accent, and the player
+/// bar across the foot with its play button. The window rounds its outer corners by `outer`, and
+/// `mark` rounds the tiles.
 fn miniature(palette: &Theme, outer: Pixels, mark: Pixels, scale: f32) -> Div {
-    let panel = match palette.sidebar == palette.background {
+    let frame = match palette.sidebar == palette.background {
         true => palette.secondary,
         false => palette.sidebar,
     };
+    let foot = HEIGHT - PLAYER;
     let bar = |shape: [f32; 4], strength: f32| {
         rect(shape, scale)
             .rounded_full()
@@ -116,11 +120,13 @@ fn miniature(palette: &Theme, outer: Pixels, mark: Pixels, scale: f32) -> Div {
         .w(px(WIDTH * scale))
         .h(px(HEIGHT * scale))
         .rounded(outer)
-        .bg(palette.background)
+        .bg(frame)
         .child(
-            rect([0., 0., SIDEBAR, HEIGHT], scale)
-                .rounded_l(outer)
-                .bg(panel),
+            rect([SIDEBAR, TITLE, WIDTH - SIDEBAR, foot - TITLE], scale)
+                .border_t_1()
+                .border_l_1()
+                .border_color(palette.sidebar_border)
+                .bg(palette.background),
         )
         .children(ENTRIES.into_iter().enumerate().map(|(index, entry)| {
             bar(
@@ -141,7 +147,13 @@ fn miniature(palette: &Theme, outer: Pixels, mark: Pixels, scale: f32) -> Div {
                 .rounded(mark)
                 .bg(fill)
         }))
-        .child(rect(PLAYER, scale).rounded_full().bg(panel))
+        .child(
+            rect([0., foot, WIDTH, PLAYER], scale)
+                .rounded_b(outer)
+                .border_t_1()
+                .border_color(palette.border)
+                .bg(palette.secondary),
+        )
         .child(rect(PLAY, scale).rounded_full().bg(palette.primary))
 }
 

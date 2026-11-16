@@ -6,7 +6,8 @@
 //!
 //! - `--debug-screen=<what>` opens on a page or lays something over it. A page is a screen id
 //!   (`home`, `search`, `history`, `songs`, `albums`, `artists`, `playlists`),
-//!   `settings:<page>` (`settings:lyrics`), or `album:<id>`, `artist:<id>` and `playlist:<id>`.
+//!   `settings:<page>` (`settings:lyrics`), `equalizer`, or `album:<id>`, `artist:<id>` and
+//!   `playlist:<id>`.
 //!   `now-playing` opens the fullscreen view and `lyrics` opens it on its lyrics panel.
 //!   `powerbar` opens the quick search, and `menu`, `album`, `artist` and `playlist` without an
 //!   id open a context menu or the first of that kind Home lists.
@@ -255,6 +256,7 @@ fn destination(what: &str) -> Option<Destination> {
         "settings" => Some(Destination::Settings(
             SettingsPage::from_id(&id).unwrap_or(SettingsPage::General),
         )),
+        "equalizer" => Some(Destination::Equalizer),
         "album" | "artist" | "playlist" if id.is_empty() => None,
         "album" => Some(Destination::Album(id)),
         "artist" => Some(Destination::Artist(id)),

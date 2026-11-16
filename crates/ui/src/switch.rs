@@ -157,7 +157,7 @@ impl RenderOnce for Switch {
 
         switch.style().refine(&overrides);
         if !disabled && let Some(handler) = on_click {
-            switch = switch.on_click(handler);
+            switch = crate::button::keyboard_control(switch, cx).on_click(handler);
         }
 
         let (switch, level) = match disabled {

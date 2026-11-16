@@ -576,7 +576,10 @@ impl Session {
             })
             .map(|(_, provider)| provider.slug());
 
-        if next.is_none() && guest.is_none() {
+        // Nothing stored anywhere is a first run (or a sign-out), which the welcome screen
+        // answers with its three ways in rather than a guest session nobody asked for.
+        let first_run = error.is_none() && !provider.stored() && next.is_none();
+        if first_run || (guest.is_none() && next.is_none()) {
             match error {
                 Some(error) => self.failed(error, cx),
                 None => {
@@ -1228,6 +1231,15 @@ impl Session {
     /// Whether a local scan is under way right now.
     pub fn scanning(&self) -> bool {
         self.scanning
+    }
+
+    /// Whether the app runs on local files alone: no account is signed in, and a music folder
+    /// is set or its first scan is under way. The workspace stands in for the welcome screen.
+    pub fn local_only(&self) -> bool {
+        matches!(
+            self.state,
+            SessionState::SignedOut | SessionState::Failed(_)
+        ) && (!self.local_folders.is_empty() || self.scanning)
     }
 
     fn local_signed_in(&mut self, session: ProviderSession, cx: &mut Context<Self>) {

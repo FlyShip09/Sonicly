@@ -168,7 +168,7 @@ impl RenderOnce for Checkbox {
 
         checkbox.style().refine(&overrides);
         if !disabled && let Some(handler) = on_click {
-            checkbox = checkbox.on_click(handler);
+            checkbox = crate::button::keyboard_control(checkbox, cx).on_click(handler);
         }
         checkbox
     }

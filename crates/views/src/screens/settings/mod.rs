@@ -418,7 +418,6 @@ impl SettingsView {
         let search = cx.new(|cx| {
             Input::new("settings-search", cx)
                 .icon("icons/search.svg")
-                .blurred()
                 .clearable()
         });
         let filter =
@@ -677,6 +676,15 @@ impl SettingsView {
 
     /// What a page shows between its title and its groups, built only while visible.
     fn header(&self, page: SettingsPage, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // The account card waits on a sign-in with placeholders, and with no account to wait
+        // on, as on local files alone, it stays away rather than loading forever.
+        let account = matches!(
+            self.session.read(cx).state(),
+            SessionState::SignedIn(_) | SessionState::Restoring | SessionState::Authorizing(_)
+        );
+        if page == SettingsPage::Providers && !account {
+            return None;
+        }
         match page {
             SettingsPage::Providers | SettingsPage::About => Some(
                 self.lazy((page.id(), 0_usize), cx, move |this, _, cx| match page {
@@ -704,13 +712,14 @@ impl SettingsView {
 
     /// The live preview above a page's first group, built and animated only while visible.
     fn preview(&self, page: SettingsPage, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !matches!(
-            page,
-            SettingsPage::NowPlaying
-                | SettingsPage::Lyrics
-                | SettingsPage::Sound
-                | SettingsPage::Discord
-        ) {
+        // a build with no Discord application shows no status, so it previews none either
+        let discord = page == SettingsPage::Discord && state::DISCORD_APPLICATION_ID.is_some();
+        if !discord
+            && !matches!(
+                page,
+                SettingsPage::NowPlaying | SettingsPage::Lyrics | SettingsPage::Sound
+            )
+        {
             return None;
         }
         let view = cx.entity();
