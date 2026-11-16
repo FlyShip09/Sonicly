@@ -244,6 +244,7 @@ impl Shelves {
             .flex()
             .flex_col()
             .gap_3()
+            .group(SHELF_GROUP)
             .child(
                 div()
                     .flex()
@@ -258,7 +259,7 @@ impl Shelves {
                         cx,
                     ))
                     .when(crowded, |this| {
-                        this.child(self.arrows(place, &handle, &glide, me))
+                        this.child(on_shelf_hover(self.arrows(place, &handle, &glide, me)))
                     }),
             )
             .child(Hold::new(
@@ -540,6 +541,7 @@ impl Rail {
             .flex_col()
             .mx(-inset)
             .gap_3()
+            .group(SHELF_GROUP)
             .child(
                 div()
                     .flex()
@@ -553,7 +555,7 @@ impl Rail {
                         title,
                         cx,
                     ))
-                    .children(arrows),
+                    .children(arrows.map(on_shelf_hover)),
             )
             .children(tabs.map(|tabs| div().px(inset).child(tabs)))
             .child(Hold::new(
@@ -722,6 +724,20 @@ fn slot(kind: &'static str, place: usize) -> ElementId {
 /// trackpad scrolls the rail itself and a vertical notch belongs to the page.
 fn sideways(event: &ScrollWheelEvent) -> bool {
     !event.delta.precise() && event.delta.pixel_delta(px(1.)).x != Pixels::ZERO
+}
+
+/// The group a shelf's heading and cards share, so its paging arrows show while the pointer is
+/// anywhere over the shelf and stay out of the way otherwise.
+pub(crate) const SHELF_GROUP: &str = "shelf";
+
+/// Paging arrows that show only while the pointer is over their shelf, as a desktop app keeps
+/// a row's secondary controls until they are wanted.
+pub(crate) fn on_shelf_hover(arrows: impl IntoElement) -> Div {
+    div()
+        .flex_none()
+        .invisible()
+        .group_hover(SHELF_GROUP, |style| style.visible())
+        .child(arrows)
 }
 
 /// A shelf or rail title as a level two heading, so screen readers can jump from one shelf to
