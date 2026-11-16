@@ -190,7 +190,9 @@ Working set of the debug build as `scripts/shot.ps1` prints it.
 | Process start to first window | 716 ms |
 | Home at 1080x1080 after 8 s, YouTube Music guest | 145 MB working set, 150 MB private, 0.9 s CPU |
 
-One run each, not an average.
+One run each, not an average. Those figures are from the build before the M9 look. Rebuilt
+from the final branch: the portable zip is 30.5 MB, and a first run (the welcome screen) shows
+its window 602 ms after start at 111 MB working set, 91 MB private.
 
 ### A 10,000-track library (debug build)
 
@@ -217,8 +219,9 @@ no input, so frame times at 60 or 120 Hz are still unknown.
   scrolling. Captures take no input.
 - The frame's Mica material on an active window: captures show the inactive flat fallback.
 - User theme files over the new structure.
-- The Windows installer: its script is reviewed but Inno Setup is not installed, so it has
-  never been compiled. Nothing is code-signed.
+- The Windows installer compiles (`Sonicly-0.1.0-windows-x64-setup.exe`, 23.4 MB) but has
+  never been run: installing it is the owner's to try. Nothing is code-signed, so SmartScreen
+  will warn.
 - Scrolling frame times, and the fix for playlists that name a cue-split file (unit test
   written, not run; `cargo test` is run only when the owner asks).
 

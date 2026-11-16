@@ -45,7 +45,7 @@ Read this first in a new session.
 - **Next:** the owner's pass over streaming, sign-in (Apple Music first) and a
   yt-dlp download; then the motion items listed as not done in `docs/REPORT.md`.
 - **Waiting on the owner:** Discord application id, Inter Display (a download),
-  Inno Setup for the installer, review of the open pull request.
+  a try of the installer, review of the open pull request.
 - **House rules:** never open tryliner/desktop; no DRM circumvention; no
   credentials in chat or files; windows open only through `scripts/shot.ps1`
   (off-screen, unfocused, `--debug-mute` when something plays); the owner
@@ -76,8 +76,9 @@ powershell -ExecutionPolicy Bypass -File scripts/shot.ps1 -Exe target/release/so
   subsystem, Sonicly icon, version resource 0.1.0), the zip 30.1 MB. Home at
   1080x1080 after 8 s, YouTube Music guest: 145 MB working set, 150 MB private,
   0.9 s CPU, first window 716 ms after process start. One run, not an average.
-- **Not built:** the installer (Inno Setup is not installed, and installing it
-  is the owner's call), any macOS or Linux package, an arm64 build. Nothing is
+- **Built from the final branch on 2026-11-16:** the portable zip (30.5 MB) and
+  the installer (23.4 MB, compiled with the owner's Inno Setup 6, never run).
+- **Not built:** any macOS or Linux package, an arm64 build. Nothing is
   code-signed, so SmartScreen will warn on first run.
 - **Not seen:** the star rows and switch under Settings, About; the star button
   in a narrow window; a settings migration on a real file (there is no step

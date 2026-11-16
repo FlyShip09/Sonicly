@@ -39,7 +39,7 @@ running Sonicly.
 | App | `settings.json` version and migration | Upstream had atomic saves, a backup and broken-file protection but no version; version and steps built, unit tested, no step exists yet |
 | Release | Third-party notices (`THIRD-PARTY.md`) | Generated with cargo-about 0.9.3 for Sonicly's own tree: 14 licences, 866 crates |
 | Release | Windows release build, portable zip | Built and launched off-screen on Windows x64; `scripts/windows/package-portable.ps1` |
-| Release | Windows installer (Inno Setup) | Script reviewed for Sonicly's name, id, scheme and licence path; never compiled, Inno Setup is not installed |
+| Release | Windows installer (Inno Setup) | Compiles with Inno Setup 6 (23.4 MB); never run |
 | Release | macOS bundle, Linux packages | Not built. `assets/macos/Info.plist` is Sonicly's; there are no `flatpak/`, `aur/` or `nix/` files in the tree |
 | UI | Lyrics page styling (background, typeface, spacing, emphasis, saved looks) | Not in upstream; built, seen on Windows, the settings page again in the merged build |
 | UI | Lyrics video background | Windows only (Media Foundation). Hidden on macOS and Linux, which have no decoder in Sonicly yet |
