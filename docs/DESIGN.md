@@ -365,3 +365,77 @@ Newest last. One entry per decision: what was chosen, and why.
     worth a later look: the Now playing preview animates its visualizer while nothing
     plays, and the player bar menu still offers to start or join a session when no
     server is saved.
+37. **A calm desktop look, after macOS's own apps (M9).** The owner asked for a clean UI
+    "like macOS". It is built from Sonicly's tokens, Inter and its own icons; no Apple asset,
+    icon or font is used or named. Supersedes 18 and the bold rule of 20, keeps 19, 21, 22 and
+    33. Captures before and after, dark and light, are in `docs/screenshots/m9/`.
+    - **Surfaces.** The built-in dark page is a soft charcoal (`#1e1e1e`, was near-black
+      `#0a0a0a`) in a frame a step lighter (`#262626`); light is a white page in a pale grey frame
+      (`#ebebeb`). Text comes in three steps of the page's opposite: about 85% for primary
+      (`#dedede` / `#262626`, never pure white on dark), 55% for secondary (`muted_foreground`),
+      and that at the existing faded strength, about 25%, for what is disabled. Every rule is a
+      10% hairline of white or black (`border`, `sidebar_border`, `title_bar_border`); a row's own
+      hairline is lighter still. Hover fills are veils (5% for a row, 8% for a control) rather than
+      greys. Only the two built-in palettes changed; theme files and the adaptive tint work as
+      before, since every token kept its name.
+    - **Structure.** The sidebar is one full-height column on the frame's material (Mica on
+      Windows 11, solid elsewhere), and the page's surface runs up under the title bar from the
+      sidebar's edge, so the bar reads as the top of the page. The rule under the bar is gone; the
+      hairline along the sidebar runs the window's full height, title bar and player strip
+      included. Over the sidebar sits only its toggle; the history arrows start where the page
+      does. Every icon button in the bar is one size, and the screen's own controls stand apart
+      from the account group by room, not by a rule. Windows' caption buttons and the round
+      window buttons option are unchanged.
+    - **Sidebar.** A source list: 28 px rows (`Metrics::nav_row`), 16 px icons, 6 px corners, one
+      neutral highlight (`sidebar_accent`) under the current page that glides between rows, and
+      semibold secondary section headings in sentence case.
+    - **Type.** The default text size is 13 px, a desktop app's body size (was 14). A settings file
+      that still holds the old default moves with it through the first `settings.json` step; any
+      other size was a choice and stays. Page titles and the names an album, artist or genre page
+      is about are bold with slightly tight tracking (`Text::tracking`: -0.016 em for a title,
+      -0.022 em for a display name); section headings stay semibold.
+38. **Controls and lists.** Raised surfaces wear one soft shadow (`ui::lifted`: 8 px drop, 24 px
+    blur, the theme's overlay at 50% on dark and 26% on light) in place of the mixed
+    `shadow_md`/`shadow_lg`: menus, the dropdown, dialogs, toasts, the notice card, quick search
+    and the player bar. Menus and the dropdown round to about 10 px (`ui::rim`), dialogs and
+    sheets keep 12 px. The switch has a white knob with its own small shadow in both states (a
+    near-white track on the neutral dark theme keeps a dark knob). A segmented control is a
+    track whose one raised highlight slides to the chosen segment; a capped, scrolling bar keeps
+    its per-segment fill, since a highlight outside the scroller would not clip. Focus rings take
+    the theme's one accent (`primary`, which the adaptive tint colours from the cover) instead of
+    grey; no second accent was added. Table rows draw their hairline and their hover, selection
+    and playing fills inset 8 px and rounded, instead of stripes from edge to edge. A shelf's
+    paging arrows show only while the pointer is over the shelf. Each settings group's rows are
+    one grouped list: a rounded sheet with a hairline between rows, its option cards above it on
+    the page. Not done: a "see all" link on shelves, since most shelves have no page to open.
+39. **The player bar floats.** The bar stands 10 px in from the window's sides and bottom as one
+    rounded sheet (12 px, the dialog radius) with a hairline and the soft shadow. With the
+    translucent bar (the default) it is the same single frosted layer as before and pages scroll
+    beneath and around it; with it off, the strip around the bar continues the sidebar and the
+    page, edge included. All four layouts (classic, centered, compact, and stacked in a narrow
+    window) were captured (`after-bars.png`). Cost of the whole M9 pass, Home at 1080x1080 on
+    `.targets/media`, debug, one run each: 114 MB working set at 8 s before and after; CPU over
+    the 30 s from 12 s to 42 s 0.3 s before and 0.1 s after at idle, 0.6 s and 0.7 s with a song
+    playing (131 MB before, 126 MB after). The
+    fullscreen player's leave button now lands 10 px from the bar's button while the cover flies,
+    since the drop it shares with the bar cannot go negative.
+40. **Motion tokens added (M9).** All in `ui::motion`, all landing at once under reduced motion:
+    `Springs::GLIDE` (0.26 s, bounce 0.06) for a selection travelling to a new place, used by the
+    sidebar highlight and the segmented control; `Springs::POP` (0.4 s, bounce 0.55, one swing)
+    for a heart turning on, which bounces only when the swap follows a click on that same button
+    within 1.5 s, so a like made elsewhere swaps plainly; `Entrance::page` (180 ms at the
+    listener's pace) with `PAGE_SHIFT` (14 px), a page entering from the right after a forward
+    move and from the left after Back (`router::Step`); `HoverFade::leaving`, which lets a card's
+    play button rise 6 px and fade in over the quick span and leave over the shorter hover dim; and
+    a new track's title and artist rising 6 px into place in the player bar on `SWAP_IN`. Each
+    asks for frames only while it moves.
+41. **What was not animated, and why.** A level meter on the playing row: it would redraw the
+    main window every frame for as long as music plays, the one cost the bar and the table were
+    built to avoid; the row keeps its still glyph. Sidebar collapse: animating its width lays the
+    cached page out again every frame. A header collapsing into a compact sticky title, a seek bar
+    that grows on hover, titles that scroll on hover, and acknowledging a queue add were left for
+    later rather than half built. Keyboard moves through lists and every focus change stay
+    instant. Things that already existed and were kept as they are: press and hover on every
+    primitive, the seek bar's time bubble, the volume wheel, covers fading in over their
+    skeleton, shelves surfacing once, menus growing from their anchor, the cover flying into Now
+    Playing and the adaptive colour cross-fade.
