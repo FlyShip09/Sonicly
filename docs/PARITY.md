@@ -33,5 +33,6 @@ running Sonicly.
 | App | Auto-update | Disabled (no releases yet) |
 | App | Install counter | Removed |
 | UI | Lyrics page styling (image/video background, typeface) | Planned |
-| UI | Floating mini player | Planned |
-| UI | Drag files onto the window to import | Planned |
+| UI | Floating mini player | Built; seen on Windows in captures, macOS and Linux not run |
+| UI | Drag files onto the window to import | Built; drag-over state and question seen through debug launch flags, a real system drag not yet tried |
+| UI | Drawn covers for Favorites, Local Music, Recents | Built; seen in captures |
