@@ -336,6 +336,12 @@ impl Listening {
         self.saving.is_some()
     }
 
+    /// Whether a server is set for sessions to go through, without which starting or joining one
+    /// only says that a server is needed.
+    pub fn has_server(&self, cx: &App) -> bool {
+        self.server(cx).is_some()
+    }
+
     /// The server sessions go through: the one `SONICLY_SESSION_SERVER` names, else the
     /// listener's own when they gave an address that reads. Sonicly has no official server, so
     /// with neither there is none and nothing connects.
