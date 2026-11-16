@@ -7,8 +7,8 @@ use gpui::{Window, deferred, div};
 use input::WORKSPACE_CONTEXT;
 use state::{AppSettings, Playback, Queue, SideTab, Sonicly};
 use ui::{
-    Activate, ActiveTheme as _, Deselect, Entrance, Remove, SelectNext, SelectPrevious, entering,
-    shown_listing, veiled,
+    Activate, ActiveTheme as _, Deselect, Entrance, PAGE_SHIFT, Remove, SelectNext, SelectPrevious,
+    entering, shown_listing, veiled,
 };
 
 use crate::chrome::{
@@ -33,7 +33,8 @@ pub(crate) struct Workspace {
     /// not, since a cached view that redraws builds every view in it again, and it caches its
     /// own parts instead.
     cached: bool,
-    transition: Option<Entrance>,
+    /// The page entrance under way and the way it came: 1 forward, -1 back.
+    transition: Option<(Entrance, f32)>,
     focus: FocusHandle,
 }
 
@@ -104,14 +105,20 @@ impl Workspace {
         cx.notify();
     }
 
-    pub fn reveal_content(&mut self, cx: &mut Context<Self>) -> Duration {
+    /// Starts the entrance of the page just shown, sliding in a little from the side `step`
+    /// came from, and answers how long it runs.
+    pub fn reveal_content(&mut self, step: router::Step, cx: &mut Context<Self>) -> Duration {
         if cx.reduce_motion() {
             self.transition = None;
             return Duration::ZERO;
         }
 
-        let entrance = Entrance::start();
-        self.transition = Some(entrance);
+        let entrance = Entrance::page();
+        let side = match step {
+            router::Step::Forward => 1.,
+            router::Step::Back => -1.,
+        };
+        self.transition = Some((entrance, side));
         cx.notify();
         entrance.span()
     }
@@ -122,18 +129,19 @@ impl Workspace {
         }
     }
 
-    fn hidden(&mut self, window: &mut Window, cx: &Context<Self>) -> f32 {
+    /// How much of the entering page is still hidden, and which way it comes from.
+    fn hidden(&mut self, window: &mut Window, cx: &Context<Self>) -> (f32, f32) {
         if cx.reduce_motion() {
             self.transition = None;
-            return 0.;
+            return (0., 0.);
         }
-        let Some(transition) = self.transition else {
-            return 0.;
+        let Some((transition, side)) = self.transition else {
+            return (0., 0.);
         };
         if transition.running() {
             window.request_animation_frame();
         }
-        transition.hidden()
+        (transition.hidden(), side)
     }
 }
 
@@ -193,7 +201,8 @@ impl Render for Workspace {
                 .into_any_element(),
             false => header.into_any_element(),
         });
-        let hidden = self.hidden(window, cx);
+        let (hidden, side) = self.hidden(window, cx);
+        let shift = ui::snapped(PAGE_SHIFT * hidden * side, window);
         // The scrim is what fades the outgoing page: it is the page's own colour at
         // full strength, so covering the content with it costs no layout and the
         // content view keeps its cache. A see-through window has no such colour. The
@@ -308,8 +317,8 @@ impl Render for Workspace {
                                     .child(
                                         div()
                                             .absolute()
-                                            .left(-overlay_width)
-                                            .right_0()
+                                            .left(-overlay_width + shift)
+                                            .right(-shift)
                                             .top_0()
                                             .bottom_0()
                                             .flex()

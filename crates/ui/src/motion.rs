@@ -19,6 +19,12 @@ const BASE: Duration = Duration::from_millis(200);
 const SLOW: Duration = Duration::from_millis(320);
 
 const ENTRANCE_EXTRA: Duration = Duration::from_millis(50);
+/// How long a page takes to come in as the listener moves between pages: shorter than a shell's
+/// entrance, since it answers every click in the sidebar and never holds input back.
+const PAGE: Duration = Duration::from_millis(180);
+/// How far a page slides in from the side it came from, forward from the right and back from
+/// the left. Enough to say which way, never enough to read as a slide show.
+pub const PAGE_SHIFT: Pixels = px(14.);
 pub(crate) const ENTRANCE_BLUR: Pixels = px(1.5);
 pub(crate) const ENTRANCE_ZOOM: f32 = 0.01;
 /// How far a menu, popover or dialog is shrunk as it starts to open and once it has left. More
@@ -258,6 +264,14 @@ impl Entrance {
         Self {
             started: Instant::now(),
             span: entrance_span(),
+        }
+    }
+
+    /// The entrance of a page the listener moved to, on the shorter page span.
+    pub fn page() -> Self {
+        Self {
+            started: Instant::now(),
+            span: paced(PAGE),
         }
     }
 

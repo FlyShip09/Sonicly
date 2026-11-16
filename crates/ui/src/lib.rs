@@ -117,7 +117,7 @@ pub use menu::{MENU_CONTEXT, Menu, MenuItem, MenuSearch, SubmenuState, close_men
 pub use metrics::{LEADING, Metrics, Rounding, Text, snapped, tucked};
 pub use modal::{Modal, corners};
 pub use motion::{
-    Entrance, Fading, Glow, Glowed, Glowing, HoverFade, Motion, Motioned, PRESS_SCALE,
+    Entrance, Fading, Glow, Glowed, Glowing, HoverFade, Motion, Motioned, PAGE_SHIFT, PRESS_SCALE,
     PRESS_SCALE_CARD, Pace, Rising, Saver, Springs, Sprung, Stillness, css_ease, css_ease_out,
     dim_span, ease_in_out_cubic, ease_in_out_expo, ease_out_cubic, ease_out_expo, ease_out_quad,
     entering, entrance_span, glow_fill, glowing, mix, paced, pressing, spring, veiled,
