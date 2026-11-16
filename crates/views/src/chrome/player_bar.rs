@@ -11,7 +11,7 @@ use gpui::{
 };
 use gpui::{Window, deferred, div, px};
 use i18n::t;
-use input::{ShowMembers, ToggleFullscreen, ToggleLyrics, ToggleQueue};
+use input::{ShowMembers, ToggleFullscreen, ToggleLyrics, ToggleMiniPlayer, ToggleQueue};
 use state::{AppSettings, Playback, PlayerBarLayout, Queue, SideTab, Sonicly};
 use ui::{
     Artwork, Badge, Button, Flight, InlineLink, InlineLinks, Perch, Pinnable, Popup, Room,
@@ -291,6 +291,16 @@ impl PlayerBar {
         }
     }
 
+    /// The button that opens the mini player and hands the main window to the taskbar.
+    fn mini_button() -> Button {
+        Button::new("open-mini-player")
+            .ghost()
+            .small()
+            .icon("icons/minimize.svg")
+            .tooltip_above("player-mini")
+            .on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleMiniPlayer), cx))
+    }
+
     fn now_playing(
         &self,
         room: bool,
@@ -504,9 +514,9 @@ impl PlayerBar {
         let button = px(ICON_BUTTON);
         let row = window.viewport_size().width - rem * (BAR_PAD + COLUMN_GAP) * 2.;
         let tools = button * tools as f32 + rem * TOOL_GAP * tools.saturating_sub(1) as f32;
-        // The right side without its slider: the buttons, the mute and fullscreen buttons and
-        // the gaps between them.
-        let rising = tools + button * 2. + rem * SIDE_GAP * 2.;
+        // The right side without its slider: the buttons, the mute, mini player and fullscreen
+        // buttons and the gaps between them.
+        let rising = tools + button * 3. + rem * SIDE_GAP * 3.;
         let around = rising + rem * VOLUME_GAP;
         let keep = (row / 3.).max(px(SEEK_KEEP)).min(px(SEEK_MAX));
         let slider = (row - keep) / 2. - around;
@@ -580,7 +590,7 @@ impl Render for PlayerBar {
         let transparent = self.settings.read(cx).player_bar_translucent();
         let height = Self::height(window, cx);
         // Equal wings keep the title centered while reserving the original volume slider width.
-        let centered_wing = theme.metrics.control * 4. + px(VOLUME_WIDTH) + theme.metrics.pad * 3.;
+        let centered_wing = theme.metrics.control * 5. + px(VOLUME_WIDTH) + theme.metrics.pad * 4.;
         let show_track = span.fits(Room::Snug);
         let sides = match SidebarRight::available(window) {
             true => Some(self.side_buttons(cx)),
@@ -664,6 +674,7 @@ impl Render for PlayerBar {
                         .child(div().flex_1().min_w_0().child(seek))
                         .child(buttons)
                         .child(self.sound(Volume::Slider(Self::volume_width(window)), cx))
+                        .child(Self::mini_button())
                         .child(self.fullscreen_button(cx)),
                 ),
             (false, PlayerBarLayout::Centered) => base
@@ -704,6 +715,7 @@ impl Render for PlayerBar {
                         .gap_2()
                         .child(buttons)
                         .child(self.sound(Volume::Slider(px(VOLUME_WIDTH)), cx))
+                        .child(Self::mini_button())
                         .child(self.fullscreen_button(cx)),
                 ),
             (false, PlayerBarLayout::Compact) => base
@@ -717,6 +729,7 @@ impl Render for PlayerBar {
                 .child(div().flex_1().min_w_0().child(seek))
                 .child(buttons)
                 .child(self.sound(Volume::Slider(px(VOLUME_WIDTH)), cx))
+                .child(Self::mini_button())
                 .child(self.fullscreen_button(cx)),
             // The two sides share what the middle leaves them evenly, so the transport and the
             // seek bar stay centred. `classic` works out how wide the middle is and how the
@@ -747,6 +760,7 @@ impl Render for PlayerBar {
                             .gap_2()
                             .child(buttons)
                             .child(self.sound(volume, cx))
+                            .child(Self::mini_button())
                             .child(self.fullscreen_button(cx)),
                     )
             }

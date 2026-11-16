@@ -70,6 +70,7 @@ enum Slot {
     LocalFolder,
     SubsonicLibrary,
     Folders,
+    DroppedFiles,
     Theme,
     Adaptive,
     Icons,
@@ -742,6 +743,10 @@ impl SettingsView {
     fn slot_meta(&self, slot: Slot, cx: &App) -> Option<(SharedString, SharedString)> {
         let meta = match slot {
             Slot::Folders => return None,
+            Slot::DroppedFiles => (
+                t!("settings-dropped-files"),
+                t!("settings-dropped-files-detail"),
+            ),
             Slot::Startup => (t!("settings-startup"), t!("settings-startup-detail")),
             Slot::Provider => (t!("settings-provider"), t!("settings-provider-detail")),
             Slot::Entries => (t!("settings-entries"), t!("settings-entries-detail")),
@@ -1043,6 +1048,7 @@ impl SettingsView {
             Slot::LocalFolder => self.local_folder_row(cx),
             Slot::SubsonicLibrary => self.subsonic_library_row(cx),
             Slot::Folders => self.folders(cx),
+            Slot::DroppedFiles => self.dropped_files_row(cx),
             Slot::Theme | Slot::Icons | Slot::Corners => div().into_any_element(),
             Slot::Adaptive => self.adaptive_row(cx),
             Slot::Ambient => self.ambient_row(cx),

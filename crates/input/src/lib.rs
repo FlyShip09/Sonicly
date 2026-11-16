@@ -43,6 +43,8 @@ actions!(
         OpenPlaylists,
         ToggleSidebar,
         ToggleFullscreen,
+        ToggleMiniPlayer,
+        LeaveMiniPlayer,
         ToggleQueue,
         ToggleLyrics,
         TogglePowerbar,

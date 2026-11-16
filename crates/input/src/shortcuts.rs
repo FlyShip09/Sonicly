@@ -11,9 +11,9 @@ use crate::{
     DecreaseFontSize, DownloadFromLink, IncreaseFontSize, NavigateBack, NavigateForward,
     OpenAlbums, OpenArtists, OpenFilter, OpenHome, OpenPlaylists, OpenSearch, OpenSettings,
     OpenSongs, POWERBAR_CONTEXT, Refresh, ResetFontSize, SEARCH_CONTEXT, SeekBack, SeekForward,
-    SongNext, SongPrevious, ToggleFullscreen, ToggleLyrics, TogglePlayback, TogglePowerbar,
-    ToggleQueue, ToggleRepeat, ToggleShuffle, ToggleSidebar, ToggleWindowFullscreen, VolumeDown,
-    VolumeUp, WORKSPACE_CONTEXT,
+    SongNext, SongPrevious, ToggleFullscreen, ToggleLyrics, ToggleMiniPlayer, TogglePlayback,
+    TogglePowerbar, ToggleQueue, ToggleRepeat, ToggleShuffle, ToggleSidebar,
+    ToggleWindowFullscreen, VolumeDown, VolumeUp, WORKSPACE_CONTEXT,
 };
 
 /// The modifiers that make a keystroke a command rather than typing. A key pressed without any
@@ -324,6 +324,16 @@ const SHORTCUTS: &[Shortcut] = &[
         bind: bind::<ToggleFullscreen>,
         defaults: &["f"],
         mac: &[],
+    },
+    // Heard in the mini player's window too, where it returns to the main one.
+    Shortcut {
+        id: "toggle-mini-player",
+        key: "keybind-toggle-mini-player",
+        section: Section::View,
+        scope: Scope::Anywhere,
+        bind: bind::<ToggleMiniPlayer>,
+        defaults: &["ctrl-shift-m"],
+        mac: &["cmd-shift-m"],
     },
     Shortcut {
         id: "toggle-sidebar",

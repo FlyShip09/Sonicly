@@ -8,6 +8,7 @@ mod discord;
 pub use discord::APPLICATION_ID as DISCORD_APPLICATION_ID;
 mod downloads;
 mod equalizer;
+mod file_drop;
 mod genre;
 mod history;
 mod home;
@@ -54,6 +55,7 @@ pub use downloads::{
     Active, Downloads, DownloadsChanged, Pending, Progress, Remaining, Subject, downloaded,
 };
 pub use equalizer::{DeviceRule, Equalizer, RuleDevice, Sound};
+pub use file_drop::{Ask, DropTarget, FileDrop, Survey};
 pub use genre::{GenreDetails, Genres};
 pub use history::{History, HistoryState};
 pub use home::Home;
@@ -66,6 +68,7 @@ pub use links::{Links, Opened};
 pub use listening::{CODE_LENGTH as SESSION_CODE_LENGTH, Listening, Member as RoomMember, Room};
 pub use logging::log_file;
 pub use lyrics::{Lyrics, LyricsState};
+pub use mosaic::{Generated, SWATCHES, Swatches};
 pub use music::connect::{Elsewhere, Repeat};
 pub use network::{Network, Reconnected};
 pub use outputs::Outputs;
@@ -87,8 +90,9 @@ pub use search::{AlbumHit, ArtistHit, Hit, Kind, PlaylistHit, Search};
 pub use session::{Failure, ProviderInfo, Session, SessionEvent, SessionState};
 pub use settings::{
     AppSettings, ConnectName, DiscordName, FilterValue, FullscreenControlsAutohide, LYRICS_SOURCES,
-    PlayerBarLayout, Reloaded, RomanizationScripts, SYSTEM_FONT, SideTab, ThemeFamily, ThemeOffer,
-    ThemeVariant, VisualizerScreens, equalizer_profile_label, remember_window, window_placement,
+    Placement, PlayerBarLayout, Reloaded, RomanizationScripts, SYSTEM_FONT, SideTab, ThemeFamily,
+    ThemeOffer, ThemeVariant, VisualizerScreens, equalizer_profile_label, mini_player_placement,
+    remember_mini_player, remember_window, window_placement,
 };
 pub use signal::{Change, Equalizing, FLOAT_BITS, Following, Signal, SignalPath};
 pub use song::SongDetail;

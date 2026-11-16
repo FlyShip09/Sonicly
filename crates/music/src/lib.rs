@@ -1180,6 +1180,12 @@ pub trait MusicProvider: Send + Sync {
     fn track_from_path(&self, _path: &Path) -> Option<Track> {
         None
     }
+    /// Whether the file at `path` is one the provider plays, judged by its name alone so a
+    /// whole folder can be counted without opening a file. Always false for a provider whose
+    /// tracks are not files.
+    fn plays_file(&self, _path: &Path) -> bool {
+        false
+    }
     fn sign_in_options(&self) -> Vec<SignIn>;
     fn stored(&self) -> bool;
     /// Whether what is stored is an anonymous session rather than an account, so a caller

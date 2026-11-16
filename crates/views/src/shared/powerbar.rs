@@ -6,10 +6,10 @@ use gpui::{
     point, px,
 };
 use i18n::t;
-use input::{POWERBAR_CONTEXT, PowerbarDetails};
+use input::{POWERBAR_CONTEXT, PowerbarDetails, ToggleMiniPlayer};
 use music::ytdlp;
 use router::{Destination, navigate};
-use state::{Hit, Origin, Playback, Search};
+use state::{Hit, Origin, Playback, Search, Sonicly};
 use ui::{
     ActiveTheme as _, Button, Card, Cascade, Dismiss, Input, Kbd, SelectNext, SelectPrevious,
     Spinner, Sprung, Submit, Text, Unfold, blurring, corners, effects, eyebrow, popover_fill,
@@ -58,6 +58,8 @@ pub(crate) struct Powerbar {
     search: Entity<Search>,
     playback: Entity<Playback>,
     playback_status: PlaybackStatus,
+    /// The app commands the query names, listed above the results.
+    commands: Vec<Command>,
     hits: Vec<Hit>,
     cursor: Cursor,
     restore: Option<FocusHandle>,
@@ -80,6 +82,65 @@ enum Cursor {
     On(usize),
     /// Off the list and in the field, where Enter opens the search page for what is typed.
     Field,
+}
+
+/// An app command the quick search lists above its results when the query names it, so a
+/// window action is reachable from the keyboard without remembering its shortcut.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Command {
+    MiniPlayer,
+}
+
+impl Command {
+    const ALL: [Self; 1] = [Self::MiniPlayer];
+
+    fn key(self) -> &'static str {
+        match self {
+            Self::MiniPlayer => "powerbar-command-mini-player",
+        }
+    }
+
+    /// The id of the shortcut that does the same, whose keys the row shows.
+    fn shortcut(self) -> &'static str {
+        match self {
+            Self::MiniPlayer => "toggle-mini-player",
+        }
+    }
+
+    fn icon(self) -> &'static str {
+        match self {
+            Self::MiniPlayer => "icons/minimize.svg",
+        }
+    }
+
+    fn run(self, window: &mut Window, cx: &mut App) {
+        match self {
+            Self::MiniPlayer => window.dispatch_action(Box::new(ToggleMiniPlayer), cx),
+        }
+    }
+
+    /// The commands whose name holds `query`, in the language shown. A query of one letter
+    /// names too much to be worth a row.
+    fn named(query: &str) -> Vec<Self> {
+        let query = query.trim().to_lowercase();
+        if query.chars().count() < 2 {
+            return Vec::new();
+        }
+        Self::ALL
+            .into_iter()
+            .filter(|command| {
+                i18n::lookup(command.key(), None)
+                    .to_lowercase()
+                    .contains(&query)
+            })
+            .collect()
+    }
+}
+
+/// What the keyboard cursor rests on: a command or a result.
+enum Entry {
+    Command(Command),
+    Hit(Hit),
 }
 
 /// What the quick search asks of the window around it.
@@ -160,6 +221,7 @@ impl Powerbar {
                     search,
                     playback,
                     playback_status: current_status,
+                    commands: Vec::new(),
                     hits: Vec::new(),
                     cursor: Cursor::First,
                     restore: None,
@@ -196,6 +258,7 @@ impl Powerbar {
         // Results from the last time stay only for the lift away. Search may have been reset
         // since, sign-outs included, and an empty query does not notify.
         self.hits = recent(cx);
+        self.commands.clear();
         self.cascade.clear();
         self.unfold.reset();
         self.scroll.set_offset(point(Pixels::ZERO, Pixels::ZERO));
@@ -229,26 +292,42 @@ impl Powerbar {
             true => recent(cx),
             false => search.hits().iter().take(MAX_HITS).cloned().collect(),
         };
+        let commands = Command::named(self.input.read(cx).text());
 
-        // A result the arrow keys moved to keeps the cursor as a new answer reorders the list,
-        // and its place does when that result is gone.
+        // A row the arrow keys moved to keeps the cursor as a new answer reorders the list,
+        // and its place does when that row is gone.
+        let before = self.keys();
+        self.commands = commands;
+        self.hits = hits;
         if let Cursor::On(idx) = self.cursor {
-            let picked = self.hits.get(idx).map(Hit::key);
-            let found = picked.and_then(|key| hits.iter().position(|hit| hit.key() == key));
-            let kept = found.or_else(|| hits.len().checked_sub(1).map(|last| idx.min(last)));
+            let after = self.keys();
+            let found = before
+                .get(idx)
+                .and_then(|key| after.iter().position(|other| other == key));
+            let kept = found.or_else(|| after.len().checked_sub(1).map(|last| idx.min(last)));
             self.cursor = kept.map_or(Cursor::First, Cursor::On);
             if let Some(idx) = kept {
                 self.scroll.scroll_to_item(idx);
             }
         }
-        self.hits = hits;
         cx.notify();
+    }
+
+    /// How many rows the list holds, the commands first.
+    fn total(&self) -> usize {
+        self.commands.len() + self.hits.len()
+    }
+
+    /// A key for every row, commands first, which follows a row as the list reorders.
+    fn keys(&self) -> Vec<String> {
+        let commands = self.commands.iter().map(|command| command.key().to_owned());
+        commands.chain(self.hits.iter().map(Hit::key)).collect()
     }
 
     /// The row under the keyboard cursor, if there is one.
     fn selected(&self) -> Option<usize> {
         match self.cursor {
-            Cursor::First => (!self.hits.is_empty()).then_some(0),
+            Cursor::First => (self.total() > 0).then_some(0),
             Cursor::On(idx) => Some(idx),
             Cursor::Field => None,
         }
@@ -263,7 +342,7 @@ impl Powerbar {
     }
 
     fn select_next(&mut self, _: &SelectNext, _window: &mut Window, cx: &mut Context<Self>) {
-        let total = self.hits.len();
+        let total = self.total();
         if total == 0 {
             return;
         }
@@ -293,11 +372,14 @@ impl Powerbar {
         }
     }
 
-    /// Enter: plays the chosen song at once and opens anything else. With no result chosen it
-    /// opens the search page for what is typed, or the download dialog when that is a link.
+    /// Enter: runs the chosen command, plays the chosen song at once and opens anything else.
+    /// With no row chosen it opens the search page for what is typed, or the download dialog
+    /// when that is a link.
     fn activate(&mut self, _: &Submit, window: &mut Window, cx: &mut Context<Self>) {
-        match (self.target(), self.link(cx)) {
-            (Some(hit), _) => enter_hit(&hit, &self.playback, cx),
+        let target = self.target();
+        match (&target, self.link(cx)) {
+            (Some(Entry::Hit(hit)), _) => enter_hit(hit, &self.playback, cx),
+            (Some(Entry::Command(_)), _) => {}
             (None, Some(link)) => return self.download(link, window, cx),
             (None, None) => {
                 let query = self.input.read(cx).text().trim().to_owned();
@@ -305,6 +387,9 @@ impl Powerbar {
             }
         }
         self.close(window, cx);
+        if let Some(Entry::Command(command)) = target {
+            command.run(window, cx);
+        }
     }
 
     /// What is typed, when it is a link a download could start from.
@@ -320,7 +405,7 @@ impl Powerbar {
 
     /// Ctrl+Enter: opens the page of the chosen result, a song's included.
     fn details(&mut self, _: &PowerbarDetails, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(hit) = self.target() {
+        if let Some(Entry::Hit(hit)) = self.target() {
             hit.remember(cx);
             navigate_hit(&hit, cx);
         }
@@ -338,9 +423,41 @@ impl Powerbar {
         self.rebuild_items(cx);
     }
 
-    /// The result the keys act on, the one under the keyboard cursor.
-    fn target(&self) -> Option<Hit> {
-        self.selected().and_then(|idx| self.hits.get(idx)).cloned()
+    /// The row the keys act on, the one under the keyboard cursor.
+    fn target(&self) -> Option<Entry> {
+        let idx = self.selected()?;
+        match self.commands.get(idx) {
+            Some(command) => Some(Entry::Command(*command)),
+            None => self
+                .hits
+                .get(idx - self.commands.len())
+                .cloned()
+                .map(Entry::Hit),
+        }
+    }
+
+    /// The row for a command the query names, with the keys that do the same beside it.
+    fn command_row(&self, command: Command, idx: usize, cx: &mut Context<Self>) -> AnyElement {
+        let chosen = self.selected() == Some(idx);
+        let keys = input::shown(
+            command.shortcut(),
+            Sonicly::global(cx).settings.read(cx).keybinds(),
+        );
+        Card::new(("powerbar-command", idx), i18n::lookup(command.key(), None))
+            .fallback(command.icon())
+            .meta(t!("powerbar-commands"))
+            .when_some(keys, |card, keys| card.trailing(Kbd::new(keys)))
+            .chosen(chosen)
+            .aria_position_in_set(idx + 1)
+            .aria_size_of_set(self.total())
+            .when(chosen, |card| {
+                card.aria_selected(true).aria_active_descendant()
+            })
+            .press(cx.listener(move |this, _, window, cx| {
+                this.close(window, cx);
+                command.run(window, cx);
+            }))
+            .into_any_element()
     }
 
     /// Whether `hit` is what plays right now, which turns its play button into pause.
@@ -386,12 +503,22 @@ impl Powerbar {
     /// One row per result in the order the search ranked them, each wrapped in its entrance.
     /// A row of the search history has a button that drops it.
     fn results(&self, window: &Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let total = self.hits.len();
+        let total = self.total();
         let recalling = self.recalling(cx);
         let muted = cx.theme().muted_foreground;
-        self.hits
+        let offset = self.commands.len();
+        let mut rows: Vec<AnyElement> = self
+            .commands
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(idx, command)| self.command_row(command, idx, cx))
+            .collect();
+        let hits: Vec<AnyElement> = self
+            .hits
             .iter()
             .enumerate()
+            .map(|(place, hit)| (place + offset, hit))
             .map(|(item_idx, hit)| {
                 let shown = self.cascade.level(&hit.key(), window, cx);
                 let opened = hit.clone();
@@ -433,7 +560,9 @@ impl Powerbar {
                 });
                 Cascade::surface(card, shown).into_any_element()
             })
-            .collect()
+            .collect();
+        rows.extend(hits);
+        rows
     }
 
     /// What shows under the field while there is a query and nothing to list for it: a spinner
@@ -478,9 +607,9 @@ impl Powerbar {
     fn hints(&self, cx: &App) -> impl IntoElement {
         let theme = cx.theme();
         let target = self.target();
-        let song = matches!(target, Some(Hit::Song(_)));
+        let song = matches!(target, Some(Entry::Hit(Hit::Song(_))));
         let enter = match target {
-            Some(Hit::Song(_)) => t!("common-play"),
+            Some(Entry::Hit(Hit::Song(_))) => t!("common-play"),
             Some(_) => t!("powerbar-open"),
             None if self.link(cx).is_some() => t!("powerbar-download-link"),
             None => t!("search-submit"),
@@ -605,7 +734,7 @@ impl Render for Powerbar {
             })
             // The key hints only make sense with something to act on, so they arrive with the
             // first results and ride the same growing height.
-            .when(!self.hits.is_empty(), |this| this.child(self.hints(cx)));
+            .when(self.total() > 0, |this| this.child(self.hints(cx)));
         let body = self.unfold.wrap(body, empty, window, cx);
         let height = self.unfold.height();
 

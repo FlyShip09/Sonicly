@@ -10,10 +10,10 @@ use gpui::{
 use i18n::t;
 use music::{AccountChoices, SignIn, SignInPrompt};
 use router::{Destination, SettingsPage, navigate};
-use state::{Failure, Outcome, Scan, SessionState, Sonicly, Toast, Toasts};
+use state::{Failure, Outcome, Placement, Scan, SessionState, Sonicly, Toast, Toasts};
 use ui::{
-    ActiveTheme as _, Avatar, Button, HoverFade, Initials, LEADING, Modal, Radio, Skeleton, Text,
-    Theme, mix,
+    ActiveTheme as _, Avatar, Button, HoverFade, Initials, LEADING, MenuItem, Modal, Picker, Radio,
+    Skeleton, Text, Theme, mix,
 };
 
 use super::rows::drill;
@@ -33,6 +33,8 @@ const MARK_FADE: Duration = Duration::from_millis(160);
 const CHOICES: f32 = 3.;
 /// What the guest row answers to, where a provider row answers to its slug.
 const GUEST: &str = "guest";
+/// The popover key of the picker for songs dropped from outside the music folders.
+const DROPPED_FILES: &str = "dropped-files";
 
 /// What a row does when it is clicked.
 type Press = Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
@@ -82,7 +84,39 @@ impl SettingsView {
     }
 
     pub(super) fn music_folders_groups(&self) -> Vec<Group> {
-        vec![Group::untitled().rows([Slot::Folders])]
+        vec![Group::untitled().rows([Slot::Folders, Slot::DroppedFiles])]
+    }
+
+    /// Where songs dropped on the window from outside the music folders go: asked about on the
+    /// next drop, their folder added, or copied into one of the music folders. A drop's answer
+    /// to its question lands here too, so this is where it is changed.
+    pub(super) fn dropped_files_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let settings = self.settings.read(cx);
+        let chosen = settings.dropped_files().cloned();
+        let mut options = vec![None, Some(Placement::Folder)];
+        options.extend(
+            settings
+                .local_folders()
+                .iter()
+                .map(|folder| Some(Placement::Copy(folder.clone()))),
+        );
+        let picker = Picker::new(DROPPED_FILES, &self.popovers, placement_label(&chosen))
+            .width(Picker::REGULAR)
+            .items(options.into_iter().enumerate().map(|(index, option)| {
+                MenuItem::new((DROPPED_FILES, index), placement_label(&option))
+                    .selected(option == chosen)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        let option = option.clone();
+                        this.settings
+                            .update(cx, |settings, cx| settings.set_dropped_files(option, cx));
+                        cx.notify();
+                    }))
+            }));
+
+        self.row(
+            t!("settings-dropped-files"),
+            picker.name(t!("settings-dropped-files")).into_any_element(),
+        )
     }
 
     pub(super) fn profile(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1422,4 +1456,19 @@ pub(super) fn account_error(error: &Failure, cx: &App) -> impl IntoElement {
                 .text_color(theme.muted_foreground)
                 .child(crate::shared::trouble::short(error)),
         )
+}
+
+/// How the picker names where dropped songs go.
+fn placement_label(placement: &Option<Placement>) -> SharedString {
+    match placement {
+        None => t!("settings-dropped-files-ask"),
+        Some(Placement::Folder) => t!("settings-dropped-files-folder"),
+        Some(Placement::Copy(folder)) => {
+            let name = folder
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_else(|| folder.display().to_string());
+            t!("settings-dropped-files-copy", name = name)
+        }
+    }
 }

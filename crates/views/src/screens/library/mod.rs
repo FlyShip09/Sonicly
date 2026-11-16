@@ -23,8 +23,8 @@ use i18n::t;
 use music::{Arrival, Shape, Track};
 use router::{Destination, LibraryTab, navigate};
 use state::{
-    Addition, AppSettings, DownloadsChanged, Library, LibraryPart, LibraryState, Network, Origin,
-    Playback, Scan, Shelf, Sonicly,
+    Addition, AppSettings, DownloadsChanged, Generated, Library, LibraryPart, LibraryState,
+    Network, Origin, Playback, Scan, Shelf, Sonicly, Swatches,
 };
 use ui::{
     ActiveTheme as _, Button, Card, Deck, FilterChange, Mode, Pin, Pinnable, Popovers, Popup,
@@ -356,6 +356,8 @@ impl LibraryView {
         cx.observe(&chrome, |_, _, cx| cx.notify()).detach();
         cx.observe(&Scan::global(cx), |_, _, cx| cx.notify())
             .detach();
+        let swatches = Swatches::entity(cx);
+        cx.observe(&swatches, |_, _, cx| cx.notify()).detach();
 
         let current_playback = playback_status(&playback, cx);
         cx.observe(&playback, |this, playback, cx| {
@@ -728,18 +730,25 @@ impl LibraryView {
             strip = strip.text(runtime(duration));
         }
         let liked = self.liked_only(cx);
-        let (title, icon, eyebrow) = match liked {
-            true => (
-                t!("library-liked-songs"),
-                "icons/heart-filled.svg",
-                t!("detail-playlist"),
-            ),
-            false => (t!("nav-songs"), LibraryTab::Songs.icon(), t!("nav-library")),
+        // Favorites, or the local files alone before any account, are collections with no
+        // artwork of their own, so they get a cover drawn from the colours of their first ones.
+        let collection = match (liked, self.lead(cx)) {
+            (true, _) => Some(Generated::Favorites),
+            (false, Shelf::Local) => Some(Generated::Local),
+            (false, Shelf::Streaming) => None,
+        };
+        let (title, eyebrow) = match collection {
+            Some(Generated::Favorites) => (t!("library-liked-songs"), t!("detail-playlist")),
+            Some(Generated::Local) => (t!("nav-local"), t!("nav-library")),
+            _ => (t!("nav-songs"), t!("nav-library")),
         };
 
         PageHero::new("library-hero", title)
-            .fallback(icon)
+            .fallback(collection.map_or(LibraryTab::Songs.icon(), Generated::glyph))
             .accent()
+            .when_some(collection, |hero, collection| {
+                hero.generated(Swatches::colors(collection, cx))
+            })
             .eyebrow(eyebrow)
             .meta(strip)
             .actions(

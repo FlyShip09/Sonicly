@@ -122,6 +122,10 @@ impl MusicProvider for LocalProvider {
         Some(track)
     }
 
+    fn plays_file(&self, path: &Path) -> bool {
+        scan::is_audio_file(path)
+    }
+
     fn listening_to(&self) -> &'static str {
         "Local Music"
     }

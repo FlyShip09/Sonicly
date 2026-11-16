@@ -23,7 +23,7 @@ use anyhow::{Context as _, Result};
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use gpui::WindowDecorations;
 use gpui::{
-    App, Bounds, Context, DisplayId, EventEmitter, Pixels, Size, Subscription, Task, Window,
+    App, Bounds, Context, DisplayId, EventEmitter, Pixels, Point, Size, Subscription, Task, Window,
     WindowBounds, point, px, size,
 };
 use music::lyrics::LOCAL;
@@ -279,6 +279,17 @@ impl Default for VisualizerScreens {
     }
 }
 
+/// Where songs dropped on the window from outside the music folders go. Either way the
+/// originals are left where they are.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Placement {
+    /// Their folder joins the music folders and is read where it is.
+    Folder,
+    /// They are copied into this music folder.
+    Copy(PathBuf),
+}
+
 /// A window's saved position and size in logical pixels, plus whether it was maximized.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -508,6 +519,10 @@ struct Values {
     startup: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     local_folders: Vec<PathBuf>,
+    /// Where songs dropped on the window from outside the music folders go, once the listener
+    /// has said. `None` asks on the next such drop.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dropped_files: Option<Placement>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     hidden_nav: Vec<String>,
     /// The optional sidebar rows the user added, which stay out of the sidebar otherwise.
@@ -734,6 +749,7 @@ impl Default for Values {
             font: system_font(),
             startup: DEFAULT_STARTUP.to_owned(),
             local_folders: Vec::new(),
+            dropped_files: None,
             hidden_nav: Vec::new(),
             added_nav: Vec::new(),
             silenced_requirements: Vec::new(),
@@ -789,6 +805,9 @@ struct StateValues {
     sidebar_pin_reversed: bool,
     resume: Option<Resume>,
     window: Option<Frame>,
+    /// Where the mini player stood when it last moved, and whether it was folded into a bar.
+    mini_player: Option<Frame>,
+    mini_player_bar: bool,
     system_theme: String,
     /// The variant last chosen in each theme family, by family id.
     theme_variants: HashMap<String, String>,
@@ -822,6 +841,8 @@ impl Default for StateValues {
             sidebar_pin_reversed: false,
             resume: None,
             window: None,
+            mini_player: None,
+            mini_player_bar: false,
             system_theme: ThemeKind::Dark.id().to_owned(),
             theme_variants: HashMap::new(),
             picks: Vec::new(),
@@ -948,6 +969,7 @@ pub struct AppSettings {
     save: Option<Task<()>>,
     save_state: Option<Task<()>>,
     watch: Option<Subscription>,
+    watch_mini: Option<Subscription>,
     writable: bool,
     /// What `settings.json` held when it was last read or written, so the watcher can tell our
     /// own writes from another program's.
@@ -1028,6 +1050,7 @@ impl AppSettings {
             save: None,
             save_state: None,
             watch: None,
+            watch_mini: None,
             writable,
             disk,
             broken,
@@ -1384,6 +1407,18 @@ impl AppSettings {
 
     pub fn local_folders(&self) -> &[PathBuf] {
         &self.values.local_folders
+    }
+
+    /// Where songs dropped from outside the music folders go, or `None` to ask.
+    pub fn dropped_files(&self) -> Option<&Placement> {
+        self.values.dropped_files.as_ref()
+    }
+
+    pub fn set_dropped_files(&mut self, placement: Option<Placement>, cx: &mut Context<Self>) {
+        if self.values.dropped_files.as_ref() != placement.as_ref() {
+            self.values.dropped_files = placement;
+            self.schedule_save(cx);
+        }
     }
 
     pub fn startup(&self) -> &str {
@@ -2558,6 +2593,37 @@ impl AppSettings {
         self.schedule_state_save(cx);
     }
 
+    /// Saves where the mini player stands now and after every move. The save wakes no observer,
+    /// so dragging the mini player around never redraws the main window.
+    pub fn watch_mini_player(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.keep_mini_frame(window, cx);
+        self.watch_mini = Some(cx.observe_window_bounds(window, |this, window, cx| {
+            this.keep_mini_frame(window, cx);
+        }));
+    }
+
+    fn keep_mini_frame(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let frame = Frame::of(window);
+        if !frame.sane() || self.state.mini_player == Some(frame) {
+            return;
+        }
+        self.state.mini_player = Some(frame);
+        self.save_state_quietly(cx);
+    }
+
+    /// Whether the mini player was last folded into a bar rather than showing its cover.
+    pub fn mini_player_bar(&self) -> bool {
+        self.state.mini_player_bar
+    }
+
+    /// Keeps the mini player's fold for the next time it opens, without waking observers.
+    pub fn set_mini_player_bar(&mut self, bar: bool, cx: &mut Context<Self>) {
+        if self.state.mini_player_bar != bar {
+            self.state.mini_player_bar = bar;
+            self.save_state_quietly(cx);
+        }
+    }
+
     /// Wakes observers and debounces a `settings.json` write.
     fn schedule_save(&mut self, cx: &mut Context<Self>) {
         cx.notify();
@@ -2917,6 +2983,26 @@ pub fn window_placement(least: Size<Pixels>, cx: &App) -> Option<(WindowBounds, 
 pub fn remember_window(window: &mut Window, cx: &mut App) {
     let settings = Sonicly::global(cx).settings.clone();
     settings.update(cx, |settings, cx| settings.watch_window(window, cx));
+}
+
+/// Where the mini player last stood, and its display, if its centre still lands on a connected
+/// display. Only the origin is kept: the fold picks the size.
+pub fn mini_player_placement(cx: &App) -> Option<(Point<Pixels>, DisplayId)> {
+    let frame = Sonicly::global(cx).settings.read(cx).state.mini_player?;
+    if !frame.sane() {
+        return None;
+    }
+    let bounds = frame.placement(Size::default()).get_bounds();
+    cx.displays()
+        .iter()
+        .find(|display| display.bounds().contains(&bounds.center()))
+        .map(|display| (bounds.origin, display.id()))
+}
+
+/// Starts saving where the mini player stands, for the next time it opens.
+pub fn remember_mini_player(window: &mut Window, cx: &mut App) {
+    let settings = Sonicly::global(cx).settings.clone();
+    settings.update(cx, |settings, cx| settings.watch_mini_player(window, cx));
 }
 
 /// Whether reloading `current` from disk would replace the values that serialize to `ours`. A

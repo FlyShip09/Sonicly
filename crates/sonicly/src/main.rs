@@ -5,12 +5,14 @@ mod actions;
 mod app_icon;
 mod assets;
 mod console;
+mod debug;
 mod dock;
 #[cfg(target_os = "macos")]
 mod gestures;
 mod http;
 mod logging;
 mod memory;
+mod mini;
 mod single;
 #[cfg(debug_assertions)]
 mod staging;
@@ -28,7 +30,7 @@ use std::time::Duration;
 use cli::commands::CommandType;
 use gpui::{
     App, AppContext as _, Bounds, Pixels, QuitMode, Size, TitlebarOptions, WindowBounds,
-    WindowOptions, px, size,
+    WindowHandle, WindowOptions, px, size,
 };
 use music::LyricsProvider;
 use music::link::Linked;
@@ -62,6 +64,7 @@ fn main() -> ExitCode {
         .collect();
     #[cfg(debug_assertions)]
     let staging = Staging::take(&mut args);
+    let (args, debug) = debug::take(args);
     let command = cli::parse(args, state::version());
     if !matches!(command, Ok(CommandType::Launch(_))) {
         console::attach();
@@ -194,6 +197,7 @@ fn main() -> ExitCode {
             cx.set_quit_mode(QuitMode::Explicit);
         }
         actions::register(lingers, cx);
+        mini::register(cx);
         #[cfg(target_os = "macos")]
         gestures::install(cx);
         memory::watch(cx);
@@ -201,6 +205,7 @@ fn main() -> ExitCode {
         open_window(cx);
         #[cfg(debug_assertions)]
         staging.stage(cx);
+        debug.apply(cx);
         let session = Sonicly::global(cx).session.clone();
         session.update(cx, |session, cx| session.restore(cx));
 
@@ -304,8 +309,15 @@ fn destination(linked: &Linked) -> Option<Destination> {
     }
 }
 
+/// The main window, told apart from the mini player's by the view it holds.
+fn main_window(cx: &App) -> Option<WindowHandle<Root>> {
+    cx.windows()
+        .into_iter()
+        .find_map(|window| window.downcast::<Root>())
+}
+
 fn show_window(cx: &mut App) {
-    match cx.windows().first() {
+    match main_window(cx) {
         Some(window) => {
             window
                 .update(cx, |_, window, _| window.activate_window())
@@ -328,14 +340,12 @@ enum WindowAction {
 
 /// Shows the window when it is hidden, minimized or closed, and hides it when it is visible.
 fn toggle_window(cx: &mut App) {
-    let visible = cx
-        .windows()
-        .first()
+    let visible = main_window(cx)
         .and_then(|window| window.update(cx, |_, window, _| window.is_visible()).ok());
     match window_action(visible) {
         WindowAction::Show => show_window(cx),
         WindowAction::Hide => {
-            if let Some(window) = cx.windows().first() {
+            if let Some(window) = main_window(cx) {
                 window
                     .update(cx, |_, window, _| window.minimize_window())
                     .ok();

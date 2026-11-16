@@ -65,6 +65,30 @@ library-scanning-found = Looking through your folders… { $found } so far
 library-scanning-progress = Reading your music… { $read } of { $found }
 library-part-not-loaded = This part of your library did not load
 library-local-unconfigured = Add a folder of music to start your library
+drop-add-library = { $count ->
+    [one] Add one song to Local Music
+   *[other] Add { $count } songs to Local Music
+}
+drop-counting = Counting songs…
+drop-detail-kept = Your files stay where they are.
+drop-detail-ask = You choose where they go after the drop. Your files stay where they are.
+drop-detail-folder = Their folder joins your music folders. Your files stay where they are.
+drop-detail-copy = Copies go into { $name }. Your files stay where they are.
+drop-nothing = Nothing here plays in Sonicly
+drop-nothing-detail = Drop audio files or folders that hold them, like MP3, FLAC, AAC, Ogg, Opus or WAV.
+drop-hint-playlist = Drop on a playlist in the sidebar to add them there instead.
+drop-ask-title = Where should these songs go?
+drop-ask-detail = { $count ->
+    [one] One song is outside your music folders. Your files stay where they are either way, and Sonicly keeps your choice for next time.
+   *[other] { $count } songs are outside your music folders. Your files stay where they are either way, and Sonicly keeps your choice for next time.
+}
+drop-ask-folder = Add { $name } to your music folders
+drop-ask-folders = { $count ->
+    [one] Add their folder to your music folders
+   *[other] Add their { $count } folders to your music folders
+}
+drop-ask-copy = Copy them into { $name }
+drop-ask-confirm = Add songs
 
 # download from a link, through the listener's own yt-dlp
 link-download-title = Download from a link
@@ -125,6 +149,7 @@ window-restore = Restore
 
 # tray menu
 tray-show = Show Sonicly
+tray-mini-player = Mini player
 tray-play = Play
 tray-pause = Pause
 
@@ -335,6 +360,11 @@ player-previous = Previous track
 player-next = Next track
 player-fullscreen = Now playing
 player-fullscreen-leave = Leave Now playing
+player-mini = Mini player
+mini-player-title = Sonicly mini player
+mini-player-return = Back to the full window
+mini-player-bar = Fold into a bar
+mini-player-card = Show the cover
 player-time-left = -{ $time }
 player-time-left-spoken = { $time } left
 devices-this-computer = This computer
@@ -549,6 +579,8 @@ powerbar-placeholder = What do you want to listen to?
 powerbar-open = Open
 powerbar-song = Go to song
 powerbar-download-link = Download from this link
+powerbar-commands = Command
+powerbar-command-mini-player = Open the mini player
 
 # search page
 search-placeholder = What do you want to listen to?
@@ -726,6 +758,7 @@ keybind-refresh = Refresh
 keybind-download-from-link = Download from a link
 keybind-toggle-fullscreen = Now playing
 keybind-toggle-sidebar = Show or hide the sidebar
+keybind-toggle-mini-player = Mini player
 keybind-toggle-queue = Show the queue
 keybind-toggle-lyrics = Show lyrics
 keybind-toggle-window-fullscreen = Full screen window
@@ -1246,6 +1279,11 @@ settings-scrobble-server = Server address
 settings-scrobble-server-optional = Server address (optional)
 settings-local-folder = Music folders
 settings-local-folder-empty = Not configured
+settings-dropped-files = Songs dropped from elsewhere
+settings-dropped-files-detail = Where songs dropped on the window from outside your music folders go
+settings-dropped-files-ask = Ask
+settings-dropped-files-folder = Add their folder
+settings-dropped-files-copy = Copy into { $name }
 settings-choose-folder = Choose folder…
 settings-add-folder = Add folder
 settings-remove-folder = Remove folder
@@ -1552,6 +1590,16 @@ toast-library-scanned = { $count ->
 toast-scan-failed = Your music folders could not be scanned
 toast-folder-removed = Removed { $name }
 toast-folder-missing = { $name } is no longer on disk
+toast-drop-nothing = Nothing was added. Sonicly plays audio files like MP3 and FLAC.
+toast-drop-adding = { $count ->
+    [one] Adding one song to Local Music
+   *[other] Adding { $count } songs to Local Music
+}
+toast-drop-copied = { $count ->
+    [one] Copied one song into { $name }
+   *[other] Copied { $count } songs into { $name }
+}
+toast-drop-copy-failed = Some songs could not be copied into { $name }. Check that the folder is writable and has room.
 toast-history-removed = { $count ->
     [one] Removed from history
    *[other] Removed { $count } songs from history
