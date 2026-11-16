@@ -593,6 +593,10 @@ pub struct Playback {
     local_task: Option<Task<()>>,
     /// The pending load, held through its debounce; a newer load cancels it.
     load: Option<Task<()>>,
+    /// Whether the pending load has yet to reach the engine. Until it has, whatever the engine
+    /// says about this track id is about an earlier load of it, as when a restored track the
+    /// engine holds paused is opened again.
+    unsent: bool,
     /// The collection being fetched to start or extend the queue.
     fetch: Option<Task<()>>,
     /// The collection a press is waiting on and whether it asked for shuffle. It means
@@ -781,6 +785,7 @@ impl Playback {
             task: None,
             local_task: None,
             load: None,
+            unsent: false,
             fetch: None,
             sought: None,
             warm: None,
@@ -1088,6 +1093,7 @@ impl Playback {
 
         self.track = Some(track.clone());
         self.state = PlaybackState::Loading;
+        self.unsent = true;
         self.position = at;
         self.clock.reset(at, false);
         self.preloaded = None;
@@ -1108,6 +1114,7 @@ impl Playback {
         self.load = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(wait).await;
             this.update(cx, |this, cx| {
+                this.unsent = false;
                 if this.intent == Intent::Pause {
                     return this.hold(at, cx);
                 }
@@ -3158,8 +3165,9 @@ impl Playback {
     }
 
     /// Applies what an engine reports. Events from the engine not playing the current track,
-    /// or about another track, are dropped, so a late event from a previous load cannot move
-    /// the clock.
+    /// about another track, or about this track while its load has not reached the engine yet,
+    /// are dropped, so a late event from a previous load cannot move the clock or pause the
+    /// load that replaced it.
     fn on_backend_event(&mut self, event: BackendEvent, local: bool, cx: &mut Context<Self>) {
         // an engine whose output has to reopen is rebuilt whether it plays the current track
         // or sits idle, since a dead engine would take the next track and play nothing
@@ -3177,7 +3185,7 @@ impl Playback {
         }
         let current_id = self.track.as_ref().and_then(|track| track.id.as_deref());
         if let Some(event_id) = event.id()
-            && current_id != Some(event_id)
+            && (self.unsent || current_id != Some(event_id))
         {
             return;
         }
@@ -3361,6 +3369,7 @@ impl Playback {
 
         if !self.local_active() {
             self.load = None;
+            self.unsent = false;
             self.fetch = None;
             self.sought = None;
             self.warm = None;
