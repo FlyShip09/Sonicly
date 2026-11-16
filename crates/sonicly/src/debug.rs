@@ -28,6 +28,12 @@
 //! - `--debug-play=<text>` plays the local library's tracks whose id, which holds the file's
 //!   path, contains `<text>`, once no scan is under way: `big.wav` plays the tracks a cue sheet
 //!   splits that file into.
+//! - `--debug-guest=<slug>` signs in to the service `<slug>` with no account, where it has such
+//!   a session. `apple` has one only under this flag: Apple's catalog and, in the hidden web
+//!   player, the 30-second previews Apple gives any visitor, which is how the web player is
+//!   checked without an account.
+//! - `--debug-play-id=<id>[,<id>]` plays the signed-in service's tracks with those ids, in
+//!   order, once it is signed in.
 //! - `--debug-level=<path>` appends a line to `<path>` twice a second: the position in seconds
 //!   and the loudest band of the music in dBFS, heard ahead of the equalizer and the volume, so
 //!   a muted run can still show that sound reaches the output chain. `-200.0` is silence, and
@@ -60,6 +66,8 @@ pub struct Launch {
     folders: Vec<PathBuf>,
     imports: Vec<PathBuf>,
     play: Option<String>,
+    guest: Option<String>,
+    play_ids: Vec<String>,
     level: Option<PathBuf>,
 }
 
@@ -90,6 +98,10 @@ pub fn take(args: Vec<OsString>) -> (Vec<OsString>, Launch) {
                 "--debug-folder" => launch.folders.push(PathBuf::from(value)),
                 "--debug-import" => launch.imports.push(PathBuf::from(value)),
                 "--debug-play" => launch.play = Some(value.to_owned()),
+                "--debug-guest" => launch.guest = Some(value.to_owned()),
+                "--debug-play-id" => {
+                    launch.play_ids = value.split(',').map(str::to_owned).collect();
+                }
                 "--debug-level" => launch.level = Some(PathBuf::from(value)),
                 _ => return true,
             }
@@ -101,6 +113,11 @@ pub fn take(args: Vec<OsString>) -> (Vec<OsString>, Launch) {
 }
 
 impl Launch {
+    /// The service `--debug-guest` named.
+    pub fn guest(&self) -> Option<&str> {
+        self.guest.as_deref()
+    }
+
     /// Applies what has to be in place before the window opens: the theme, the volume and the
     /// fullscreen panel. Returns the page to open on, the one `--debug-screen` names by its
     /// address or `start` otherwise.
@@ -201,6 +218,46 @@ impl Launch {
                 };
                 tracks.retain(|track| track.id.as_deref().is_some_and(|id| id.contains(&wanted)));
                 playback.update(cx, |playback, cx| playback.start(tracks, 0, None, cx));
+            })
+            .detach();
+        }
+        if let Some(slug) = self.guest {
+            let session = Sonicly::global(cx).session.clone();
+            session.update(cx, |session, cx| {
+                session.sign_in(&slug, music::SignIn::Anonymous, cx)
+            });
+        }
+        if !self.play_ids.is_empty() {
+            let session = Sonicly::global(cx).session.clone();
+            let playback = Sonicly::global(cx).playback.clone();
+            let io = state::Io::global(cx);
+            let ids = self.play_ids;
+            cx.spawn(async move |cx| {
+                let client = loop {
+                    cx.background_executor().timer(TICK).await;
+                    let client = session.read_with(cx, |session, _| {
+                        session.playback().and_then(|_| session.client())
+                    });
+                    if let Some(client) = client {
+                        break client;
+                    }
+                };
+                let found = io
+                    .spawn(async move {
+                        let mut tracks = Vec::new();
+                        for id in ids {
+                            tracks.push(client.track(&id).await?);
+                        }
+                        anyhow::Ok(tracks)
+                    })
+                    .await;
+                match found {
+                    Ok(Ok(tracks)) => {
+                        playback.update(cx, |playback, cx| playback.start(tracks, 0, None, cx))
+                    }
+                    Ok(Err(error)) => log::warn!("debug: cannot read a track to play: {error:#}"),
+                    Err(error) => log::warn!("debug: cannot read a track to play: {error:#}"),
+                }
             })
             .detach();
         }
