@@ -54,6 +54,10 @@ const SEEK_FLOOR: f32 = 220.;
 const TITLE_ROOM: f32 = 1.4;
 /// The stacked bar's `gap_2` between its two rows, in rems.
 const STACK_GAP: f32 = 0.5;
+/// How far the bar floats in from the window's sides and bottom and from the page above it.
+const BAR_INSET: Pixels = px(10.);
+/// The hairline along the sidebar's edge, carried down past the bar.
+const EDGE: Pixels = px(1.);
 
 /// How the bar draws its volume control.
 #[derive(Clone, Copy)]
@@ -100,6 +104,9 @@ impl PlayerBar {
         cx.observe(&library, |_, _, cx| cx.notify()).detach();
         cx.observe(&settings, |_, _, cx| cx.notify()).detach();
         cx.observe_global::<ShellSwap>(|_, cx| cx.notify()).detach();
+        // the strip under the bar continues the sidebar and the page, so it follows their edge
+        let chrome = Chrome::entity(cx);
+        cx.observe(&chrome, |_, _, cx| cx.notify()).detach();
 
         let me = cx.entity_id();
         let playlist_scrollbar = cx.new(|_| Scrollbar::inset().watching(me));
@@ -514,7 +521,7 @@ impl PlayerBar {
         let title = cx.theme().metrics.cover * TITLE_ROOM;
         let rem = window.rem_size();
         let button = px(ICON_BUTTON);
-        let row = window.viewport_size().width - rem * (BAR_PAD + COLUMN_GAP) * 2.;
+        let row = window.viewport_size().width - (BAR_INSET + rem * (BAR_PAD + COLUMN_GAP)) * 2.;
         let tools = button * tools as f32 + rem * TOOL_GAP * tools.saturating_sub(1) as f32;
         // The right side without its slider: the buttons, the mute, mini player and fullscreen
         // buttons and the gaps between them.
@@ -561,7 +568,7 @@ impl PlayerBar {
     pub(crate) fn fullscreen_drop(window: &Window, cx: &gpui::App) -> Pixels {
         let theme = *cx.theme();
         let layout = Sonicly::global(cx).settings.read(cx).player_bar_layout();
-        let spare = theme.metrics.player_bar - Self::height(window, cx);
+        let spare = theme.metrics.player_bar - Self::bar_height(window, cx);
         let drop = match Self::stacked(window, layout) {
             // The button's row is centred under the cover's row and the gap between the two.
             true => spare + theme.metrics.row + window.rem_size() * STACK_GAP,
@@ -570,8 +577,14 @@ impl PlayerBar {
         ui::snapped((drop / 2.).max(Pixels::ZERO), window)
     }
 
-    /// The height the workspace reserves, shared by the overlay's bottom scroll clearance.
+    /// The height the workspace reserves, the floating bar and the room around it, shared by
+    /// the overlay's bottom scroll clearance.
     pub(crate) fn height(window: &Window, cx: &gpui::App) -> Pixels {
+        ui::snapped(Self::bar_height(window, cx) + BAR_INSET * 2., window)
+    }
+
+    /// The height of the floating bar itself.
+    fn bar_height(window: &Window, cx: &gpui::App) -> Pixels {
         let theme = *cx.theme();
         let layout = Sonicly::global(cx).settings.read(cx).player_bar_layout();
         let height = match (Self::stacked(window, layout), layout) {
@@ -591,6 +604,7 @@ impl Render for PlayerBar {
         let stacked = Self::stacked(window, layout);
         let transparent = self.settings.read(cx).player_bar_translucent();
         let height = Self::height(window, cx);
+        let bar_height = Self::bar_height(window, cx);
         // Equal wings keep the title centered while reserving the original volume slider width.
         let centered_wing = theme.metrics.control * 5. + px(VOLUME_WIDTH) + theme.metrics.pad * 4.;
         let show_track = span.fits(Room::Snug);
@@ -623,24 +637,27 @@ impl Render for PlayerBar {
         #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
         let radius: Option<Pixels> = None;
 
+        // The bar floats a little in from the window's edges as one raised surface: a rounded
+        // sheet with a hairline and the soft shadow every raised surface wears.
         let base = div()
             .id("player-bar")
             .role(Role::Toolbar)
             .aria_label(t!("settings-page-player-bar"))
             .flex()
             .w_full()
-            .h(height)
+            .h(bar_height)
             .flex_none()
             .px_5()
             .when(stacked, |this| this.py_2())
-            .when_some(radius, |this, radius| this.rounded_b(radius))
+            .rounded(ui::corners(theme.radius))
             .when_else(
                 transparent,
                 |this| ui::bar_surface(this, cx).text_color(theme.popover_foreground),
                 |this| this.when(!theme.transparent, |this| this.bg(theme.secondary)),
             )
-            .border_t_1()
+            .border_1()
             .border_color(theme.border)
+            .shadow(ui::lifted(cx))
             .occlude()
             .on_mouse_move(cx.listener(Self::hover));
 
@@ -768,8 +785,43 @@ impl Render for PlayerBar {
             }
         };
 
-        content
+        let bar = content
             .relative()
-            .when_some(context_menu, |this, menu| this.child(menu))
+            .when_some(context_menu, |this, menu| this.child(menu));
+        // The strip the bar floats in carries on the sidebar and the page above it, edge and
+        // all. Over a translucent bar's page it paints nothing, so the page shows round the bar.
+        let left = Chrome::get(cx).left();
+        div()
+            .relative()
+            .w_full()
+            .h(height)
+            .p(BAR_INSET)
+            .when_some(radius, |this, radius| this.rounded_b(radius))
+            .when(!transparent && !theme.transparent, |this| {
+                this.when(left > Pixels::ZERO, |this| {
+                    this.child(
+                        div()
+                            .absolute()
+                            .top_0()
+                            .bottom_0()
+                            .left_0()
+                            .w(left)
+                            .when_some(ui::frame_fill(cx), |this, fill| this.bg(fill)),
+                    )
+                })
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .bottom_0()
+                        .left(left)
+                        .right_0()
+                        .bg(theme.background)
+                        .when(left > Pixels::ZERO, |this| {
+                            this.border_l(EDGE).border_color(theme.sidebar_border)
+                        }),
+                )
+            })
+            .child(bar)
     }
 }
