@@ -9,7 +9,10 @@ use gpui::{
 };
 use ui::TrafficLightControls;
 use ui::WindowControls;
-use ui::{ActiveTheme as _, Button, MenuItem, Picker, Popovers, Room, Spin};
+use ui::{
+    ActiveTheme as _, Button, HoverFade, MenuItem, Motion, PageEdge, Picker, Popovers, Room, Spin,
+    dim_span,
+};
 
 use crate::chrome::Chrome;
 use crate::chrome::SidebarRight;
@@ -86,6 +89,8 @@ pub(crate) struct TitleBar {
     downloads: Entity<DownloadsButton>,
     /// The account menu's group, so it closes when another of the bar's menus opens.
     popovers: Popovers,
+    /// The hairline under the bar, which shows while the page has scrolled beneath it.
+    under: HoverFade,
 }
 
 impl EventEmitter<TitleBarEvent> for TitleBar {}
@@ -108,6 +113,8 @@ impl TitleBar {
         // the star button drops its words when the window is narrow
         let chrome = Chrome::entity(cx);
         cx.observe(&chrome, |_, _, cx| cx.notify()).detach();
+        let edge = PageEdge::entity(cx);
+        cx.observe(&edge, |_, _, cx| cx.notify()).detach();
         Self {
             navigation,
             settings,
@@ -117,6 +124,7 @@ impl TitleBar {
             spin: Spin::default(),
             downloads: cx.new(DownloadsButton::new),
             popovers: Popovers::default(),
+            under: HoverFade::new(Motion::Quick.span()).leaving(dim_span()),
         }
     }
 
@@ -387,6 +395,10 @@ impl Render for TitleBar {
         let chrome = Chrome::get(cx);
         let unified = navigation && !self.options.transparent && !theme.transparent;
         let (left, right) = (chrome.left(), chrome.right());
+        // the hairline follows the page under the bar
+        let edge = PageEdge::get(cx);
+        self.under.set(navigation && edge.under);
+        let under = self.under.level(window, cx);
 
         div()
             .id("title-bar")
@@ -443,6 +455,17 @@ impl Render for TitleBar {
                         .when(left > Pixels::ZERO, |this| {
                             this.border_l_1().border_color(theme.sidebar_border)
                         })
+                        .when(under > 0., |this| {
+                            this.child(
+                                div()
+                                    .absolute()
+                                    .left_0()
+                                    .right_0()
+                                    .bottom_0()
+                                    .h(EDGE)
+                                    .bg(theme.title_bar_border.opacity(under)),
+                            )
+                        })
                         .when(right > Pixels::ZERO, |this| {
                             this.child(
                                 div()
@@ -489,7 +512,15 @@ impl Render for TitleBar {
                     .gap_1()
                     .items_center()
                     .when(navigation, |this| this.child(self.history(window, cx)))
-                    .child(div().flex_1())
+                    .child(
+                        div()
+                            .flex()
+                            .flex_1()
+                            .min_w_0()
+                            .items_center()
+                            .px_2()
+                            .overflow_hidden(),
+                    )
                     .when(navigation, |this| {
                         this.child(
                             div()
