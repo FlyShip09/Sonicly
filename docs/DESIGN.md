@@ -61,3 +61,53 @@ Newest last. One entry per decision: what was chosen, and why.
     rather than feature-gated. `docs/UPSTREAM.md` becomes the provenance record
     (which commit the port started from, what was removed and why) instead of a
     merge guide. Behavior is checked against the source in `reference/sonora`.
+14. **A cue sheet track is a stretch of its file, named in the track id.** A
+    sheet beside the one audio file it describes replaces that file in the
+    library with the sheet's tracks. Each track's id is the file's id followed
+    by `#cue=<start>-<end>`, counted in the sheet's own 1/75 s frames (`end`
+    empty for the last track). Nothing else carries the range: the local
+    provider turns the id into the existing `Trim` (skip, take) and wraps its
+    decoder in the existing `Trimmed` source, so the engine, the queue and the
+    seek bar see an ordinary track whose position starts at zero. Chosen over
+    a new field on `Track` or the queue entry because an id already travels
+    everywhere a track does (queue, history, favorites, restore) and nothing
+    outside `music::local` had to change. The scan index still holds one row
+    per real file and the sheet is applied on every scan, so editing a sheet
+    needs no rescan of the audio; the list of sheets is remembered beside the
+    index, because a folder listed from memory is never read from disk. A
+    sheet that names several files changes nothing (those files are already a
+    track each). A cue track's tags cannot be edited and its file cannot be
+    deleted from the app, since both would act on the whole album, and it gets
+    no lyrics from a file beside the audio, which would be timed for the whole
+    file.
+15. **How the user's yt-dlp is run.** Extends decision 8. yt-dlp is started
+    directly with a fixed argument list, never through a shell, in the chosen
+    music folder, with `--ignore-config` and `--no-exec` so no configuration
+    of the user's can run a program or move the file, and with the link after
+    `--`. Only `http`/`https` links with a host are passed on. Progress and
+    file facts are asked for as prefixed lines (`--progress-template`,
+    `--print`) with every text field JSON-encoded by yt-dlp, so a title cannot
+    pose as another field; all of it is treated as data, cleaned of control
+    characters and cut to length, and a reported file name is used only by its
+    last part inside the chosen folder. The format is
+    `bestaudio[ext=m4a]/bestaudio`: the stream as served, so no ffmpeg; a site
+    with no audio-only stream is refused with that explanation rather than
+    downloaded as video. The thumbnail is fetched only to be embedded: Sonicly
+    crops it square, re-encodes it as JPEG itself and writes it with the tags
+    through `lofty`, then deletes the image file. WebM, which `lofty` cannot
+    tag, is kept untagged. One download runs at a time, and it outlives its
+    dialog.
+16. **Spotify's and YouTube's sign-ins are sealed around the libraries that
+    write them.** Neither goes through `credentials.rs` by itself. librespot
+    (the pinned fork) can keep the credential in memory only, so Sonicly reads
+    and writes Spotify's `credentials.json` itself, sealed; no plain copy is
+    written at any point. `ytmusic` only loads and saves its cookie store as a
+    plain file and exposes neither the store nor a hook, and it saves whenever
+    Google sets a cookie. Without patching it, the lasting copy
+    (`cookies.json`) is kept sealed and the crate is pointed at
+    `cookies.live.json`, which Sonicly writes for the instant a client loads
+    it and deletes at once, then seals and deletes again after every rotation
+    it asks for and on a one-minute tick. That leaves a window of at most a
+    minute (or until the next launch after a crash) in which rotated cookies
+    are on disk unsealed. It is documented in `docs/PRIVACY.md`; closing it
+    needs a load/save hook in `ytmusic`.
