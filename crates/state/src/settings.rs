@@ -6,9 +6,14 @@
 //! debounce, so a sidebar drag never rewrites the preferences file.
 
 mod equalizer;
+mod lyrics_style;
 mod themes;
 
 pub use self::equalizer::equalizer_profile_label;
+pub use self::lyrics_style::{
+    LYRICS_WEIGHTS, LyricsAlign, LyricsBackground, LyricsEmphasis, LyricsPreset, LyricsStyle,
+    LyricsStyleChange, MAX_DIM, MAX_SPACING, MIN_DIM, MIN_INACTIVE, MIN_SPACING,
+};
 pub use self::themes::{ThemeFamily, ThemeOffer, ThemeVariant};
 pub(crate) use self::themes::{is_own_link, read_link as read_theme_link};
 
@@ -488,6 +493,11 @@ struct Values {
     panel_lyrics_scale: f32,
     fullscreen_lyrics_scale: f32,
     romanization_scripts: RomanizationScripts,
+    /// How the lyrics page looks: its background, face, spacing and emphasis.
+    lyrics_style: LyricsStyle,
+    /// Looks the listener saved by name.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    lyrics_presets: Vec<LyricsPreset>,
     adaptive_menu: bool,
     check_updates: bool,
     /// The release channel chosen in settings, by its id. Empty follows the running build's own
@@ -717,6 +727,8 @@ impl Default for Values {
             panel_lyrics_scale: DEFAULT_LYRICS_SCALE,
             fullscreen_lyrics_scale: DEFAULT_LYRICS_SCALE,
             romanization_scripts: RomanizationScripts::default(),
+            lyrics_style: LyricsStyle::default(),
+            lyrics_presets: Vec::new(),
             adaptive_menu: false,
             check_updates: crate::updates::RELEASE_REPO.is_some()
                 && (cfg!(target_os = "windows") || updates_itself()),
@@ -1459,7 +1471,7 @@ impl AppSettings {
     /// ambient background is painted out of the tint, so fullscreen tints whatever the adaptive
     /// theme setting says.
     pub fn cover_tint(&self, fullscreen: bool) -> bool {
-        self.adaptive_theme() || (fullscreen && self.ambient())
+        self.adaptive_theme() || (fullscreen && (self.ambient() || self.lyrics_backdrop()))
     }
 
     /// The visualizer's style, `None` when it is off. The old `visualizer` switch is still the
