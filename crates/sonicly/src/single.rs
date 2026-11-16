@@ -104,10 +104,17 @@ pub fn claim(
 /// changes.
 pub fn connect(streams: bool) -> io::Result<Stream> {
     let stream = Stream::connect(name()?)?;
-    stream.set_recv_timeout(match streams {
+    let timeout = match streams {
         true => None,
         false => Some(ANSWER),
-    })?;
+    };
+    // Named pipes take no timeout, so on Windows a reply is waited for as long as it takes,
+    // as the instance itself does in `serve`, rather than the connection counting as refused.
+    if let Err(error) = stream.set_recv_timeout(timeout)
+        && cfg!(not(windows))
+    {
+        return Err(error);
+    }
     Ok(stream)
 }
 
