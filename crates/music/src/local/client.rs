@@ -137,37 +137,40 @@ impl LocalClient {
     /// leads, so a `..` or a folder reached through a link still finds its file.
     fn find_files(&self, paths: &[PathBuf]) -> (Vec<String>, usize) {
         let scanned = self.scanned.read().unwrap();
-        let known: HashSet<&str> = scanned
+        let ids: Vec<&str> = scanned
             .tracks
             .iter()
             .filter_map(|track| track.id.as_deref())
             .collect();
+        let known: HashSet<&str> = ids.iter().copied().collect();
         // Resolving every library path costs a disk lookup each, so it waits for an entry that
         // the cheaper matches miss.
-        let mut resolved: Option<HashMap<PathBuf, &str>> = None;
+        let mut resolved: Option<HashMap<PathBuf, Vec<&str>>> = None;
         let mut found = Vec::new();
         let mut seen = HashSet::new();
         let mut skipped = 0;
         for path in paths {
-            let id = known
-                .get(wire::track_id(path).as_str())
-                .copied()
-                .or_else(|| {
-                    let real = std::fs::canonicalize(path).ok()?;
-                    known
-                        .get(wire::track_id(&real).as_str())
-                        .copied()
-                        .or_else(|| {
-                            resolved
-                                .get_or_insert_with(|| resolve(&known))
-                                .get(&real)
-                                .copied()
-                        })
-                });
-            match id {
-                Some(id) if seen.insert(id) => found.push(id.to_owned()),
-                Some(_) => {}
-                None => skipped += 1,
+            let matched = match known.get(wire::track_id(path).as_str()) {
+                Some(&id) => vec![id],
+                None => std::fs::canonicalize(path)
+                    .ok()
+                    .map(|real| match known.get(wire::track_id(&real).as_str()) {
+                        Some(&id) => vec![id],
+                        None => resolved
+                            .get_or_insert_with(|| resolve(&ids))
+                            .get(&real)
+                            .cloned()
+                            .unwrap_or_default(),
+                    })
+                    .unwrap_or_default(),
+            };
+            if matched.is_empty() {
+                skipped += 1;
+            }
+            for id in matched {
+                if seen.insert(id) {
+                    found.push(id.to_owned());
+                }
             }
         }
         (found, skipped)
@@ -812,15 +815,19 @@ fn whole_file(track_id: &str) -> Result<&Path> {
 }
 
 /// The library's tracks by where each file really is, for matching a path that reaches a file
-/// another way. A file that cannot be resolved is left out.
-fn resolve<'a>(known: &HashSet<&'a str>) -> HashMap<PathBuf, &'a str> {
-    known
-        .iter()
-        .filter_map(|&id| {
-            let path = std::fs::canonicalize(wire::path_from_track_id(id)?).ok()?;
-            Some((path, id))
-        })
-        .collect()
+/// another way. A file a cue sheet splits answers with every track cut out of it, in the order
+/// given. A file that cannot be resolved is left out.
+fn resolve<'a>(ids: &[&'a str]) -> HashMap<PathBuf, Vec<&'a str>> {
+    let mut files: HashMap<PathBuf, Vec<&'a str>> = HashMap::new();
+    for &id in ids {
+        let Some(path) = wire::path_from_track_id(id) else {
+            continue;
+        };
+        if let Ok(path) = std::fs::canonicalize(path) {
+            files.entry(path).or_default().push(id);
+        }
+    }
+    files
 }
 
 #[cfg(test)]
@@ -1018,5 +1025,17 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_split_by_a_cue_sheet_resolves_to_every_track() {
+        let folder = tempfile::tempdir().unwrap();
+        let file = folder.path().join("big.wav");
+        std::fs::write(&file, b"").unwrap();
+        let first = wire::cue_track_id(&file, 0, Some(975));
+        let second = wire::cue_track_id(&file, 975, None);
+        let found = resolve(&[first.as_str(), second.as_str()]);
+        let real = std::fs::canonicalize(&file).unwrap();
+        assert_eq!(found[&real], vec![first.as_str(), second.as_str()]);
     }
 }
