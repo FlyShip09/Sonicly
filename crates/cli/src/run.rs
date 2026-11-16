@@ -325,6 +325,9 @@ fn describe(failure: &Failure) -> String {
             "could not update the current track's favorite state".to_owned()
         }
         Failure::NothingFound(query) => format!("nothing found for '{query}'"),
+        Failure::NeedsAccount(name) => {
+            format!("{name} is open without an account; sign in to it in Settings, Providers")
+        }
     }
 }
 

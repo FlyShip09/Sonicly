@@ -352,6 +352,8 @@ pub enum Failure {
     FavoriteUpdateFailed,
     /// A search to queue the best hit of found nothing.
     NothingFound(String),
+    /// The provider, by name, is open as a guest, and the request needs an account.
+    NeedsAccount(String),
 }
 
 /// Why a line could not be read off the socket.

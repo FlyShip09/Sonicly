@@ -237,6 +237,13 @@ impl Control {
             reply.send(Reply::Done).ok();
             return;
         }
+        // A guest's like would only be refused by the provider, so the answer names the cause.
+        let session = self.session.read(cx);
+        if !shelf.local() && session.guest() {
+            let name = session.provider_name().unwrap_or_default().to_owned();
+            reply.send(Reply::Failed(Failure::NeedsAccount(name))).ok();
+            return;
+        }
         let completed = self
             .library
             .update(cx, |library, cx| library.save_track(track, wanted, cx));

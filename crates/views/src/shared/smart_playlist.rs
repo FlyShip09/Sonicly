@@ -317,6 +317,13 @@ impl SmartPlaylistEditor {
     }
 
     pub fn open(edit: SmartEdit, window: &mut Window, cx: &mut App) {
+        // A guest hears that a playlist needs an account before writing rules for one.
+        let session = Sonicly::global(cx).session.clone();
+        if let SmartEdit::Create { shelf } = &edit
+            && !state::has_account(&session, *shelf, "toast-guest-playlists", cx)
+        {
+            return;
+        }
         let editor = Self::entity(cx);
         editor.update(cx, |this, cx| this.show(edit, window, cx));
     }

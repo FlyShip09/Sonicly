@@ -63,7 +63,7 @@ pub use history::{History, HistoryState};
 pub use home::Home;
 pub use library::{
     Addition, CoverEdit, Leaving, Library, LibraryEvent, LibraryPart, LibraryState, Problem, Ready,
-    Shelf, cover_problem,
+    Shelf, cover_problem, has_account,
 };
 pub use link_download::{LinkDownload, LinkState};
 pub use links::{Links, Opened};

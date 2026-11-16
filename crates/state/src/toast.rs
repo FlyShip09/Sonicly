@@ -321,9 +321,9 @@ impl Toasts {
     }
 
     /// Shows a toast and returns its id, which [`Self::settle`] and [`Self::close`] take. Every
-    /// call shows a new toast, except a failure or warning that says the same thing as one
-    /// already up. Those can fire again on their own, so the one up restarts its clock instead
-    /// and its id is returned.
+    /// call shows a new toast, except a failure, warning or hint that says the same thing as
+    /// one already up. Those can fire again on their own or on every press of the same button,
+    /// so the one up restarts its clock instead and its id is returned.
     pub fn post(toast: Toast, cx: &mut App) -> usize {
         let toasts = Self::entity(cx);
         toasts.update(cx, |this, cx| this.push(toast, cx))
@@ -447,7 +447,10 @@ impl Toasts {
     }
 
     fn push(&mut self, toast: Toast, cx: &mut Context<Self>) -> usize {
-        let repeats = matches!(toast.outcome, Outcome::Failed | Outcome::Warning);
+        let repeats = matches!(
+            toast.outcome,
+            Outcome::Failed | Outcome::Warning | Outcome::Info
+        );
         if let Some(shown) = self
             .shown
             .iter_mut()

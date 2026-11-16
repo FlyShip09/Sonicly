@@ -658,6 +658,27 @@ fn holds_pin(items: &[music::PinTarget], uri: &str) -> bool {
     items.iter().any(|item| item.uri == uri && item.pinned)
 }
 
+/// Whether a change to `shelf` has an account to land in. A guest session has none, so the
+/// provider would only refuse the request: the listener is told what signing in gives them,
+/// under the Fluent key `key`, with a button to the accounts page, and the caller sends nothing.
+/// The local shelf needs no account.
+pub fn has_account(
+    session: &Entity<Session>,
+    shelf: Shelf,
+    key: &'static str,
+    cx: &mut App,
+) -> bool {
+    let session = session.read(cx);
+    if shelf.local() || !session.guest() {
+        return true;
+    }
+    let toast = Toast::new(Outcome::Info, key)
+        .name(session.provider_name().unwrap_or_default())
+        .open("toast-sign-in", Target::ProviderSettings);
+    Toasts::post(toast, cx);
+    false
+}
+
 /// Reports whether a provider accepted a favorite update when a caller is waiting for it.
 fn finish_save(completion: Option<oneshot::Sender<bool>>, succeeded: bool) {
     if let Some(completion) = completion {
@@ -681,6 +702,10 @@ impl Library {
             return;
         };
         if S::requests(self).contains_key(&id) {
+            finish_save(completion, false);
+            return;
+        }
+        if !has_account(&self.session, Shelf::of(&id), S::GUEST, cx) {
             finish_save(completion, false);
             return;
         }
@@ -882,6 +907,8 @@ trait Savable: Clone + Send + Sized + 'static {
     const TROUBLE: &'static str;
     /// The family whose toast reports this kind's removals.
     const FAMILY: Family;
+    /// The Fluent key that tells a guest what signing in would let them keep.
+    const GUEST: &'static str;
 
     fn id(&self) -> Option<&str>;
     fn title(&self) -> &str;
@@ -905,6 +932,7 @@ trait Savable: Clone + Send + Sized + 'static {
 impl Savable for Track {
     const TROUBLE: &'static str = "saved track";
     const FAMILY: Family = Family::SavedTracks;
+    const GUEST: &'static str = "toast-guest-songs";
 
     fn gone(self) -> Gone {
         Gone::SavedTrack(self)
@@ -973,6 +1001,7 @@ impl Savable for Track {
 impl Savable for Album {
     const TROUBLE: &'static str = "saved album";
     const FAMILY: Family = Family::SavedAlbums;
+    const GUEST: &'static str = "toast-guest-albums";
 
     fn gone(self) -> Gone {
         Gone::SavedAlbum(self)
@@ -1019,6 +1048,7 @@ impl Savable for Album {
 impl Savable for SavedArtist {
     const TROUBLE: &'static str = "favorite artist";
     const FAMILY: Family = Family::SavedArtists;
+    const GUEST: &'static str = "toast-guest-artists";
 
     fn gone(self) -> Gone {
         Gone::SavedArtist(self)
@@ -1908,6 +1938,9 @@ impl Library {
             return;
         }
         let shelf = Shelf::of(&id);
+        if !has_account(&self.session, shelf, "toast-guest-library", cx) {
+            return;
+        }
         let Some(client) = self.session.read(cx).client_of(shelf) else {
             return;
         };
@@ -3367,6 +3400,10 @@ impl Library {
             log::warn!("library: cannot {action} before the new order of the playlist is written");
             Toasts::show(Outcome::Failed, "toast-playlist-busy", cx);
             self.arm_reorders(Duration::ZERO, cx);
+            on_result(self, Err(()), cx);
+            return false;
+        }
+        if !has_account(&self.session, shelf, "toast-guest-playlists", cx) {
             on_result(self, Err(()), cx);
             return false;
         }

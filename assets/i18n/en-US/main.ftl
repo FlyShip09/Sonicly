@@ -1419,6 +1419,11 @@ toast-track-removed-unnamed = Removed from the playlist
 toast-playlist-failed = That change could not be saved
 toast-playlist-busy = Another change is still running
 toast-playlist-signed-out = Sign in to change playlists
+toast-guest-songs = Sign in to { $name } to save songs
+toast-guest-albums = Sign in to { $name } to save albums
+toast-guest-artists = Sign in to { $name } to follow artists
+toast-guest-library = Sign in to { $name } to add to your library
+toast-guest-playlists = Sign in to { $name } to make and change playlists
 toast-playlist-imported = Imported { $name }
 toast-playlist-imported-partly = Imported { $name }, leaving out { $count ->
         [one] one song
