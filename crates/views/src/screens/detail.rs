@@ -570,6 +570,7 @@ impl DetailView {
             }
         });
         PageHero::new("detail-hero", title)
+            .washed()
             .pending(header.is_none() && self.detail.read(cx).is_loading())
             .pin(pin)
             .cover(cover)

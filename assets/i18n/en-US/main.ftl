@@ -64,7 +64,59 @@ library-scanning = Looking through your folders…
 library-scanning-found = Looking through your folders… { $found } so far
 library-scanning-progress = Reading your music… { $read } of { $found }
 library-part-not-loaded = This part of your library did not load
-library-local-unconfigured = Configure your local library
+library-local-unconfigured = Add a folder of music to start your library
+drop-add-library = { $count ->
+    [one] Add one song to Local Music
+   *[other] Add { $count } songs to Local Music
+}
+drop-counting = Counting songs…
+drop-detail-kept = Your files stay where they are.
+drop-detail-ask = You choose where they go after the drop. Your files stay where they are.
+drop-detail-folder = Their folder joins your music folders. Your files stay where they are.
+drop-detail-copy = Copies go into { $name }. Your files stay where they are.
+drop-nothing = Nothing here plays in Sonicly
+drop-nothing-detail = Drop audio files or folders that hold them, like MP3, FLAC, AAC, Ogg, Opus or WAV.
+drop-hint-playlist = Drop on a playlist in the sidebar to add them there instead.
+drop-ask-title = Where should these songs go?
+drop-ask-detail = { $count ->
+    [one] One song is outside your music folders. Your files stay where they are either way, and Sonicly keeps your choice for next time.
+   *[other] { $count } songs are outside your music folders. Your files stay where they are either way, and Sonicly keeps your choice for next time.
+}
+drop-ask-folder = Add { $name } to your music folders
+drop-ask-folders = { $count ->
+    [one] Add their folder to your music folders
+   *[other] Add their { $count } folders to your music folders
+}
+drop-ask-copy = Copy them into { $name }
+drop-ask-confirm = Add songs
+
+# download from a link, through the listener's own yt-dlp
+link-download-title = Download from a link
+link-download-detail = Sonicly runs your own yt-dlp and keeps the audio as the site serves it, in one of your music folders.
+link-download-hint = https://…
+link-download-link = Link
+link-download-invalid = That is not a web link. Paste one that starts with http:// or https://.
+link-download-folder = Save to
+link-download-playlist = Download the whole playlist the link belongs to
+link-download-starting = Asking the site…
+link-download-percent = { $percent }%
+link-download-speed-mb = { $speed } MB/s
+link-download-speed-kb = { $speed } KB/s
+link-download-left = { $time } left
+link-download-start = Start
+link-download-stop = Stop download
+link-download-hide = Hide
+link-download-open-settings = Open storage settings
+link-download-no-folder = A download goes into one of your music folders, and none is set up yet. Choose one first.
+link-download-folder-gone = That music folder is not there. Check that its drive is connected, or pick another folder.
+link-download-missing-windows = yt-dlp was not found. Install it by running “winget install yt-dlp” in a terminal, or get yt-dlp.exe from github.com/yt-dlp/yt-dlp/releases and choose it under Settings, Storage. Sonicly never downloads or updates it for you.
+link-download-missing = yt-dlp was not found. Install it with your package manager, or get it from github.com/yt-dlp/yt-dlp/releases and choose it under Settings, Storage. Sonicly never downloads or updates it for you.
+link-download-unsupported = yt-dlp does not know this site. Check the link, or update yt-dlp if the site is one it supports.
+link-download-protected = This media is DRM-protected. yt-dlp does not download protected media, and neither does Sonicly.
+link-download-no-audio = The site has no separate audio for this link, only video with sound. Sonicly keeps audio as the site serves it and does not convert.
+link-download-network = The site could not be reached. Check your connection and try again.
+link-download-unavailable = The site says this is not available. It may be private, removed, limited to signed-in accounts or blocked in your country.
+link-download-failed = yt-dlp could not download this. Updating yt-dlp often helps, since sites change.
 
 # app menu
 app-refresh = Refresh
@@ -97,6 +149,7 @@ window-restore = Restore
 
 # tray menu
 tray-show = Show Sonicly
+tray-mini-player = Mini player
 tray-play = Play
 tray-pause = Pause
 
@@ -307,6 +360,11 @@ player-previous = Previous track
 player-next = Next track
 player-fullscreen = Now playing
 player-fullscreen-leave = Leave Now playing
+player-mini = Mini player
+mini-player-title = Sonicly mini player
+mini-player-return = Back to the full window
+mini-player-bar = Fold into a bar
+mini-player-card = Show the cover
 player-time-left = -{ $time }
 player-time-left-spoken = { $time } left
 devices-this-computer = This computer
@@ -520,6 +578,9 @@ powerbar-title = Quick search
 powerbar-placeholder = What do you want to listen to?
 powerbar-open = Open
 powerbar-song = Go to song
+powerbar-download-link = Download from this link
+powerbar-commands = Command
+powerbar-command-mini-player = Open the mini player
 
 # search page
 search-placeholder = What do you want to listen to?
@@ -685,11 +746,19 @@ keybind-toggle-repeat = Repeat
 keybind-navigate-back = Go back
 keybind-navigate-forward = Go forward
 keybind-open-search = Search
+keybind-open-home = Go to Home
+keybind-open-songs = Go to Songs
+keybind-open-albums = Go to Albums
+keybind-open-artists = Go to Artists
+keybind-open-playlists = Go to Playlists
 keybind-toggle-powerbar = Quick search
 keybind-open-filter = Filter the page
 keybind-open-settings = Open settings
 keybind-refresh = Refresh
+keybind-download-from-link = Download from a link
 keybind-toggle-fullscreen = Now playing
+keybind-toggle-sidebar = Show or hide the sidebar
+keybind-toggle-mini-player = Mini player
 keybind-toggle-queue = Show the queue
 keybind-toggle-lyrics = Show lyrics
 keybind-toggle-window-fullscreen = Full screen window
@@ -703,9 +772,12 @@ settings-group-controls = Controls
 settings-group-display = Display
 settings-group-sources = Sources
 settings-group-lyrics-order = Priority
+settings-group-lyrics-background = Background
+settings-group-lyrics-presets = Saved looks
 settings-group-playing = Playing
 settings-group-cache = Played tracks
 settings-group-downloads = Downloads
+settings-group-link-downloads = Downloads from links
 settings-group-output = Output
 settings-group-status = Status
 settings-group-startup = Startup
@@ -884,6 +956,11 @@ settings-offline-mode-detail = Show and play only what you downloaded
 settings-downloads-open = Open downloads
 settings-downloads-open-detail = Show the folder your downloads are saved in as audio files any player opens
 settings-downloads-remove = Remove all
+settings-ytdlp = yt-dlp
+settings-ytdlp-detail = The program that downloads from a link. Sonicly runs the one you installed and never fetches it for you
+settings-ytdlp-found = Using { $path }
+settings-ytdlp-choose = Choose program…
+settings-ytdlp-reset = Use the one on PATH
 settings-size-gb = { $size } GB
 settings-size-mb = { $size } MB
 settings-size-measuring = Measuring…
@@ -1124,14 +1201,66 @@ settings-karaoke-lyrics-detail = Highlight lyrics word by word when timing is av
 settings-blur-lyrics = Blur inactive lines
 settings-blur-lyrics-detail = Blur upcoming and previous lines in the lyrics panel
 settings-lyrics-sample-first = Arbitrary data
-settings-lyrics-sample-second = Insert funny text right here
-settings-lyrics-sample-japanese = ここに面白い文章を入れてください
-settings-lyrics-sample-romanized = koko ni omoshiroi bunshou o irete kudasai
-settings-lyrics-sample-fourth = I hope this Japanese checks out
+settings-lyrics-sample-second = The streetlights hum along the river
+settings-lyrics-sample-japanese = 夜の街に灯りがともる
+settings-lyrics-sample-romanized = yoru no machi ni akari ga tomoru
+settings-lyrics-sample-fourth = Lights come on across the night city
 settings-lyrics-sample-fifth = The fifth line
 settings-romanized-lyrics = Romanized lyrics
 settings-romanized-lyrics-detail = Show locally generated pronunciation for selected writing systems
 settings-romanization-writing-systems = Writing systems
+settings-lyrics-background-detail = What Now playing shows behind the lyrics
+settings-lyrics-background-waves = Waves
+settings-lyrics-background-fluid = Fluid
+settings-lyrics-background-cover = Cover
+settings-lyrics-background-image = Picture
+settings-lyrics-background-video = Video
+settings-lyrics-image = Picture
+settings-lyrics-video = Video
+settings-lyrics-file-none = None chosen
+settings-lyrics-file-choose = Choose…
+settings-lyrics-dim = Dim
+settings-lyrics-dim-detail = How dark the background goes behind the lines. A bright picture goes darker on its own, so the lines stay readable
+settings-lyrics-background-blur = Blur
+settings-lyrics-background-blur-detail = How soft the background picture looks
+settings-lyrics-video-pause = Pause with the music
+settings-lyrics-video-pause-detail = Hold the video still while nothing plays
+settings-lyrics-percent = { $percent }%
+settings-lyrics-reset = Reset to default
+settings-lyrics-typeface = Font
+settings-lyrics-typeface-detail = The typeface of the lyrics in Now playing and the side panel
+settings-lyrics-typeface-app = Same as the app
+settings-lyrics-weight = Weight
+settings-lyrics-weight-regular = Regular
+settings-lyrics-weight-medium = Medium
+settings-lyrics-weight-semibold = Semibold
+settings-lyrics-weight-bold = Bold
+settings-lyrics-weight-heavy = Heavy
+settings-lyrics-spacing = Line spacing
+settings-lyrics-spacing-detail = Room between the lines and inside each one
+settings-lyrics-align = Alignment
+settings-lyrics-align-left = Left
+settings-lyrics-align-center = Center
+settings-lyrics-emphasis = Current line
+settings-lyrics-emphasis-detail = How the line being sung stands out
+settings-lyrics-emphasis-scale = Larger
+settings-lyrics-emphasis-weight = Bolder
+settings-lyrics-emphasis-color = Brighter
+settings-lyrics-inactive = Other lines
+settings-lyrics-inactive-detail = How strongly the lines before and after the current one show
+settings-lyrics-preset-new = Save this look
+settings-lyrics-preset-new-detail = Keep the background and text settings under a name to switch back to later
+settings-lyrics-preset-hint = Name
+settings-lyrics-preset-save = Save
+settings-lyrics-preset-numbered = Look { $number }
+settings-lyrics-preset-apply = Use
+settings-lyrics-preset-worn = In use
+settings-lyrics-preset-rename = Rename
+settings-lyrics-preset-rename-done = Done
+settings-lyrics-preset-delete = Delete
+settings-lyrics-look-reset = Default look
+settings-lyrics-look-reset-detail = Put every lyrics style setting back. Saved looks stay
+settings-lyrics-look-reset-action = Reset
 settings-lyrics-priority = Provider priority
 settings-lyrics-priority-detail = Sonicly shows synced lyrics from the highest source that has them
 settings-lyrics-word-synced-first = Prioritize word-synced lyrics
@@ -1204,6 +1333,11 @@ settings-scrobble-server = Server address
 settings-scrobble-server-optional = Server address (optional)
 settings-local-folder = Music folders
 settings-local-folder-empty = Not configured
+settings-dropped-files = Songs dropped from elsewhere
+settings-dropped-files-detail = Where songs dropped on the window from outside your music folders go
+settings-dropped-files-ask = Ask
+settings-dropped-files-folder = Add their folder
+settings-dropped-files-copy = Copy into { $name }
 settings-choose-folder = Choose folder…
 settings-add-folder = Add folder
 settings-remove-folder = Remove folder
@@ -1222,6 +1356,10 @@ settings-licenses = Open-source licenses
 settings-licenses-detail = The licenses of the libraries, fonts and icons this build includes
 settings-source = Source code
 settings-source-detail = The corresponding source for this build
+github-star = Star on GitHub
+settings-star-detail = Opens Sonicly's repository in your browser
+settings-star-count = Show the star count
+settings-star-count-detail = Ask GitHub at most once a day how many stars Sonicly has. Only the app's name and version are sent
 settings-notice = Copyright © 2026 Sonicly Contributors. Sonicly comes with absolutely no warranty. It is free software, and you are welcome to redistribute it under the terms of the GNU General Public License version 3 or later. Sonicly is unofficial and is not affiliated with Spotify AB.
 
 # themes
@@ -1276,7 +1414,20 @@ toast-playlist-imported-partly = Imported { $name }, leaving out { $count ->
     } not in your library
 toast-playlist-import-empty = None of the songs in { $name } are in your library
 toast-playlist-exported = Playlist exported
+toast-link-downloaded = { $count ->
+        [0] Downloaded { $name }
+        [one] Downloaded { $name } and one more
+       *[other] Downloaded { $name } and { $count } more
+    }
+toast-link-downloaded-untagged = A file in a format Sonicly cannot tag keeps the name the site gave it
 toast-file-dialog-failed = Could not open the file dialog
+toast-lyrics-picture-failed = Could not open { $name }. Choose a JPEG, PNG or WebP picture
+toast-lyrics-video-unsupported = Video backgrounds play on Windows only
+toast-lyrics-video-unreadable = Could not open { $name }. Check that the file is still there
+toast-lyrics-video-empty = { $name } has no video in it. Choose another file
+toast-lyrics-video-codec = Windows can't decode { $name }. Use an MP4 (H.264) file, or install the codec from the Microsoft Store
+toast-lyrics-preset-full = Sonicly keeps 24 looks. Delete one to save another
+toast-lyrics-preset-name-taken = Another look has that name, or the name is empty
 toast-queued-track = { $name } added to the queue
 toast-next-track = { $name } plays next
 toast-last-track = { $name } plays last
@@ -1367,6 +1518,11 @@ lyrics-source = Lyrics from { $source }
 lyrics-source-local = Lyrics from the local file
 lyrics-writers = Written by { $writers }
 lyrics-instrumental-break = Instrumental break
+lyrics-style = Lyrics style
+lyrics-style-backgrounds = Background
+lyrics-style-looks = Saved looks
+lyrics-style-default = Default look
+lyrics-style-more = More options…
 
 update-available = Sonicly { $version } is out
 update-detail = You are on { $running }. Read what changed, or update now.
@@ -1460,7 +1616,7 @@ nav-return-top = Back to top
 # trouble
 trouble-offline = No connection
 trouble-offline-detail = Check your internet connection and try again.
-trouble-not-loaded = Could not load
+trouble-not-loaded = This page didn't load
 trouble-retry = Try again
 trouble-busy = Service is busy
 trouble-busy-detail = Too many requests went out at once. Wait a minute and try again.
@@ -1504,6 +1660,16 @@ toast-library-scanned = { $count ->
 toast-scan-failed = Your music folders could not be scanned
 toast-folder-removed = Removed { $name }
 toast-folder-missing = { $name } is no longer on disk
+toast-drop-nothing = Nothing was added. Sonicly plays audio files like MP3 and FLAC.
+toast-drop-adding = { $count ->
+    [one] Adding one song to Local Music
+   *[other] Adding { $count } songs to Local Music
+}
+toast-drop-copied = { $count ->
+    [one] Copied one song into { $name }
+   *[other] Copied { $count } songs into { $name }
+}
+toast-drop-copy-failed = Some songs could not be copied into { $name }. Check that the folder is writable and has room.
 toast-history-removed = { $count ->
     [one] Removed from history
    *[other] Removed { $count } songs from history

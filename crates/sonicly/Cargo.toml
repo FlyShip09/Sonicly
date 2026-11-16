@@ -7,7 +7,7 @@ license.workspace = true
 [features]
 # the gpui frame overlay and repaint wash, off in normal builds
 profiler = ["gpui/profiler"]
-# patch running debug builds from `dx serve --hot-patch`, see CONTRIBUTING.md
+# patch running debug builds from `dx serve --hot-patch`, see "Building and checks" in CLAUDE.md
 hot-reload = ["gpui/hot-reload"]
 
 [dependencies]
@@ -52,6 +52,8 @@ libc.workspace = true
 objc2.workspace = true
 objc2-app-kit = { workspace = true, features = [
     "block2",
+    "NSButton",
+    "NSControl",
     "NSEvent",
     "NSImage",
     "NSImageRep",

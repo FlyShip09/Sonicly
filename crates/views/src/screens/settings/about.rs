@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use gpui::prelude::*;
 use gpui::{AnyElement, Context, FontWeight, SharedString, div, img};
 use i18n::t;
-use state::Channel;
+use state::{Channel, Stars};
 use ui::{ActiveTheme as _, Switch, Text};
 
 use super::rows::{outward, segmented};
@@ -16,8 +16,6 @@ const MARK_TILE: f32 = 0.5;
 /// The app icon as this platform shows it, registered by the binary's asset source.
 const APP_ICON: &str = "brand/sonicly.svg";
 const LICENSE_URL: &str = "https://www.gnu.org/licenses/gpl-3.0.html";
-/// Sonicly's own repository, which the source row opens.
-const SOURCE_URL: &str = "https://github.com/FlyShip09/Sonicly";
 /// The third-party notices as a package ships them.
 const NOTICES: &str = "THIRD-PARTY.md";
 
@@ -32,7 +30,14 @@ impl SettingsView {
                     .into_iter()
                     .chain(updates)
                     .chain(channel)
-                    .chain([Slot::Log, Slot::License, Slot::Licenses, Slot::Source]),
+                    .chain([
+                        Slot::Log,
+                        Slot::License,
+                        Slot::Licenses,
+                        Slot::Source,
+                        Slot::Star,
+                        Slot::StarCount,
+                    ]),
             ),
         ]
     }
@@ -138,8 +143,33 @@ impl SettingsView {
 
     pub(super) fn source_row(&self, cx: &mut Context<Self>) -> AnyElement {
         outward("source", t!("settings-source"), None, cx)
-            .on_click(|_, _, cx| cx.open_url(SOURCE_URL))
+            .on_click(|_, _, cx| cx.open_url(state::REPO_URL))
             .into_any_element()
+    }
+
+    /// The row that opens the repository to star it, with the count beside it once known.
+    pub(super) fn star_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let count = Stars::global(cx).read(cx).label().map(SharedString::from);
+
+        outward("star", t!("github-star"), count, cx)
+            .on_click(|_, _, cx| cx.open_url(state::REPO_URL))
+            .into_any_element()
+    }
+
+    /// The switch for the one request that reads the star count.
+    pub(super) fn star_count_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let on = self.settings.read(cx).github_stars();
+
+        self.row(
+            t!("settings-star-count"),
+            Switch::new("star-count", on)
+                .name(t!("settings-star-count"))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.settings
+                        .update(cx, |settings, cx| settings.set_github_stars(!on, cx));
+                }))
+                .into_any_element(),
+        )
     }
 
     /// Opens About with the app icon beside its name, aligned with the settings below. The icon

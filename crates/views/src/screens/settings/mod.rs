@@ -34,6 +34,7 @@ mod header;
 mod keybinds;
 mod layout;
 mod lyrics;
+mod lyrics_style;
 mod now_playing;
 mod playback;
 mod player_bar;
@@ -57,6 +58,7 @@ const TITLE_WEIGHT: u32 = 2;
 /// The picker keys the page's render watches, shared with the rows that open them.
 const LANGUAGES: &str = "languages";
 const TYPEFACES: &str = "typefaces";
+const LYRIC_FACES: &str = "lyric-faces";
 /// The shortcut that puts the caret in the search field, whose key the field shows.
 const OPEN_FILTER: &str = "open-filter";
 /// How often the storage section measures the cache and the downloads again while its tab shows.
@@ -70,6 +72,7 @@ enum Slot {
     LocalFolder,
     SubsonicLibrary,
     Folders,
+    DroppedFiles,
     Theme,
     Adaptive,
     Icons,
@@ -90,6 +93,22 @@ enum Slot {
     FullscreenControlsAutohide,
     OsFullscreen,
     Lyrics,
+    LyricsBackground,
+    LyricsImage,
+    LyricsVideo,
+    LyricsDim,
+    LyricsBlur,
+    LyricsVideoPause,
+    LyricsTypeface,
+    LyricsWeight,
+    LyricsSpacing,
+    LyricsAlign,
+    LyricsEmphasis,
+    LyricsInactive,
+    LyricsPresetSave,
+    /// The saved look at this place in the list.
+    LyricsPreset(usize),
+    LyricsLookReset,
     Karaoke,
     BlurLyrics,
     Romanized,
@@ -108,6 +127,8 @@ enum Slot {
     DownloadsUsage,
     OfflineMode,
     OpenDownloads,
+    /// The yt-dlp program that downloads from a link.
+    YtDlp,
     Sleep,
     StayAwake,
     StreamQuality,
@@ -170,6 +191,8 @@ enum Slot {
     License,
     Licenses,
     Source,
+    Star,
+    StarCount,
 }
 
 /// What a tab scrolls to once it is laid out.
@@ -261,6 +284,17 @@ pub struct SettingsView {
     cache: ScrubberState,
     /// The cache size a drag of its slider points at, until it lets go.
     pending_cache: Option<u32>,
+    lyrics_dim: ScrubberState,
+    lyrics_blur: ScrubberState,
+    lyrics_spacing: ScrubberState,
+    lyrics_inactive: ScrubberState,
+    /// The name a look is saved under.
+    preset_name: Entity<Input>,
+    /// The new name of the look being renamed, and which look that is.
+    preset_rename: Entity<Input>,
+    renaming: Option<String>,
+    /// The file prompt for a background picture or video, while it is up.
+    backdrop_pick: Option<Task<()>>,
     popovers: Popovers,
     /// The theme family whose variant menu opened last, which owns that menu's popover.
     theme_variants: Option<String>,
@@ -335,6 +369,9 @@ impl SettingsView {
         cx.observe(&session, |this, _, cx| this.remeasure(cx))
             .detach();
         cx.observe(&scrobbling, |this, _, cx| this.remeasure(cx))
+            .detach();
+        let link_download = Sonicly::global(cx).link_download.clone();
+        cx.observe(&link_download, |this, _, cx| this.remeasure(cx))
             .detach();
         cx.observe(&settings, |this, _, cx| {
             this.show_filter_shortcut(cx);
@@ -458,6 +495,14 @@ impl SettingsView {
             pending_sleep: None,
             cache: ScrubberState::new("cache-size"),
             pending_cache: None,
+            lyrics_dim: ScrubberState::new("lyrics-dim"),
+            lyrics_blur: ScrubberState::new("lyrics-blur"),
+            lyrics_spacing: ScrubberState::new("lyrics-spacing"),
+            lyrics_inactive: ScrubberState::new("lyrics-inactive"),
+            preset_name: cx.new(|cx| Input::new("settings-lyrics-preset-hint", cx).compact()),
+            preset_rename: cx.new(|cx| Input::new("settings-lyrics-preset-hint", cx).compact()),
+            renaming: None,
+            backdrop_pick: None,
             popovers,
             theme_variants: None,
             deleting_theme: None,
@@ -534,7 +579,12 @@ impl SettingsView {
     /// closing stops what they keep running.
     pub(crate) fn set_open(&mut self, open: bool, cx: &mut Context<Self>) {
         match open {
-            true => self.previews.opened(),
+            true => {
+                self.previews.opened();
+                // yt-dlp may have been installed since settings were last open.
+                let link_download = Sonicly::global(cx).link_download.clone();
+                link_download.update(cx, |downloads, cx| downloads.look(cx));
+            }
             false => {
                 self.previews.closed();
                 self.stop_recording(cx);
@@ -732,6 +782,10 @@ impl SettingsView {
     fn slot_meta(&self, slot: Slot, cx: &App) -> Option<(SharedString, SharedString)> {
         let meta = match slot {
             Slot::Folders => return None,
+            Slot::DroppedFiles => (
+                t!("settings-dropped-files"),
+                t!("settings-dropped-files-detail"),
+            ),
             Slot::Startup => (t!("settings-startup"), t!("settings-startup-detail")),
             Slot::Provider => (t!("settings-provider"), t!("settings-provider-detail")),
             Slot::Entries => (t!("settings-entries"), t!("settings-entries-detail")),
@@ -880,6 +934,7 @@ impl SettingsView {
                 t!("settings-downloads-open"),
                 t!("settings-downloads-open-detail"),
             ),
+            Slot::YtDlp => (t!("settings-ytdlp"), t!("settings-ytdlp-detail")),
             Slot::StreamQuality => (
                 t!("settings-stream-quality"),
                 t!("settings-stream-quality-detail"),
@@ -927,6 +982,58 @@ impl SettingsView {
                 t!("settings-lyrics-word-synced-first-detail"),
             ),
             Slot::Lyrics => (t!("settings-lyrics"), t!("settings-lyrics-detail")),
+            Slot::LyricsBackground => (
+                t!("settings-group-lyrics-background"),
+                t!("settings-lyrics-background-detail"),
+            ),
+            Slot::LyricsImage => (t!("settings-lyrics-image"), SharedString::default()),
+            Slot::LyricsVideo => (t!("settings-lyrics-video"), SharedString::default()),
+            Slot::LyricsDim => (t!("settings-lyrics-dim"), t!("settings-lyrics-dim-detail")),
+            Slot::LyricsBlur => (
+                t!("settings-lyrics-background-blur"),
+                t!("settings-lyrics-background-blur-detail"),
+            ),
+            Slot::LyricsVideoPause => (
+                t!("settings-lyrics-video-pause"),
+                t!("settings-lyrics-video-pause-detail"),
+            ),
+            Slot::LyricsTypeface => (
+                t!("settings-lyrics-typeface"),
+                t!("settings-lyrics-typeface-detail"),
+            ),
+            Slot::LyricsWeight => (t!("settings-lyrics-weight"), SharedString::default()),
+            Slot::LyricsSpacing => (
+                t!("settings-lyrics-spacing"),
+                t!("settings-lyrics-spacing-detail"),
+            ),
+            Slot::LyricsAlign => (t!("settings-lyrics-align"), SharedString::default()),
+            Slot::LyricsEmphasis => (
+                t!("settings-lyrics-emphasis"),
+                t!("settings-lyrics-emphasis-detail"),
+            ),
+            Slot::LyricsInactive => (
+                t!("settings-lyrics-inactive"),
+                t!("settings-lyrics-inactive-detail"),
+            ),
+            Slot::LyricsPresetSave => (
+                t!("settings-lyrics-preset-new"),
+                t!("settings-lyrics-preset-new-detail"),
+            ),
+            Slot::LyricsPreset(index) => (
+                SharedString::from(
+                    self.settings
+                        .read(cx)
+                        .lyrics_presets()
+                        .get(index)?
+                        .name
+                        .clone(),
+                ),
+                t!("settings-group-lyrics-presets"),
+            ),
+            Slot::LyricsLookReset => (
+                t!("settings-lyrics-look-reset"),
+                t!("settings-lyrics-look-reset-detail"),
+            ),
             Slot::Karaoke => (
                 t!("settings-karaoke-lyrics"),
                 t!("settings-karaoke-lyrics-detail"),
@@ -1014,6 +1121,8 @@ impl SettingsView {
             Slot::License => (t!("settings-license"), t!("settings-license-detail")),
             Slot::Licenses => (t!("settings-licenses"), t!("settings-licenses-detail")),
             Slot::Source => (t!("settings-source"), t!("settings-source-detail")),
+            Slot::Star => (t!("github-star"), t!("settings-star-detail")),
+            Slot::StarCount => (t!("settings-star-count"), t!("settings-star-count-detail")),
         };
         Some(meta)
     }
@@ -1032,6 +1141,7 @@ impl SettingsView {
             Slot::LocalFolder => self.local_folder_row(cx),
             Slot::SubsonicLibrary => self.subsonic_library_row(cx),
             Slot::Folders => self.folders(cx),
+            Slot::DroppedFiles => self.dropped_files_row(cx),
             Slot::Theme | Slot::Icons | Slot::Corners => div().into_any_element(),
             Slot::Adaptive => self.adaptive_row(cx),
             Slot::Ambient => self.ambient_row(cx),
@@ -1080,6 +1190,7 @@ impl SettingsView {
             Slot::DownloadsUsage => self.downloads_usage_row(cx),
             Slot::OfflineMode => self.offline_mode_row(cx),
             Slot::OpenDownloads => self.open_downloads_row(cx),
+            Slot::YtDlp => self.ytdlp_row(cx),
             Slot::StreamQuality => self.stream_quality_row(cx),
             Slot::StreamFormat => self.stream_format_row(cx),
             Slot::StreamBitrate => self.stream_bitrate_row(cx),
@@ -1095,6 +1206,21 @@ impl SettingsView {
             Slot::LyricsPriority => self.lyrics_priority(cx),
             Slot::WordSyncedFirst => self.word_synced_first_row(cx),
             Slot::Lyrics => self.lyrics_row(cx),
+            Slot::LyricsBackground => self.lyrics_background_cards(window, cx),
+            Slot::LyricsImage => self.lyrics_file_row(state::LyricsBackground::Image, cx),
+            Slot::LyricsVideo => self.lyrics_file_row(state::LyricsBackground::Video, cx),
+            Slot::LyricsDim => self.lyrics_dim_row(cx),
+            Slot::LyricsBlur => self.lyrics_blur_row(cx),
+            Slot::LyricsVideoPause => self.lyrics_video_pause_row(cx),
+            Slot::LyricsTypeface => self.lyrics_typeface_row(cx),
+            Slot::LyricsWeight => self.lyrics_weight_row(cx),
+            Slot::LyricsSpacing => self.lyrics_spacing_row(cx),
+            Slot::LyricsAlign => self.lyrics_align_row(cx),
+            Slot::LyricsEmphasis => self.lyrics_emphasis_row(cx),
+            Slot::LyricsInactive => self.lyrics_inactive_row(cx),
+            Slot::LyricsPresetSave => self.lyrics_preset_save_row(cx),
+            Slot::LyricsPreset(index) => self.lyrics_preset_row(index, cx),
+            Slot::LyricsLookReset => self.lyrics_look_reset_row(cx),
             Slot::Karaoke => self.karaoke_lyrics_row(cx),
             Slot::Romanized => self.romanized_lyrics_row(cx),
             Slot::LyricsForLocal => self.lyrics_for_local_files_row(cx),
@@ -1125,6 +1251,8 @@ impl SettingsView {
             Slot::License => self.license_row(cx),
             Slot::Licenses => self.licenses_row(cx),
             Slot::Source => self.source_row(cx),
+            Slot::Star => self.star_row(cx),
+            Slot::StarCount => self.star_count_row(cx),
         }
     }
 
@@ -1363,8 +1491,10 @@ impl SettingsView {
 
     /// Starts reading the installed fonts the first time the typeface picker could need them.
     fn load_fonts(&mut self, cx: &mut Context<Self>) {
-        let picking = self.popovers.shows(TYPEFACES);
-        let wanted = self.page.tab() == SettingsTab::Appearance || picking;
+        let picking = self.popovers.shows(TYPEFACES) || self.popovers.shows(LYRIC_FACES);
+        let wanted = self.page.tab() == SettingsTab::Appearance
+            || self.page == SettingsPage::Lyrics
+            || picking;
         if !wanted || self.installed.is_some() || self.loading_fonts {
             return;
         }
@@ -1382,12 +1512,15 @@ impl SettingsView {
                 this.font_task = None;
                 // the picker may already be open on an empty list: put the
                 // cursor on the chosen face now that it can be found
-                if this.popovers.shows(TYPEFACES) {
-                    let chosen = this.settings.read(cx).font();
+                if let Some(key) = [TYPEFACES, LYRIC_FACES]
+                    .into_iter()
+                    .find(|key| this.popovers.shows(key))
+                {
+                    let chosen = this.chosen_typeface(key, cx);
                     let place = this
                         .typeface_entries()
                         .iter()
-                        .position(|name| name.as_ref() == chosen);
+                        .position(|name| *name.as_ref() == chosen);
                     this.typefaces.place(place, cx);
                 }
                 cx.notify();
@@ -1422,12 +1555,15 @@ impl Render for SettingsView {
             self.languages.sync(false, None, window, cx);
         }
 
-        if self.popovers.shows(TYPEFACES) {
-            let chosen_typeface = self.settings.read(cx).font();
+        let picking_faces = [TYPEFACES, LYRIC_FACES]
+            .into_iter()
+            .find(|key| self.popovers.shows(key));
+        if let Some(key) = picking_faces {
+            let chosen_typeface = self.chosen_typeface(key, cx);
             let typeface_selected = self
                 .typeface_entries()
                 .iter()
-                .position(|name| name.as_ref() == chosen_typeface);
+                .position(|name| *name.as_ref() == chosen_typeface);
             self.typefaces.sync(true, typeface_selected, window, cx);
         } else {
             self.typefaces.sync(false, None, window, cx);

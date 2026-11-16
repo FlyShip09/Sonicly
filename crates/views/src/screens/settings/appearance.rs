@@ -11,7 +11,7 @@ use ui::{
 };
 
 use super::rows::{Announced as _, grid};
-use super::{Group, SettingsView, Slot, TYPEFACES};
+use super::{Group, LYRIC_FACES, SettingsView, Slot, TYPEFACES};
 use crate::shared::popups::matches_query;
 
 /// The website's gallery of themes people made, whose install buttons hand a theme to Sonicly.
@@ -70,23 +70,52 @@ impl SettingsView {
     }
 
     pub(super) fn typeface_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let chosen = self.settings.read(cx).font().to_owned();
+        let picker = self.typeface_picker(TYPEFACES, cx);
+        self.row(t!("settings-typeface"), picker)
+    }
+
+    /// The face a typeface picker under `key` has chosen: the app's own under `TYPEFACES`, and
+    /// the lyrics' under `LYRIC_FACES`.
+    pub(super) fn chosen_typeface(&self, key: &'static str, cx: &App) -> String {
+        let settings = self.settings.read(cx);
+        match key == LYRIC_FACES {
+            true => settings.lyrics_style().font,
+            false => settings.font().to_owned(),
+        }
+    }
+
+    /// Puts the face `name` on where the picker under `key` sets it.
+    fn choose_typeface(&mut self, key: &'static str, name: String, cx: &mut Context<Self>) {
+        match key == LYRIC_FACES {
+            true => self.restyle(state::LyricsStyleChange::Font(name), cx),
+            false => self
+                .settings
+                .update(cx, |settings, cx| settings.set_font(name, cx)),
+        }
+    }
+
+    /// The searchable list of every installed face, each previewed in itself as it scrolls into
+    /// view, for the app's font under `TYPEFACES` or the lyrics' under `LYRIC_FACES`. Its first
+    /// entry is the app's default, which for the lyrics means the app's own font.
+    pub(super) fn typeface_picker(&self, key: &'static str, cx: &mut Context<Self>) -> AnyElement {
+        let chosen = self.chosen_typeface(key, cx);
         let bundled = chosen == SYSTEM_FONT;
+        let default = match key == LYRIC_FACES {
+            true => t!("settings-lyrics-typeface-app"),
+            false => t!("settings-typeface-system"),
+        };
         let current = match bundled {
-            true => t!("settings-typeface-system"),
+            true => default.clone(),
             false => SharedString::from(chosen.clone()),
         };
 
-        let picking = self.popovers.shows(TYPEFACES);
+        let picking = self.popovers.shows(key);
         let asked = self.typefaces.query();
         let installed = self.installed.as_deref().unwrap_or_default();
 
         let mut entries = Vec::new();
         if picking {
-            entries.push((
-                SharedString::from(SYSTEM_FONT),
-                t!("settings-typeface-system"),
-            ));
+            entries.push((SharedString::from(SYSTEM_FONT), default));
             entries.extend(installed.iter().map(|name| (name.clone(), name.clone())));
             entries = entries
                 .into_iter()
@@ -159,9 +188,7 @@ impl SettingsView {
                         .checked(chosen == name.as_ref())
                         .when(shows, |item| item.face(preview))
                         .on_click(cx.listener(move |this, _, _, cx| {
-                            let name = name.to_string();
-                            this.settings
-                                .update(cx, |settings, cx| settings.set_font(name, cx));
+                            this.choose_typeface(key, name.to_string(), cx);
                             this.popovers.close();
                             cx.notify();
                         }))
@@ -180,8 +207,11 @@ impl SettingsView {
             .detach();
         }
 
-        let picker = Picker::new(TYPEFACES, &self.popovers, current)
-            .name(t!("settings-typeface"))
+        let picker = Picker::new(key, &self.popovers, current)
+            .name(match key == LYRIC_FACES {
+                true => t!("settings-lyrics-typeface"),
+                false => t!("settings-typeface"),
+            })
             .width(Picker::WIDE)
             .menu(self.typefaces.menu("typefaces-menu", Picker::WIDE))
             .items(items)
@@ -202,15 +232,14 @@ impl SettingsView {
                 let Some(name) = submitted.get(place) else {
                     return;
                 };
-                this.settings
-                    .update(cx, |settings, cx| settings.set_font(name.to_string(), cx));
+                this.choose_typeface(key, name.to_string(), cx);
                 this.popovers.close();
                 cx.notify();
             },
             cx,
         );
 
-        self.row(t!("settings-typeface"), keys.into_any_element())
+        keys.into_any_element()
     }
 
     pub(super) fn blur_row(&self, cx: &mut Context<Self>) -> AnyElement {

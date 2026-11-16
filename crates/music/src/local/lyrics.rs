@@ -29,9 +29,12 @@ impl LyricsProvider for LocalLyrics {
     }
 
     async fn search(&self, query: &LyricsQuery) -> Result<Vec<LyricsHit>> {
+        // A file beside a cue sheet holds the whole album, and so do its lyrics, timed from the
+        // first track on. They are no single track's, so a cue sheet track gets none from here.
         let Some(path) = query
             .track
             .as_ref()
+            .filter(|track| wire::window(&track.id).is_none())
             .and_then(|track| wire::path_from_track_id(&track.id))
         else {
             return Ok(Vec::new());

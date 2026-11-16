@@ -19,6 +19,31 @@
    scratch. Folders are merged *before* grouping, so an artist/album split across folders still
    merges into one entry.
 
+## Cue sheets (`cue.rs`)
+
+A `.cue` beside the one audio file it describes replaces that file in the library with the sheet's
+tracks. The file is matched by the name in the sheet's `FILE` line, then by that name with another
+extension (a `.wav` packed into a `.flac`), then by the sheet's own name (`Album.cue`,
+`Album.flac.cue`). A sheet that names several files changes nothing.
+
+- Each track's id is the file's id plus `#cue=<start>-<end>` in the sheet's 1/75 s frames
+  (`wire::cue_track_id`). `wire::path_from_track_id` still answers with the file, and `wire::window`
+  with the stretch to play, which `playback::decode` hands to `audio::Trimmed`. Nothing outside
+  this module knows the track is not a file.
+- Title, performer and number come from the track, album and album artist from the sheet's header,
+  the year from `REM DATE`, everything else (cover, genre, disc) from the file's own tags.
+- The index keeps one row per real file. `cue::apply` runs on every scan, so an edited sheet shows
+  on the next one. Where the sheets are is kept under `scan/cues` in the cache, since a folder
+  listed from memory is never read from disk.
+- `client::whole_file` refuses tag edits and file deletion for such a track, and `lyrics.rs` gives
+  it no lyrics from the file, which would be the whole album's.
+
+## Playlist files
+
+`m3u.rs`, `pls.rs` and `xspf.rs` each turn a file into the paths it names; `client::import_playlist`
+picks one by extension. Paths, `file://` URLs and separators are read by `m3u::located` for all
+three.
+
 ## Playback
 
 `wire::id3v2_end` skips a leading ID3v2 tag before handing the file to `rodio` — audio doesn't need

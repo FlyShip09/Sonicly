@@ -1,7 +1,7 @@
 use gpui::prelude::*;
 use gpui::{App, Hsla, Pixels, px};
 
-use crate::theme::ActiveTheme as _;
+use crate::theme::{ActiveTheme as _, WindowMaterial};
 
 /// How much of the popover colour a glass control keeps over what it blurs.
 pub const GLASS_FILL: f32 = 0.2;
@@ -17,6 +17,13 @@ const BAR_BLUR: Pixels = px(18.);
 /// The bar's fill on a see-through window. The page wash already sits under the bar, so the thick
 /// fill would stack on it and leave the bar far darker than the window around it.
 const CLEAR_BAR_FILL: f32 = 0.3;
+/// How much of the frame colour lies over the platform's material. Mica is already a calm,
+/// tinted surface, so Windows keeps it thin; a raw blur of the desktop elsewhere can be any
+/// wallpaper, so the frame holds more of its own colour to keep its labels legible.
+const FRAME_FILL: f32 = match cfg!(target_os = "windows") {
+    true => 0.5,
+    false => 0.78,
+};
 
 /// Whether a surface that only frosts for the look of it should frost at all. A backdrop blur
 /// is the priciest thing the renderer does per frame, so the setting turns those off and each
@@ -24,6 +31,25 @@ const CLEAR_BAR_FILL: f32 = 0.3;
 /// it answers: their haze is what keeps text readable over the content passing under it.
 pub fn blurring(cx: &App) -> bool {
     cx.theme().blur
+}
+
+/// Whether the frame, the title bar and the sidebar, lies thin over the platform's own material
+/// rather than as a solid fill. It follows the Blur setting, the same choice of look over cost,
+/// and needs an opaque window, since a see-through one already shows the desktop everywhere.
+pub fn material(cx: &App) -> bool {
+    let theme = cx.theme();
+    theme.blur && !theme.transparent && WindowMaterial::supported(cx)
+}
+
+/// What the frame paints: the frame colour, thinned over the platform's material, or nothing on
+/// a see-through window, whose root already paints the veiled background under everything.
+pub fn frame_fill(cx: &App) -> Option<Hsla> {
+    let theme = cx.theme();
+    match (theme.transparent, material(cx)) {
+        (true, _) => None,
+        (false, true) => Some(theme.sidebar.opacity(FRAME_FILL)),
+        (false, false) => Some(theme.sidebar),
+    }
 }
 
 /// Styles an element as frosted glass: a faint popover fill over a hard blur of

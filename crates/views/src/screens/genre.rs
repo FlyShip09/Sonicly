@@ -181,7 +181,8 @@ impl Render for GenreView {
                                         .aria_level(1)
                                         .aria_label(name.clone())
                                         .text_size(theme.text(Text::Display))
-                                        .font_weight(FontWeight::BOLD)
+                                        .line_height(gpui::relative(Text::Display.leading()))
+                                        .font_weight(FontWeight::SEMIBOLD)
                                         .child(name),
                                 )
                             })

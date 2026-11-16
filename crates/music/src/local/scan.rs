@@ -5,6 +5,7 @@ use std::time::UNIX_EPOCH;
 use crate::progress;
 use crate::{Album, ReleaseType, SavedArtist, Track};
 
+use super::cue;
 use super::index::{Changes, Index, Remembered};
 use super::wire::{self, Tagged};
 
@@ -44,6 +45,9 @@ pub(super) struct Folder {
     pub known: bool,
     /// The files in it named like album art or a portrait. Only a folder listed from disk has them.
     pub images: Vec<PathBuf>,
+    /// The cue sheets in it, from the listing or, for a folder the index was trusted for, from
+    /// what the last scan remembered.
+    pub cues: Vec<PathBuf>,
 }
 
 /// One track as this scan has it, beside what the index should record for its file.
@@ -116,10 +120,18 @@ pub fn scan(roots: &[PathBuf], cache_dir: &Path, index: &Index) -> Scanned {
     let opened = readings.iter().filter(|reading| reading.fresh).count();
     scanned.portraits = name_portraits(&looks, &readings);
     let parsed: Vec<Tagged> = readings.into_iter().map(|reading| reading.tagged).collect();
+    // The index keeps each file as one track. A cue sheet cuts its file up here, on every scan,
+    // so an edit to the sheet shows on the next one without the audio being read again.
+    let sheets: Vec<PathBuf> = folders
+        .iter()
+        .flat_map(|folder| folder.cues.iter().cloned())
+        .collect();
+    let parsed = cue::apply(parsed, &sheets);
     scanned.albums = group_albums(&parsed);
     scanned.artists = group_artists(&parsed, &scanned.portraits, &scanned.albums);
     scanned.tracks = parsed.into_iter().map(|tagged| tagged.track).collect();
     index.save(&changes);
+    index.keep_cues(&remembered, sheets, &reached);
 
     log::debug!(
         "local: scanned {found} files and {} folders in {}ms \
@@ -479,10 +491,12 @@ fn walk(
         mtime,
         known,
         images: Vec::new(),
+        cues: Vec::new(),
     });
 
     match known {
         true => {
+            folders[at].cues = remembered.cues_in(dir);
             let Some(children) = remembered.children(dir) else {
                 return;
             };
@@ -534,6 +548,11 @@ fn walk(
             folders[at].images = here
                 .iter()
                 .filter(|(path, folder)| !folder && path.file_name().is_some_and(wire::is_art))
+                .map(|(path, _)| path.clone())
+                .collect();
+            folders[at].cues = here
+                .iter()
+                .filter(|(path, folder)| !folder && cue::is_sheet(path))
                 .map(|(path, _)| path.clone())
                 .collect();
             for (path, folder) in here {
@@ -654,7 +673,7 @@ fn folder_name(dir: &Path) -> String {
         .unwrap_or_else(|| dir.display().to_string())
 }
 
-fn is_audio_file(path: &Path) -> bool {
+pub(super) fn is_audio_file(path: &Path) -> bool {
     if path
         .file_name()
         .is_some_and(|name| name.as_encoded_bytes().starts_with(b"._"))

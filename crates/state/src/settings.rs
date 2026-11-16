@@ -6,9 +6,15 @@
 //! debounce, so a sidebar drag never rewrites the preferences file.
 
 mod equalizer;
+mod lyrics_style;
 mod themes;
+mod version;
 
 pub use self::equalizer::equalizer_profile_label;
+pub use self::lyrics_style::{
+    LYRICS_WEIGHTS, LyricsAlign, LyricsBackground, LyricsEmphasis, LyricsPreset, LyricsStyle,
+    LyricsStyleChange, MAX_DIM, MAX_SPACING, MIN_DIM, MIN_INACTIVE, MIN_SPACING,
+};
 pub use self::themes::{ThemeFamily, ThemeOffer, ThemeVariant};
 pub(crate) use self::themes::{is_own_link, read_link as read_theme_link};
 
@@ -23,7 +29,7 @@ use anyhow::{Context as _, Result};
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use gpui::WindowDecorations;
 use gpui::{
-    App, Bounds, Context, DisplayId, EventEmitter, Pixels, Size, Subscription, Task, Window,
+    App, Bounds, Context, DisplayId, EventEmitter, Pixels, Point, Size, Subscription, Task, Window,
     WindowBounds, point, px, size,
 };
 use music::lyrics::LOCAL;
@@ -279,6 +285,17 @@ impl Default for VisualizerScreens {
     }
 }
 
+/// Where songs dropped on the window from outside the music folders go. Either way the
+/// originals are left where they are.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Placement {
+    /// Their folder joins the music folders and is read where it is.
+    Folder,
+    /// They are copied into this music folder.
+    Copy(PathBuf),
+}
+
 /// A window's saved position and size in logical pixels, plus whether it was maximized.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -383,10 +400,13 @@ struct Picked {
 }
 
 /// Everything `settings.json` holds. Preferences a user sets on purpose, safe to edit by hand.
-/// Missing keys take their defaults, unknown keys are ignored.
+/// Missing keys take their defaults, unknown keys are ignored. A key is renamed or retyped only
+/// together with a step in [`version`], so files saved before the change still load.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct Values {
+    /// The shape the file is written in, which is always this build's own.
+    version: u32,
     /// The provider to select on startup. Omit to restore the last-used provider.
     #[serde(skip_serializing_if = "Option::is_none")]
     provider: Option<String>,
@@ -434,6 +454,10 @@ struct Values {
     sessions_button: bool,
     /// The WebSocket address of the Sonicly Sessions server to use.
     sessions_server: String,
+    /// The yt-dlp program that downloads from a link, when it is not the one on `PATH`. Sonicly
+    /// only ever runs the file named here and never fetches one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ytdlp_path: Option<PathBuf>,
     discord_presence: bool,
     discord_name: DiscordName,
     discord_show_paused: bool,
@@ -488,8 +512,15 @@ struct Values {
     panel_lyrics_scale: f32,
     fullscreen_lyrics_scale: f32,
     romanization_scripts: RomanizationScripts,
+    /// How the lyrics page looks: its background, face, spacing and emphasis.
+    lyrics_style: LyricsStyle,
+    /// Looks the listener saved by name.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    lyrics_presets: Vec<LyricsPreset>,
     adaptive_menu: bool,
     check_updates: bool,
+    /// Whether GitHub is asked, at most once a day, how many stars the repository has.
+    github_stars: bool,
     /// The release channel chosen in settings, by its id. Empty follows the running build's own
     /// channel, and a copy a package manager installed ignores it.
     update_channel: String,
@@ -504,6 +535,10 @@ struct Values {
     startup: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     local_folders: Vec<PathBuf>,
+    /// Where songs dropped on the window from outside the music folders go, once the listener
+    /// has said. `None` asks on the next such drop.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dropped_files: Option<Placement>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     hidden_nav: Vec<String>,
     /// The optional sidebar rows the user added, which stay out of the sidebar otherwise.
@@ -662,6 +697,7 @@ enum SettingsSave {
 impl Default for Values {
     fn default() -> Self {
         Self {
+            version: version::CURRENT,
             provider: None,
             normalisation: false,
             gapless: true,
@@ -682,6 +718,7 @@ impl Default for Values {
             spotify_connect_custom_name: String::new(),
             sessions_button: true,
             sessions_server: String::new(),
+            ytdlp_path: None,
             discord_presence: false,
             discord_name: DiscordName::Sonicly,
             discord_show_paused: false,
@@ -717,9 +754,12 @@ impl Default for Values {
             panel_lyrics_scale: DEFAULT_LYRICS_SCALE,
             fullscreen_lyrics_scale: DEFAULT_LYRICS_SCALE,
             romanization_scripts: RomanizationScripts::default(),
+            lyrics_style: LyricsStyle::default(),
+            lyrics_presets: Vec::new(),
             adaptive_menu: false,
             check_updates: crate::updates::RELEASE_REPO.is_some()
                 && (cfg!(target_os = "windows") || updates_itself()),
+            github_stars: true,
             update_channel: String::new(),
             close_to_tray: true,
             tray_icon: true,
@@ -729,6 +769,7 @@ impl Default for Values {
             font: system_font(),
             startup: DEFAULT_STARTUP.to_owned(),
             local_folders: Vec::new(),
+            dropped_files: None,
             hidden_nav: Vec::new(),
             added_nav: Vec::new(),
             silenced_requirements: Vec::new(),
@@ -784,6 +825,9 @@ struct StateValues {
     sidebar_pin_reversed: bool,
     resume: Option<Resume>,
     window: Option<Frame>,
+    /// Where the mini player stood when it last moved, and whether it was folded into a bar.
+    mini_player: Option<Frame>,
+    mini_player_bar: bool,
     system_theme: String,
     /// The variant last chosen in each theme family, by family id.
     theme_variants: HashMap<String, String>,
@@ -817,6 +861,8 @@ impl Default for StateValues {
             sidebar_pin_reversed: false,
             resume: None,
             window: None,
+            mini_player: None,
+            mini_player_bar: false,
             system_theme: ThemeKind::Dark.id().to_owned(),
             theme_variants: HashMap::new(),
             picks: Vec::new(),
@@ -943,6 +989,7 @@ pub struct AppSettings {
     save: Option<Task<()>>,
     save_state: Option<Task<()>>,
     watch: Option<Subscription>,
+    watch_mini: Option<Subscription>,
     writable: bool,
     /// What `settings.json` held when it was last read or written, so the watcher can tell our
     /// own writes from another program's.
@@ -979,10 +1026,13 @@ impl AppSettings {
                 (None, false)
             }
         };
-        let parsed = bytes.map(|bytes| (serde_json::from_slice::<Values>(json(&bytes)), bytes));
+        let parsed = bytes.map(|bytes| (version::parse(&bytes), bytes));
         let parsed = parsed.map(|(values, bytes)| (values.map(offer_new_lyrics), bytes));
         let (values, writable, disk, broken) = match parsed {
-            Some((Ok(values), bytes)) => (values.settled(), writable, Some(bytes), None),
+            Some((Ok(values), bytes)) => {
+                version::keep_newer(&path, &bytes);
+                (values.settled(), writable, Some(bytes), None)
+            }
             Some((Err(_), bytes)) if empty_settings(&bytes) => {
                 (Values::default().settled(), writable, Some(bytes), None)
             }
@@ -1023,6 +1073,7 @@ impl AppSettings {
             save: None,
             save_state: None,
             watch: None,
+            watch_mini: None,
             writable,
             disk,
             broken,
@@ -1099,6 +1150,11 @@ impl AppSettings {
     /// The address of the server to use, as typed.
     pub fn sessions_server(&self) -> &str {
         &self.values.sessions_server
+    }
+
+    /// The yt-dlp program the listener chose, or `None` to use the one on `PATH`.
+    pub fn ytdlp_path(&self) -> Option<&Path> {
+        self.values.ytdlp_path.as_deref()
     }
 
     /// Whether the playing track is published to a local Discord client.
@@ -1266,6 +1322,10 @@ impl AppSettings {
         self.values.check_updates
     }
 
+    pub fn github_stars(&self) -> bool {
+        self.values.github_stars
+    }
+
     pub fn close_to_tray(&self) -> bool {
         self.values.close_to_tray
     }
@@ -1376,6 +1436,18 @@ impl AppSettings {
         &self.values.local_folders
     }
 
+    /// Where songs dropped from outside the music folders go, or `None` to ask.
+    pub fn dropped_files(&self) -> Option<&Placement> {
+        self.values.dropped_files.as_ref()
+    }
+
+    pub fn set_dropped_files(&mut self, placement: Option<Placement>, cx: &mut Context<Self>) {
+        if self.values.dropped_files.as_ref() != placement.as_ref() {
+            self.values.dropped_files = placement;
+            self.schedule_save(cx);
+        }
+    }
+
     pub fn startup(&self) -> &str {
         &self.values.startup
     }
@@ -1459,7 +1531,7 @@ impl AppSettings {
     /// ambient background is painted out of the tint, so fullscreen tints whatever the adaptive
     /// theme setting says.
     pub fn cover_tint(&self, fullscreen: bool) -> bool {
-        self.adaptive_theme() || (fullscreen && self.ambient())
+        self.adaptive_theme() || (fullscreen && (self.ambient() || self.lyrics_backdrop()))
     }
 
     /// The visualizer's style, `None` when it is off. The old `visualizer` switch is still the
@@ -1741,6 +1813,11 @@ impl AppSettings {
         self.schedule_save(cx);
     }
 
+    pub fn set_ytdlp_path(&mut self, path: Option<PathBuf>, cx: &mut Context<Self>) {
+        self.values.ytdlp_path = path;
+        self.schedule_save(cx);
+    }
+
     pub fn set_discord_presence(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.values.discord_presence = enabled;
         self.schedule_save(cx);
@@ -1911,6 +1988,11 @@ impl AppSettings {
 
     pub fn set_check_updates(&mut self, check_updates: bool, cx: &mut Context<Self>) {
         self.values.check_updates = check_updates;
+        self.schedule_save(cx);
+    }
+
+    pub fn set_github_stars(&mut self, github_stars: bool, cx: &mut Context<Self>) {
+        self.values.github_stars = github_stars;
         self.schedule_save(cx);
     }
 
@@ -2543,6 +2625,37 @@ impl AppSettings {
         self.schedule_state_save(cx);
     }
 
+    /// Saves where the mini player stands now and after every move. The save wakes no observer,
+    /// so dragging the mini player around never redraws the main window.
+    pub fn watch_mini_player(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.keep_mini_frame(window, cx);
+        self.watch_mini = Some(cx.observe_window_bounds(window, |this, window, cx| {
+            this.keep_mini_frame(window, cx);
+        }));
+    }
+
+    fn keep_mini_frame(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let frame = Frame::of(window);
+        if !frame.sane() || self.state.mini_player == Some(frame) {
+            return;
+        }
+        self.state.mini_player = Some(frame);
+        self.save_state_quietly(cx);
+    }
+
+    /// Whether the mini player was last folded into a bar rather than showing its cover.
+    pub fn mini_player_bar(&self) -> bool {
+        self.state.mini_player_bar
+    }
+
+    /// Keeps the mini player's fold for the next time it opens, without waking observers.
+    pub fn set_mini_player_bar(&mut self, bar: bool, cx: &mut Context<Self>) {
+        if self.state.mini_player_bar != bar {
+            self.state.mini_player_bar = bar;
+            self.save_state_quietly(cx);
+        }
+    }
+
     /// Wakes observers and debounces a `settings.json` write.
     fn schedule_save(&mut self, cx: &mut Context<Self>) {
         cx.notify();
@@ -2842,7 +2955,7 @@ impl AppSettings {
             self.broken = None;
             return SettingsReload::Unchanged;
         }
-        let values = match serde_json::from_slice::<Values>(json(&bytes)) {
+        let values = match version::parse(&bytes) {
             Ok(values) => offer_new_lyrics(values).settled(),
             Err(error) => {
                 log::warn!("settings: cannot parse {}: {error}", self.path.display());
@@ -2904,10 +3017,30 @@ pub fn remember_window(window: &mut Window, cx: &mut App) {
     settings.update(cx, |settings, cx| settings.watch_window(window, cx));
 }
 
+/// Where the mini player last stood, and its display, if its centre still lands on a connected
+/// display. Only the origin is kept: the fold picks the size.
+pub fn mini_player_placement(cx: &App) -> Option<(Point<Pixels>, DisplayId)> {
+    let frame = Sonicly::global(cx).settings.read(cx).state.mini_player?;
+    if !frame.sane() {
+        return None;
+    }
+    let bounds = frame.placement(Size::default()).get_bounds();
+    cx.displays()
+        .iter()
+        .find(|display| display.bounds().contains(&bounds.center()))
+        .map(|display| (bounds.origin, display.id()))
+}
+
+/// Starts saving where the mini player stands, for the next time it opens.
+pub fn remember_mini_player(window: &mut Window, cx: &mut App) {
+    let settings = Sonicly::global(cx).settings.clone();
+    settings.update(cx, |settings, cx| settings.watch_mini_player(window, cx));
+}
+
 /// Whether reloading `current` from disk would replace the values that serialize to `ours`. A
 /// file that does not parse is left to the broken-file toast, since the reload keeps our values.
 fn overrides(current: &[u8], ours: &[u8]) -> bool {
-    serde_json::from_slice::<Values>(json(current))
+    version::parse(current)
         .ok()
         .and_then(|theirs| serde_json::to_vec_pretty(&theirs).ok())
         .is_some_and(|theirs| theirs != ours)
@@ -3058,9 +3191,7 @@ fn save_settings(path: &Path, bytes: &[u8], previous: Option<&[u8]>) -> Result<(
     if previous == Some(bytes) {
         return Ok(());
     }
-    if let Some(previous) =
-        previous.filter(|previous| serde_json::from_slice::<Values>(json(previous)).is_ok())
-    {
+    if let Some(previous) = previous.filter(|previous| version::parse(previous).is_ok()) {
         write_settings(&path.with_file_name("sonicly.backup.json"), previous)
             .context("cannot back up settings")?;
     }
@@ -3121,7 +3252,7 @@ fn write_settings(path: &Path, bytes: &[u8]) -> Result<()> {
 fn settings_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("sonicly")
+        .join(storage::folder())
         .join("settings.json")
 }
 

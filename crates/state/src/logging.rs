@@ -7,5 +7,5 @@ const FILE: &str = "sonicly.log";
 pub fn log_file() -> Option<PathBuf> {
     let root = dirs::state_dir().or_else(dirs::cache_dir)?;
 
-    Some(root.join("sonicly").join(FILE))
+    Some(root.join(storage::folder()).join(FILE))
 }

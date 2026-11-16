@@ -8,6 +8,11 @@ use storage::Cache;
 use super::scan::{Look, Reading};
 use super::wire::Tagged;
 
+/// The cache key the cue sheets of the last scan are listed under, as JSON. The index has a
+/// row for every audio file and folder and none for any other file, and a folder listed from
+/// memory is never read from disk, so this is how it still knows a sheet sits in it.
+const CUES: &str = "scan/cues";
+
 /// What the last scan learned about one file: when it was last written, how big it was, and what
 /// its tags produced. A file whose time and size both match is not opened again.
 pub struct Known {
@@ -32,6 +37,8 @@ pub struct Remembered {
     pub files: HashMap<PathBuf, Known>,
     pub folders: HashMap<PathBuf, Seen>,
     children: HashMap<PathBuf, Children>,
+    /// Every cue sheet the last scan saw, sorted, or `None` when no scan has recorded any yet.
+    cues: Option<Vec<PathBuf>>,
 }
 
 #[derive(Default)]
@@ -53,6 +60,18 @@ impl Remembered {
         self.folders
             .get(folder)
             .is_some_and(|seen| seen.mtime == mtime)
+    }
+
+    /// The cue sheets the last scan saw in `folder`, which is all a folder listed from memory
+    /// knows of them. Adding or removing one moves the folder's time, so the list holds for as
+    /// long as the folder is trusted.
+    pub fn cues_in(&self, folder: &Path) -> Vec<PathBuf> {
+        self.cues
+            .iter()
+            .flatten()
+            .filter(|cue| cue.parent() == Some(folder))
+            .cloned()
+            .collect()
     }
 }
 
@@ -88,6 +107,28 @@ impl Index {
         }
         if let Err(error) = self.write(changes) {
             log::warn!("local: cannot record the scan index: {error:#}");
+        }
+    }
+
+    /// Records where the cue sheets are, given the ones a scan `found` under the roots it
+    /// `reached`. Sheets under a root that was offline are kept, like its rows. A scan that
+    /// found the same sheets as the last one writes nothing.
+    pub fn keep_cues(&self, remembered: &Remembered, mut found: Vec<PathBuf>, reached: &[PathBuf]) {
+        let under = |path: &Path| reached.iter().any(|root| path.starts_with(root));
+        let offline = remembered.cues.iter().flatten().filter(|cue| !under(cue));
+        found.extend(offline.cloned());
+        found.sort();
+        if remembered.cues.as_ref() == Some(&found) {
+            return;
+        }
+        let saved_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_secs() as i64);
+        let kept = serde_json::to_string(&found)
+            .context("cannot encode the cue sheets")
+            .and_then(|list| self.cache.write(CUES, &list, saved_at));
+        if let Err(error) = kept {
+            log::warn!("local: cannot record the cue sheets: {error:#}");
         }
     }
 
@@ -214,6 +255,14 @@ impl Index {
         for children in remembered.children.values_mut() {
             children.folders.sort();
             children.files.sort();
+        }
+        remembered.cues = self
+            .cache
+            .read(CUES, |list| serde_json::from_str(list).unwrap_or_default())?;
+        // An index from before cue sheets were looked for knows of none, so no folder is
+        // trusted this once and each is listed again. The files keep their rows.
+        if remembered.cues.is_none() {
+            remembered.folders.clear();
         }
         Ok(remembered)
     }

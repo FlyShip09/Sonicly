@@ -10,7 +10,9 @@ mod dropdown;
 mod explicit;
 mod filters;
 mod flight;
+mod fluid;
 mod form;
+mod generated;
 mod glass;
 mod glide;
 mod hold;
@@ -62,6 +64,7 @@ mod traffic_light_controls;
 mod unfold;
 mod vacancy;
 mod veil;
+mod video;
 mod view;
 mod visualizer;
 mod waves;
@@ -85,9 +88,12 @@ pub use filters::{
     Filter, FilterChange, FlagAxis, RangeAxis, RangeScrubber, RangeState, SortAxis, Unit,
 };
 pub use flight::{Flight, Zoom};
+pub use fluid::Fluid;
 pub use form::{FORM_CONTEXT, Field, Form, NextField, PreviousField, Submit, step_focus};
+pub use generated::GeneratedCover;
 pub use glass::{
-    GLASS_BLUR, GLASS_FILL, bar_surface, blurring, frost, glass, popover_fill, popover_surface,
+    GLASS_BLUR, GLASS_FILL, bar_surface, blurring, frame_fill, frost, glass, material,
+    popover_fill, popover_surface,
 };
 pub use glide::{Glide, ScrollPosition};
 pub use hold::{Held, Hold, held};
@@ -101,8 +107,8 @@ pub use input::{
 };
 pub use kbd::Kbd;
 pub use label::{
-    Tails, eyebrow, eyebrow_with, faint, heading, spoken, spoken_eyebrow, spoken_heading,
-    spoken_vacant, vacant,
+    Tails, eyebrow, eyebrow_with, faint, heading, section_heading, spoken, spoken_eyebrow,
+    spoken_heading, spoken_vacant, vacant,
 };
 pub use lattice::Lattice;
 pub use layout::{ALWAYS, MIN_CONTENT, ROOMY, Room, SNUG, VAST, WIDE};
@@ -156,7 +162,7 @@ pub use tabs::{TabBar, Tabs};
 pub use theme::{
     ActiveTheme, BACKDROP_TRANSPARENCY, CoverFill, Look, MAX_FONT, MAX_LYRICS_SCALE,
     MAX_TRANSPARENCY, MIN_FONT, MIN_LYRICS_SCALE, Theme, ThemeKind, ThemeOverrides, WindowBlur,
-    backdrop,
+    WindowMaterial, backdrop,
 };
 pub use time::{clock, runtime, tabular};
 pub use toast::Toast;
@@ -165,6 +171,7 @@ pub use traffic_light_controls::TrafficLightControls;
 pub use unfold::{Cascade, Unfold};
 pub use vacancy::Vacancy;
 pub use veil::{VeilEdge, effects, veil};
+pub use video::{Picture, VideoFrames, VideoProblem, legible_dim, picture_luma};
 pub use view::Mode;
 pub use visualizer::{Levels, Visualizer, VisualizerStyle};
 pub use waves::Waves;

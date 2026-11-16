@@ -39,9 +39,9 @@ use gpui::{
     div,
 };
 use ui::{
-    Button, Card, Checkbox, DraggedPin, Field, Form, Glowing as _, Input, OptionCard, OtpInput,
-    Pin, PinKind, Pinnable as _, Radio, RangeScrubber, RangeState, Scrubber, ScrubberState, Spot,
-    Theme, Toast,
+    Button, Card, Checkbox, DraggedPin, Field, Form, GeneratedCover, Glowing as _, Input,
+    OptionCard, OtpInput, Pin, PinKind, Pinnable as _, Radio, RangeScrubber, RangeState, Scrubber,
+    ScrubberState, Spot, Theme, Toast,
 };
 
 /// Formats what the frame builder would put in the tree for `element`.
@@ -675,6 +675,49 @@ async fn spoken_heading_lists_among_headings(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+async fn page_title_heading_is_level_one(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |_, cx| {
+        let element = ui::spoken_heading("appearance", "Appearance", 1, cx).into_element();
+        snapshot("page-heading", &element)
+    });
+    let lines = rendered(&lines, "page-heading");
+    assert!(
+        lines.iter().any(|line| line.contains("role=Heading")),
+        "page title exposes no Role::Heading: {lines:?}"
+    );
+    assert!(
+        lines.iter().any(|line| line.contains("level=Some(1)")),
+        "page title is not a level one heading: {lines:?}"
+    );
+}
+
+#[gpui::test]
+async fn section_heading_is_text_until_spoken(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |_, cx| {
+        let element = ui::section_heading("Releases", cx).into_element();
+        snapshot("section-heading", &element)
+    });
+    let lines = rendered(&lines, "section-heading");
+    assert!(
+        lines.iter().any(|line| line.contains("NO NODE")),
+        "a bare section heading is plain text; spoken_heading gives it its node: {lines:?}"
+    );
+}
+
+#[gpui::test]
+async fn edged_artwork_adds_no_node(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |_, _| {
+        let element = ui::Artwork::new(None::<&str>).edged().into_element();
+        snapshot("edged-artwork", &element)
+    });
+    let lines = rendered(&lines, "edged-artwork");
+    assert!(
+        lines.iter().any(|line| line.contains("NO NODE")),
+        "a cover's hairline must not reach the accessibility tree: {lines:?}"
+    );
+}
+
+#[gpui::test]
 async fn spoken_eyebrow_reads_as_written(cx: &mut TestAppContext) {
     let lines = open_probe(cx, |_, cx| {
         let element = ui::spoken_eyebrow("pinned", "Pinned", cx).into_element();
@@ -780,5 +823,47 @@ async fn movable_row_keeps_its_role_name_and_place(cx: &mut TestAppContext) {
             .iter()
             .any(|line| line.contains("place=Some(3) of=Some(5)")),
         "a row that can be dragged into a new order loses its place in the list: {lines:?}"
+    );
+}
+
+#[gpui::test]
+async fn generated_cover_is_an_image_named_for_its_collection(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |window, cx| {
+        let element = GeneratedCover::new("favorites-cover", "Favorites", "icons/heart-filled.svg")
+            .colors([gpui::hsla(0.6, 0.5, 0.4, 1.)])
+            .size(gpui::px(140.))
+            .render(window, cx)
+            .into_element();
+        snapshot("generated-cover", &element)
+    });
+    let lines = rendered(&lines, "generated-cover");
+    assert!(
+        lines.iter().any(|line| line.contains("role=Image")),
+        "a generated cover drops out of the tree, the hero reads as a blank: {lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("name=Some(\"Favorites\")")),
+        "a generated cover is not named for its collection: {lines:?}"
+    );
+}
+
+#[gpui::test]
+async fn fluid_field_stays_out_of_the_tree(cx: &mut TestAppContext) {
+    // The field only paints behind the lyrics, so a screen reader should never land on it.
+    let lines = open_probe(cx, |window, cx| {
+        let color = gpui::Hsla::black();
+        let element = ui::Fluid::new([color; 4])
+            .time(1.)
+            .energy(0.5)
+            .render(window, cx)
+            .into_element();
+        snapshot("fluid", &element)
+    });
+    let lines = rendered(&lines, "fluid");
+    assert!(
+        lines.iter().all(|line| line.contains("NO NODE")),
+        "the fluid field reached the accessibility tree, where it says nothing: {lines:?}"
     );
 }

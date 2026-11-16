@@ -39,6 +39,7 @@ mod trim;
 pub mod trouble;
 pub mod vault;
 pub mod youtube;
+pub mod ytdlp;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -51,6 +52,7 @@ use jiff::fmt::temporal::DateTimeParser;
 
 pub use audio::Meter;
 pub use equalizer::Equalizer;
+pub use local::is_cue_track;
 pub use models::{
     Album, AlbumCatalogue, AlbumDetail, Arrival, Artist, ArtistCatalogue, ArtistProfile, ArtistRef,
     Contributor, CoverSize, Credit, Found, Genre, GenreDetail, GenreItem, GenreSection, HomeFeed,
@@ -324,9 +326,9 @@ pub trait MusicApi: Send + Sync {
         anyhow::bail!("this provider cannot reorder a playlist")
     }
 
-    /// Reads the M3U or M3U8 playlist at `path` into a new playlist named after the file, for a
-    /// provider whose tracks are files. Entries naming a file outside the library are left out
-    /// and counted.
+    /// Reads the M3U, M3U8, PLS or XSPF playlist at `path` into a new playlist named after the
+    /// file, for a provider whose tracks are files. Entries naming a file outside the library
+    /// are left out and counted.
     async fn import_playlist(&self, _path: &Path) -> Result<ImportedPlaylist> {
         anyhow::bail!("this provider cannot import playlist files")
     }
@@ -1177,6 +1179,12 @@ pub trait MusicProvider: Send + Sync {
     /// by file-association opens, which may point outside any scanned folder.
     fn track_from_path(&self, _path: &Path) -> Option<Track> {
         None
+    }
+    /// Whether the file at `path` is one the provider plays, judged by its name alone so a
+    /// whole folder can be counted without opening a file. Always false for a provider whose
+    /// tracks are not files.
+    fn plays_file(&self, _path: &Path) -> bool {
+        false
     }
     fn sign_in_options(&self) -> Vec<SignIn>;
     fn stored(&self) -> bool;

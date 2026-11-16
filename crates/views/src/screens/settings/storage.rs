@@ -1,12 +1,15 @@
+use std::path::PathBuf;
+
 use gpui::prelude::*;
-use gpui::{AnyElement, App, Context, SharedString, div};
+use gpui::{AnyElement, App, Context, PathPromptOptions, SharedString, div};
 use i18n::t;
 use state::{Network, Sonicly};
 use ui::{ActiveTheme as _, Button, Switch};
 
-use super::rows::outward;
+use super::rows::{Row, outward};
 use super::{Group, SettingsView, Slot};
 use crate::shared::confirm::{Confirm, Kind};
+use crate::shared::link_download;
 
 /// The bytes in a gigabyte, the unit the cache limit is set in.
 const GIGABYTE: u64 = 1 << 30;
@@ -36,7 +39,43 @@ impl SettingsView {
         vec![
             Group::new("settings-group-cache", "icons/rotate-ccw-clock.svg").rows(cache),
             Group::new("settings-group-downloads", "icons/download.svg").rows(downloads),
+            Group::new("settings-group-link-downloads", "icons/link.svg").rows([Slot::YtDlp]),
         ]
+    }
+
+    /// The yt-dlp that downloads from a link: where Sonicly found it, or how to get one when it
+    /// found none. One button points Sonicly at a program, and once one is chosen another goes
+    /// back to the one on `PATH`.
+    pub(super) fn ytdlp_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let downloads = Sonicly::global(cx).link_download.read(cx);
+        let detail = match downloads.program() {
+            Some(program) => t!("settings-ytdlp-found", path = program.display().to_string()),
+            None => link_download::missing(),
+        };
+        let chosen = self.settings.read(cx).ytdlp_path().is_some();
+        let control = div()
+            .flex()
+            .items_center()
+            .gap_2()
+            .when(chosen, |this| {
+                this.child(
+                    Button::new("ytdlp-reset")
+                        .label(t!("settings-ytdlp-reset"))
+                        .small()
+                        .ghost()
+                        .on_click(|_, _, cx| choose_ytdlp(None, cx)),
+                )
+            })
+            .child(
+                Button::new("ytdlp-choose")
+                    .label(t!("settings-ytdlp-choose"))
+                    .small()
+                    .outline()
+                    .on_click(|_, _, cx| ask_for_ytdlp(cx)),
+            );
+        Row::new(t!("settings-ytdlp"), control.into_any_element())
+            .detail(detail)
+            .into_any_element()
     }
 
     /// What the cached tracks take on disk, with a button that removes them all. Downloads stay.
@@ -129,6 +168,31 @@ impl SettingsView {
             );
         self.row(t!("settings-downloads-used"), control.into_any_element())
     }
+}
+
+/// Keeps the listener's choice of yt-dlp, or goes back to the one on `PATH` with `None`.
+fn choose_ytdlp(path: Option<PathBuf>, cx: &mut App) {
+    let downloads = Sonicly::global(cx).link_download.clone();
+    downloads.update(cx, |downloads, cx| downloads.choose_program(path, cx));
+}
+
+/// Asks which file is yt-dlp and keeps the answer. Sonicly only ever runs the file chosen here.
+fn ask_for_ytdlp(cx: &mut App) {
+    let receiver = cx.prompt_for_paths(PathPromptOptions {
+        files: true,
+        directories: false,
+        multiple: false,
+        prompt: None,
+    });
+    cx.spawn(async move |cx| {
+        let Ok(Ok(Some(paths))) = receiver.await else {
+            return;
+        };
+        if let Some(path) = paths.into_iter().next() {
+            cx.update(|cx| choose_ytdlp(Some(path), cx));
+        }
+    })
+    .detach();
 }
 
 /// A size in bytes as a short label: gigabytes to one decimal from a gigabyte up, whole

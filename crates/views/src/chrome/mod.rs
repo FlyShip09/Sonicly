@@ -1,7 +1,9 @@
 mod aside;
 mod downloads;
+pub(crate) mod drop_zone;
 mod jam;
 mod members;
+mod mini_player;
 mod notice;
 mod output_picker;
 mod player_bar;
@@ -9,6 +11,7 @@ mod session;
 mod sessions_button;
 mod sidebar_left;
 mod sidebar_right;
+mod specimens;
 mod swipe_cue;
 mod theme_invite;
 mod timeline;
@@ -17,15 +20,18 @@ mod toasts;
 mod toolbar;
 pub(crate) mod tools;
 
-pub(crate) use aside::{Aside, VerseLook, verse, verse_gap, verse_sizes};
+pub(crate) use aside::{Aside, Face, VerseLook, verse, verse_gap, verse_sizes};
 pub(crate) use jam::{JamCode, JamInvite, JamJoin};
 pub(crate) use members::Members;
+pub use mini_player::MiniPlayer;
 pub(crate) use notice::AppNotice;
 pub(crate) use output_picker::OutputPicker;
 pub(crate) use player_bar::PlayerBar;
 pub(crate) use session::{SessionCode, SessionJoin};
 pub(crate) use sidebar_left::SidebarLeft;
 pub(crate) use sidebar_right::SidebarRight;
+pub(crate) use specimens::cover_specimens;
+pub use specimens::show_cover_specimens;
 pub(crate) use swipe_cue::SwipeCue;
 pub(crate) use theme_invite::ThemeInvite;
 pub(crate) use timeline::Timeline;
@@ -120,6 +126,16 @@ impl Chrome {
         cx.try_global::<Installed>()
             .map(|installed| *installed.0.read(cx))
             .unwrap_or_default()
+    }
+
+    /// How wide the left sidebar stands now, nothing while it is closed.
+    pub fn left(&self) -> Pixels {
+        self.sidebar_left
+    }
+
+    /// How wide the right sidebar stands now, nothing while it is closed.
+    pub fn right(&self) -> Pixels {
+        self.sidebar_right
     }
 
     pub fn reserved_right(cx: &App) -> Pixels {

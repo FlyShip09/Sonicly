@@ -45,18 +45,17 @@ impl CardMenu {
         item: Item,
         playback: Entity<Playback>,
     ) -> impl Fn(&MouseDownEvent, &mut Window, &mut App) + 'static {
-        move |event, _, cx| {
-            let opened = Opened {
-                item: item.clone(),
-                playback: playback.clone(),
-                at: event.position,
-            };
-            Self::entity(cx).update(cx, |this, cx| {
-                this.menus.reset(cx);
-                this.open = Some(opened);
-                cx.notify();
-            });
-        }
+        move |event, _, cx| Self::open(item.clone(), playback.clone(), event.position, cx)
+    }
+
+    /// Opens the menu of `item` with its corner at `at`, in window coordinates.
+    pub(crate) fn open(item: Item, playback: Entity<Playback>, at: Point<Pixels>, cx: &mut App) {
+        let opened = Opened { item, playback, at };
+        Self::entity(cx).update(cx, |this, cx| {
+            this.menus.reset(cx);
+            this.open = Some(opened);
+            cx.notify();
+        });
     }
 }
 

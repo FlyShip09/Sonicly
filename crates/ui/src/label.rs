@@ -79,16 +79,18 @@ pub fn vacant(label: impl Into<SharedString>, cx: &App) -> Div {
         .child(div().min_w_0().child(label.into()))
 }
 
+/// A page's own title.
 pub fn heading(label: impl Into<SharedString>, cx: &App) -> Div {
-    div()
-        .flex_none()
-        .text_size(cx.theme().text(Text::Title))
-        .font_weight(FontWeight::SEMIBOLD)
-        .child(label.into())
+    titled(Text::Title, label, cx)
 }
 
-/// A `heading` that screen readers reach under `id` and list among the page's headings at
-/// `level`, one for a page title and two for a section.
+/// The title of one section of a page, such as a shelf, a library group or an artist's releases.
+pub fn section_heading(label: impl Into<SharedString>, cx: &App) -> Div {
+    titled(Text::Large, label, cx)
+}
+
+/// A heading that screen readers reach under `id` and list among the page's headings at
+/// `level`: one is a page title, set as a `heading`, and any deeper one a `section_heading`.
 pub fn spoken_heading(
     id: impl Into<ElementId>,
     label: impl Into<SharedString>,
@@ -96,11 +98,14 @@ pub fn spoken_heading(
     cx: &App,
 ) -> Stateful<Div> {
     let label = label.into();
-    heading(label.clone(), cx)
-        .id(id)
-        .role(Role::Heading)
-        .aria_level(level)
-        .aria_label(label)
+    match level {
+        1 => heading(label.clone(), cx),
+        _ => section_heading(label.clone(), cx),
+    }
+    .id(id)
+    .role(Role::Heading)
+    .aria_level(level)
+    .aria_label(label)
 }
 
 /// An `eyebrow` that screen readers reach under `id`. It reads the label as written rather than
@@ -129,4 +134,15 @@ pub fn spoken_vacant(
         .id(id)
         .role(Role::Label)
         .aria_value(label)
+}
+
+/// A heading at `step`: semibold, the one weight every title in Sonicly takes, at the step's own
+/// line height.
+fn titled(step: Text, label: impl Into<SharedString>, cx: &App) -> Div {
+    div()
+        .flex_none()
+        .text_size(cx.theme().text(step))
+        .line_height(gpui::relative(step.leading()))
+        .font_weight(FontWeight::SEMIBOLD)
+        .child(label.into())
 }

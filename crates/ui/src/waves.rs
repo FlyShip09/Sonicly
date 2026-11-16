@@ -32,6 +32,7 @@ pub struct Waves {
     colors: [Hsla; 5],
     stage: Hsla,
     time: f32,
+    swell: f32,
     radius: Pixels,
 }
 
@@ -41,6 +42,7 @@ impl Waves {
             colors,
             stage: Hsla::black(),
             time: 0.,
+            swell: SWELL,
             radius: Pixels::ZERO,
         }
     }
@@ -58,6 +60,13 @@ impl Waves {
         self
     }
 
+    /// How far the noise pushes the field, `SWELL` by default. An owner that follows the music
+    /// raises it a little with the eased loudness.
+    pub fn swell(mut self, swell: f32) -> Self {
+        self.swell = swell;
+        self
+    }
+
     pub fn corner_radius(mut self, radius: Pixels) -> Self {
         self.radius = radius;
         self
@@ -72,7 +81,7 @@ impl RenderOnce for Waves {
             [r, g, b, a]
         };
         let instance = ShaderInstance::at(self.time)
-            .params(0, &[SPEED, SWELL, MORPH, PEAK])
+            .params(0, &[SPEED, self.swell, MORPH, PEAK])
             .params(4, &channels(fifth))
             .params(8, &channels(self.stage))
             .params(12, &[DENSITY, SOFTNESS, VIGNETTE, CEILING])

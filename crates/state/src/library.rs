@@ -2230,9 +2230,9 @@ impl Library {
         );
     }
 
-    /// Reads the M3U playlist at `path` into a new local playlist named after the file. The
-    /// toast says how many of its songs were left out for not being in the library, and nothing
-    /// is made when none of them is.
+    /// Reads the M3U, PLS or XSPF playlist at `path` into a new local playlist named after the
+    /// file. The toast says how many of its songs were left out for not being in the library,
+    /// and nothing is made when none of them is.
     pub fn import_playlist(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         self.mutate_playlist(
             PlaylistMutation {

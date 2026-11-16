@@ -8,10 +8,12 @@ mod discord;
 pub use discord::APPLICATION_ID as DISCORD_APPLICATION_ID;
 mod downloads;
 mod equalizer;
+mod file_drop;
 mod genre;
 mod history;
 mod home;
 mod library;
+mod link_download;
 mod links;
 mod listening;
 mod logging;
@@ -37,6 +39,7 @@ mod signal;
 mod snapshot;
 mod song;
 mod sponsorblock;
+mod stars;
 mod tags;
 mod toast;
 mod updates;
@@ -53,6 +56,7 @@ pub use downloads::{
     Active, Downloads, DownloadsChanged, Pending, Progress, Remaining, Subject, downloaded,
 };
 pub use equalizer::{DeviceRule, Equalizer, RuleDevice, Sound};
+pub use file_drop::{Ask, DropTarget, FileDrop, Survey};
 pub use genre::{GenreDetails, Genres};
 pub use history::{History, HistoryState};
 pub use home::Home;
@@ -60,10 +64,12 @@ pub use library::{
     Addition, CoverEdit, Leaving, Library, LibraryEvent, LibraryPart, LibraryState, Problem, Ready,
     Shelf, cover_problem,
 };
+pub use link_download::{LinkDownload, LinkState};
 pub use links::{Links, Opened};
 pub use listening::{CODE_LENGTH as SESSION_CODE_LENGTH, Listening, Member as RoomMember, Room};
 pub use logging::log_file;
 pub use lyrics::{Lyrics, LyricsState};
+pub use mosaic::{Generated, SWATCHES, Swatches};
 pub use music::connect::{Elsewhere, Repeat};
 pub use network::{Network, Reconnected};
 pub use outputs::Outputs;
@@ -85,12 +91,16 @@ pub use search::{AlbumHit, ArtistHit, Hit, Kind, PlaylistHit, Search};
 pub use session::{Failure, ProviderInfo, Session, SessionEvent, SessionState};
 pub use settings::{
     AppSettings, ConnectName, DiscordName, FilterValue, FullscreenControlsAutohide, LYRICS_SOURCES,
+    LYRICS_WEIGHTS, LyricsAlign, LyricsBackground, LyricsEmphasis, LyricsPreset, LyricsStyle,
+    LyricsStyleChange, MAX_DIM, MAX_SPACING, MIN_DIM, MIN_INACTIVE, MIN_SPACING, Placement,
     PlayerBarLayout, Reloaded, RomanizationScripts, SYSTEM_FONT, SideTab, ThemeFamily, ThemeOffer,
-    ThemeVariant, VisualizerScreens, equalizer_profile_label, remember_window, window_placement,
+    ThemeVariant, VisualizerScreens, equalizer_profile_label, mini_player_placement,
+    remember_mini_player, remember_window, window_placement,
 };
 pub use signal::{Change, Equalizing, FLOAT_BITS, Following, Signal, SignalPath};
 pub use song::SongDetail;
 pub use sponsorblock::SponsorBlock;
+pub use stars::{REPO_URL, Stars};
 pub use tags::{TagState, Tags};
 pub use toast::{Outcome, Target, Toast, ToastAction, Toasts};
 pub use updates::{
@@ -98,7 +108,10 @@ pub use updates::{
 };
 pub use vault::CACHE_GB_RANGE;
 pub use wake::Wake;
-pub use window_shape::{apply_window_rounding, install_rounded_window_hook};
+pub use window_shape::{
+    apply_window_polarity, apply_window_rounding, install_rounded_window_hook,
+    install_window_polarity_hook,
+};
 
 use std::future::Future;
 use std::sync::Arc;
@@ -227,6 +240,8 @@ pub struct Sonicly {
     pub downloads: Entity<Downloads>,
     pub equalizer: Entity<Equalizer>,
     pub library: Entity<Library>,
+    /// The download from a link through the listener's own yt-dlp.
+    pub link_download: Entity<LinkDownload>,
     pub links: Entity<Links>,
     pub listening: Entity<Listening>,
     pub history: Entity<History>,
@@ -236,6 +251,7 @@ pub struct Sonicly {
     pub pins: Entity<Pins>,
     pub playback: Entity<Playback>,
     pub sponsorblock: Entity<SponsorBlock>,
+    pub stars: Entity<Stars>,
     /// The window that mints YouTube's proof-of-origin token. Nothing reads it; it is held so
     /// that it keeps ticking.
     pub potoken: Entity<potoken::PoToken>,
@@ -298,6 +314,7 @@ pub fn init(
     })
     .detach();
     let cache = storage::Cache::standard();
+    let stars = cx.new(|cx| Stars::new(settings.clone(), io.clone(), cache.clone(), cx));
     let library = cx.new(|cx| Library::new(session.clone(), io.clone(), cache, cx));
     let queue = cx.new(|cx| Queue::new(session.clone(), settings.clone(), cx));
     // Playback starts no engine until a provider is up, so the saved device is handed over
@@ -402,6 +419,8 @@ pub fn init(
         )
     });
     let links = cx.new(|cx| Links::new(session.clone(), devices.clone(), settings.clone(), cx));
+    let link_download =
+        cx.new(|cx| LinkDownload::new(settings.clone(), session.clone(), io.clone(), cx));
     let control = cx.new(|cx| Control::new(session.clone(), playback.clone(), library.clone(), cx));
     discord::attach(
         playback.clone(),
@@ -422,6 +441,7 @@ pub fn init(
         downloads,
         equalizer,
         library,
+        link_download,
         links,
         listening,
         history,
@@ -437,6 +457,7 @@ pub fn init(
         scrobbling,
         settings,
         signal,
+        stars,
         updates,
         wake,
     });

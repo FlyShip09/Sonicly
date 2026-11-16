@@ -8,11 +8,12 @@ use gpui::{Action, KeyBinding, Keystroke};
 use ui::{FORM_CONTEXT, INPUT_CONTEXT, MENU_CONTEXT, TABLE_CONTEXT};
 
 use crate::{
-    DecreaseFontSize, IncreaseFontSize, NavigateBack, NavigateForward, OpenFilter, OpenSearch,
-    OpenSettings, POWERBAR_CONTEXT, Refresh, ResetFontSize, SEARCH_CONTEXT, SeekBack, SeekForward,
-    SongNext, SongPrevious, ToggleFullscreen, ToggleLyrics, TogglePlayback, TogglePowerbar,
-    ToggleQueue, ToggleRepeat, ToggleShuffle, ToggleWindowFullscreen, VolumeDown, VolumeUp,
-    WORKSPACE_CONTEXT,
+    DecreaseFontSize, DownloadFromLink, IncreaseFontSize, NavigateBack, NavigateForward,
+    OpenAlbums, OpenArtists, OpenFilter, OpenHome, OpenPlaylists, OpenSearch, OpenSettings,
+    OpenSongs, POWERBAR_CONTEXT, Refresh, ResetFontSize, SEARCH_CONTEXT, SeekBack, SeekForward,
+    SongNext, SongPrevious, ToggleFullscreen, ToggleLyrics, ToggleMiniPlayer, TogglePlayback,
+    TogglePowerbar, ToggleQueue, ToggleRepeat, ToggleShuffle, ToggleSidebar,
+    ToggleWindowFullscreen, VolumeDown, VolumeUp, WORKSPACE_CONTEXT,
 };
 
 /// The modifiers that make a keystroke a command rather than typing. A key pressed without any
@@ -226,6 +227,51 @@ const SHORTCUTS: &[Shortcut] = &[
         mac: &[],
     },
     Shortcut {
+        id: "open-home",
+        key: "keybind-open-home",
+        section: Section::Navigation,
+        scope: Scope::Anywhere,
+        bind: bind::<OpenHome>,
+        defaults: &["ctrl-1"],
+        mac: &["cmd-1"],
+    },
+    Shortcut {
+        id: "open-songs",
+        key: "keybind-open-songs",
+        section: Section::Navigation,
+        scope: Scope::Anywhere,
+        bind: bind::<OpenSongs>,
+        defaults: &["ctrl-2"],
+        mac: &["cmd-2"],
+    },
+    Shortcut {
+        id: "open-albums",
+        key: "keybind-open-albums",
+        section: Section::Navigation,
+        scope: Scope::Anywhere,
+        bind: bind::<OpenAlbums>,
+        defaults: &["ctrl-3"],
+        mac: &["cmd-3"],
+    },
+    Shortcut {
+        id: "open-artists",
+        key: "keybind-open-artists",
+        section: Section::Navigation,
+        scope: Scope::Anywhere,
+        bind: bind::<OpenArtists>,
+        defaults: &["ctrl-4"],
+        mac: &["cmd-4"],
+    },
+    Shortcut {
+        id: "open-playlists",
+        key: "keybind-open-playlists",
+        section: Section::Navigation,
+        scope: Scope::Anywhere,
+        bind: bind::<OpenPlaylists>,
+        defaults: &["ctrl-5"],
+        mac: &["cmd-5"],
+    },
+    Shortcut {
         id: "toggle-powerbar",
         key: "keybind-toggle-powerbar",
         section: Section::Navigation,
@@ -262,6 +308,15 @@ const SHORTCUTS: &[Shortcut] = &[
         mac: &[],
     },
     Shortcut {
+        id: "download-from-link",
+        key: "keybind-download-from-link",
+        section: Section::Navigation,
+        scope: Scope::Anywhere,
+        bind: bind::<DownloadFromLink>,
+        defaults: &["cmd-shift-d", "ctrl-shift-d"],
+        mac: &[],
+    },
+    Shortcut {
         id: "toggle-fullscreen",
         key: "keybind-toggle-fullscreen",
         section: Section::View,
@@ -269,6 +324,25 @@ const SHORTCUTS: &[Shortcut] = &[
         bind: bind::<ToggleFullscreen>,
         defaults: &["f"],
         mac: &[],
+    },
+    // Heard in the mini player's window too, where it returns to the main one.
+    Shortcut {
+        id: "toggle-mini-player",
+        key: "keybind-toggle-mini-player",
+        section: Section::View,
+        scope: Scope::Anywhere,
+        bind: bind::<ToggleMiniPlayer>,
+        defaults: &["ctrl-shift-m"],
+        mac: &["cmd-shift-m"],
+    },
+    Shortcut {
+        id: "toggle-sidebar",
+        key: "keybind-toggle-sidebar",
+        section: Section::View,
+        scope: Scope::Anywhere,
+        bind: bind::<ToggleSidebar>,
+        defaults: &["ctrl-alt-s"],
+        mac: &["ctrl-cmd-s"],
     },
     Shortcut {
         id: "toggle-queue",

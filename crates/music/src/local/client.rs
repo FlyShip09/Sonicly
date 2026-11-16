@@ -17,7 +17,7 @@ use crate::{
 use super::index::Index;
 use super::scan::Scanned;
 use super::store::{Starred, Store, Stored};
-use super::{m3u, tags, wire};
+use super::{m3u, pls, tags, wire, xspf};
 
 const COVERS: usize = 4;
 const NOT_SUPPORTED: &str = "local playlists are not shared";
@@ -43,7 +43,7 @@ fn cover_path(playlist_id: &str) -> PathBuf {
         .collect();
     dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonicly")
+        .join(storage::folder())
         .join("playlist-covers")
         .join(format!("{name}-{stamp}.jpg"))
 }
@@ -137,37 +137,40 @@ impl LocalClient {
     /// leads, so a `..` or a folder reached through a link still finds its file.
     fn find_files(&self, paths: &[PathBuf]) -> (Vec<String>, usize) {
         let scanned = self.scanned.read().unwrap();
-        let known: HashSet<&str> = scanned
+        let ids: Vec<&str> = scanned
             .tracks
             .iter()
             .filter_map(|track| track.id.as_deref())
             .collect();
+        let known: HashSet<&str> = ids.iter().copied().collect();
         // Resolving every library path costs a disk lookup each, so it waits for an entry that
         // the cheaper matches miss.
-        let mut resolved: Option<HashMap<PathBuf, &str>> = None;
+        let mut resolved: Option<HashMap<PathBuf, Vec<&str>>> = None;
         let mut found = Vec::new();
         let mut seen = HashSet::new();
         let mut skipped = 0;
         for path in paths {
-            let id = known
-                .get(wire::track_id(path).as_str())
-                .copied()
-                .or_else(|| {
-                    let real = std::fs::canonicalize(path).ok()?;
-                    known
-                        .get(wire::track_id(&real).as_str())
-                        .copied()
-                        .or_else(|| {
-                            resolved
-                                .get_or_insert_with(|| resolve(&known))
-                                .get(&real)
-                                .copied()
-                        })
-                });
-            match id {
-                Some(id) if seen.insert(id) => found.push(id.to_owned()),
-                Some(_) => {}
-                None => skipped += 1,
+            let matched = match known.get(wire::track_id(path).as_str()) {
+                Some(&id) => vec![id],
+                None => std::fs::canonicalize(path)
+                    .ok()
+                    .map(|real| match known.get(wire::track_id(&real).as_str()) {
+                        Some(&id) => vec![id],
+                        None => resolved
+                            .get_or_insert_with(|| resolve(&ids))
+                            .get(&real)
+                            .cloned()
+                            .unwrap_or_default(),
+                    })
+                    .unwrap_or_default(),
+            };
+            if matched.is_empty() {
+                skipped += 1;
+            }
+            for id in matched {
+                if seen.insert(id) {
+                    found.push(id.to_owned());
+                }
             }
         }
         (found, skipped)
@@ -335,14 +338,11 @@ impl MusicApi for LocalClient {
     }
 
     async fn track_tags(&self, track_id: &str) -> Result<TrackTags> {
-        let path = wire::path_from_track_id(track_id)
-            .ok_or_else(|| anyhow!("{track_id} is not a local track id"))?;
-        tags::read(path)
+        tags::read(whole_file(track_id)?)
     }
 
     async fn set_track_tags(&self, track_id: &str, updated: TrackTags) -> Result<()> {
-        let path = wire::path_from_track_id(track_id)
-            .ok_or_else(|| anyhow!("{track_id} is not a local track id"))?;
+        let path = whole_file(track_id)?;
         let year_changed = tags::read(path)?.year != updated.year;
         let album_tracks = year_changed.then(|| self.album_track_paths(track_id));
 
@@ -478,7 +478,15 @@ impl MusicApi for LocalClient {
         let bytes =
             std::fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
         let folder = path.parent().unwrap_or_else(|| Path::new(""));
-        let (found, skipped) = self.find_files(&m3u::read(&bytes, folder));
+        let extension = path
+            .extension()
+            .map(|extension| extension.to_string_lossy().to_ascii_lowercase());
+        let listed = match extension.as_deref() {
+            Some("pls") => pls::read(&bytes, folder),
+            Some("xspf") => xspf::read(&bytes, folder),
+            _ => m3u::read(&bytes, folder),
+        };
+        let (found, skipped) = self.find_files(&listed);
         let name = path
             .file_stem()
             .map(|stem| stem.to_string_lossy().trim().to_owned())
@@ -639,8 +647,7 @@ impl MusicApi for LocalClient {
     }
 
     async fn delete_track_file(&self, track_id: &str) -> Result<()> {
-        let path = wire::path_from_track_id(track_id)
-            .ok_or_else(|| anyhow!("{track_id} is not a local track id"))?;
+        let path = whole_file(track_id)?;
 
         self.store.set_starred(Starred::Tracks, track_id, false)?;
         std::fs::remove_file(path).with_context(|| format!("cannot delete {}", path.display()))?;
@@ -797,16 +804,30 @@ impl MusicApi for LocalClient {
     }
 }
 
+/// The file a track id names, for a caller about to read or change the file as that track's
+/// own. A track a cue sheet cuts out of a longer file is refused: its tags are the whole
+/// album's, and deleting it would delete every other track of the sheet with it.
+fn whole_file(track_id: &str) -> Result<&Path> {
+    if wire::window(track_id).is_some() {
+        anyhow::bail!("{track_id} is one track of a longer file, named by its cue sheet");
+    }
+    wire::path_from_track_id(track_id).ok_or_else(|| anyhow!("{track_id} is not a local track id"))
+}
+
 /// The library's tracks by where each file really is, for matching a path that reaches a file
-/// another way. A file that cannot be resolved is left out.
-fn resolve<'a>(known: &HashSet<&'a str>) -> HashMap<PathBuf, &'a str> {
-    known
-        .iter()
-        .filter_map(|&id| {
-            let path = std::fs::canonicalize(wire::path_from_track_id(id)?).ok()?;
-            Some((path, id))
-        })
-        .collect()
+/// another way. A file a cue sheet splits answers with every track cut out of it, in the order
+/// given. A file that cannot be resolved is left out.
+fn resolve<'a>(ids: &[&'a str]) -> HashMap<PathBuf, Vec<&'a str>> {
+    let mut files: HashMap<PathBuf, Vec<&'a str>> = HashMap::new();
+    for &id in ids {
+        let Some(path) = wire::path_from_track_id(id) else {
+            continue;
+        };
+        if let Ok(path) = std::fs::canonicalize(path) {
+            files.entry(path).or_default().push(id);
+        }
+    }
+    files
 }
 
 #[cfg(test)]
@@ -1004,5 +1025,17 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_split_by_a_cue_sheet_resolves_to_every_track() {
+        let folder = tempfile::tempdir().unwrap();
+        let file = folder.path().join("big.wav");
+        std::fs::write(&file, b"").unwrap();
+        let first = wire::cue_track_id(&file, 0, Some(975));
+        let second = wire::cue_track_id(&file, 975, None);
+        let found = resolve(&[first.as_str(), second.as_str()]);
+        let real = std::fs::canonicalize(&file).unwrap();
+        assert_eq!(found[&real], vec![first.as_str(), second.as_str()]);
     }
 }

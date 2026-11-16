@@ -1,15 +1,24 @@
 mod client;
+mod cue;
 mod id3;
 mod index;
 mod lyrics;
 mod m3u;
 mod playback;
+mod pls;
 mod scan;
 mod store;
 mod tags;
 mod wire;
+mod xspf;
 
 pub use lyrics::LocalLyrics;
+
+/// Whether a track id names one track of a longer file, as its cue sheet cut it, rather than
+/// a file of its own. Such a track cannot have its tags edited or its file deleted.
+pub fn is_cue_track(id: &str) -> bool {
+    wire::window(id).is_some()
+}
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -111,6 +120,10 @@ impl MusicProvider for LocalProvider {
             track.cover = wire::art_beside(path);
         }
         Some(track)
+    }
+
+    fn plays_file(&self, path: &Path) -> bool {
+        scan::is_audio_file(path)
     }
 
     fn listening_to(&self) -> &'static str {

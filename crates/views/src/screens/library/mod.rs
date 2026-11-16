@@ -9,6 +9,7 @@ use std::time::Duration;
 use crate::chrome::tools::{self, Sliders};
 use crate::chrome::{Chrome, Searchable, Toolbar, Tooled};
 use crate::shared::confirm::{Confirm, Kind};
+use crate::shared::link_download::LinkDownloadDialog;
 use crate::shared::menus::{ItemMenu, liked_menu, new_playlist_menu};
 use crate::shared::playlist_editor::{Edit, PlaylistEditor};
 
@@ -16,19 +17,19 @@ use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Context, ElementId, Entity, FontWeight, MouseButton, Pixels, Point, Render,
-    ScrollHandle, SharedString, WeakEntity, Window, div, point, px, relative,
+    ScrollHandle, SharedString, WeakEntity, Window, div, point, px,
 };
 use i18n::t;
 use music::{Arrival, Shape, Track};
 use router::{Destination, LibraryTab, navigate};
 use state::{
-    Addition, AppSettings, DownloadsChanged, Library, LibraryPart, LibraryState, Network, Origin,
-    Playback, Scan, Shelf, Sonicly,
+    Addition, AppSettings, DownloadsChanged, Generated, Library, LibraryPart, LibraryState,
+    Network, Origin, Playback, Scan, Shelf, Sonicly, Swatches,
 };
 use ui::{
-    ActiveTheme as _, Button, Card, Deck, FilterChange, LEADING, Mode, Pin, Pinnable, Popovers,
-    Popup, Scrollbar, Scroller, Sort, SortAxis, TableDelegate, TableEvent, TableSource, TableState,
-    Text, Vacancy, Viewport, heading, quantize, runtime, scrolled, snapped, table,
+    ActiveTheme as _, Button, Card, Deck, FilterChange, Mode, Pin, Pinnable, Popovers, Popup,
+    Scrollbar, Scroller, Sort, SortAxis, TableDelegate, TableEvent, TableSource, TableState, Text,
+    Vacancy, Viewport, quantize, runtime, scrolled, section_heading, snapped, table,
 };
 
 use crate::shared::album_grid::{AlbumTiles, CardGrid, TileLook};
@@ -355,6 +356,8 @@ impl LibraryView {
         cx.observe(&chrome, |_, _, cx| cx.notify()).detach();
         cx.observe(&Scan::global(cx), |_, _, cx| cx.notify())
             .detach();
+        let swatches = Swatches::entity(cx);
+        cx.observe(&swatches, |_, _, cx| cx.notify()).detach();
 
         let current_playback = playback_status(&playback, cx);
         cx.observe(&playback, |this, playback, cx| {
@@ -727,18 +730,25 @@ impl LibraryView {
             strip = strip.text(runtime(duration));
         }
         let liked = self.liked_only(cx);
-        let (title, icon, eyebrow) = match liked {
-            true => (
-                t!("library-liked-songs"),
-                "icons/heart-filled.svg",
-                t!("detail-playlist"),
-            ),
-            false => (t!("nav-songs"), LibraryTab::Songs.icon(), t!("nav-library")),
+        // Favorites, or the local files alone before any account, are collections with no
+        // artwork of their own, so they get a cover drawn from the colours of their first ones.
+        let collection = match (liked, self.lead(cx)) {
+            (true, _) => Some(Generated::Favorites),
+            (false, Shelf::Local) => Some(Generated::Local),
+            (false, Shelf::Streaming) => None,
+        };
+        let (title, eyebrow) = match collection {
+            Some(Generated::Favorites) => (t!("library-liked-songs"), t!("detail-playlist")),
+            Some(Generated::Local) => (t!("nav-local"), t!("nav-library")),
+            _ => (t!("nav-songs"), t!("nav-library")),
         };
 
         PageHero::new("library-hero", title)
-            .fallback(icon)
+            .fallback(collection.map_or(LibraryTab::Songs.icon(), Generated::glyph))
             .accent()
+            .when_some(collection, |hero, collection| {
+                hero.generated(Swatches::colors(collection, cx))
+            })
             .eyebrow(eyebrow)
             .meta(strip)
             .actions(
@@ -1426,7 +1436,19 @@ impl Tooled for LibraryView {
                 .into_any_element()
         });
 
+        // Local Music is where a download from a link ends up, so its pages offer one.
+        let download = self.lead(cx).local().then(|| {
+            Button::new("download-from-link")
+                .icon("icons/link.svg")
+                .tooltip("link-download-title")
+                .small()
+                .ghost()
+                .on_click(|_, window, cx| LinkDownloadDialog::open(None, window, cx))
+                .into_any_element()
+        });
+
         let mut tools = Vec::new();
+        tools.extend(download);
         tools.extend(create);
         let switchable = !self.section.listing();
         tools.extend(switchable.then(|| {
@@ -1521,19 +1543,18 @@ fn deck_row(rows: &[DeckRow], key: DeckKey) -> Option<usize> {
 }
 
 fn head(display: usize, label: SharedString, cx: &App) -> AnyElement {
-    heading(label.clone(), cx)
+    section_heading(label.clone(), cx)
         .id(("library-group", display))
         .role(Role::Heading)
         .aria_level(2)
         .aria_label(label)
         .w_full()
         .pt_2()
-        .line_height(relative(LEADING))
         .into_any_element()
 }
 
 fn head_height(window: &Window, cx: &App) -> Pixels {
-    let title = px((cx.theme().text(Text::Title) / px(1.) * LEADING).round());
+    let title = px((cx.theme().text(Text::Large) / px(1.) * Text::Large.leading()).round());
 
     snapped(window.rem_size() * 0.5 + title, window)
 }

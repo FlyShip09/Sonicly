@@ -104,10 +104,17 @@ pub fn claim(
 /// changes.
 pub fn connect(streams: bool) -> io::Result<Stream> {
     let stream = Stream::connect(name()?)?;
-    stream.set_recv_timeout(match streams {
+    let timeout = match streams {
         true => None,
         false => Some(ANSWER),
-    })?;
+    };
+    // Named pipes take no timeout, so on Windows a reply is waited for as long as it takes,
+    // as the instance itself does in `serve`, rather than the connection counting as refused.
+    if let Err(error) = stream.set_recv_timeout(timeout)
+        && cfg!(not(windows))
+    {
+        return Err(error);
+    }
     Ok(stream)
 }
 
@@ -191,13 +198,24 @@ fn hand_over(name: Name<'_>, args: &[String]) -> bool {
     stream.write_all(args.join("\n").as_bytes()).is_ok()
 }
 
+/// The socket's name. A separate profile (`SONICLY_PROFILE`) is a separate instance, so a
+/// development run does not hand its arguments to the user's own Sonicly and exit.
+fn socket() -> String {
+    match std::env::var("SONICLY_PROFILE") {
+        Ok(profile) if !profile.is_empty() => format!("{profile}-{SOCKET}"),
+        _ => SOCKET.to_owned(),
+    }
+}
+
 /// The instance socket as a file in a folder only this user can enter, so another account can
 /// neither take the name first nor connect to it.
 #[cfg(unix)]
 fn name() -> io::Result<Name<'static>> {
     use interprocess::local_socket::{GenericFilePath, ToFsName as _};
 
-    private_dir()?.join(SOCKET).to_fs_name::<GenericFilePath>()
+    private_dir()?
+        .join(socket())
+        .to_fs_name::<GenericFilePath>()
 }
 
 /// The instance socket as a named pipe, which `reachable` closes to other accounts.
@@ -205,7 +223,7 @@ fn name() -> io::Result<Name<'static>> {
 fn name() -> io::Result<Name<'static>> {
     use interprocess::local_socket::{GenericNamespaced, ToNsName as _};
 
-    SOCKET.to_ns_name::<GenericNamespaced>()
+    socket().to_ns_name::<GenericNamespaced>()
 }
 
 /// The user's runtime folder, which the session manager creates readable by this user alone. A
@@ -224,7 +242,7 @@ fn private_dir() -> io::Result<std::path::PathBuf> {
         (Some(runtime), None) => return Ok(runtime),
         (None, _) => dirs::cache_dir()
             .ok_or_else(|| io::Error::new(ErrorKind::NotFound, "no runtime or cache folder"))?
-            .join("sonicly"),
+            .join(storage::folder()),
     };
     std::fs::DirBuilder::new()
         .recursive(true)

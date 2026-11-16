@@ -1,16 +1,20 @@
-use gpui::{AnyView, Context, Entity, MouseButton, NavigationDirection, Render, Task};
+use gpui::{
+    AnyView, Context, DragMoveEvent, Entity, ExternalPaths, MouseButton, NavigationDirection,
+    Render, Task,
+};
 use gpui::{App, Font, FontFallbacks, SharedString, StyleRefinement, font, prelude::*};
 use gpui::{Window, deferred, div};
 use input::{
-    CloseWindow, MinimizeWindow, NavigateBack, NavigateForward, OpenFilter, OpenSearch,
-    OpenSettings, Refresh, ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar,
-    ToggleQueue, ToggleWindowFullscreen, ZoomWindow,
+    CloseWindow, DownloadFromLink, MinimizeWindow, NavigateBack, NavigateForward, OpenAlbums,
+    OpenArtists, OpenFilter, OpenHome, OpenPlaylists, OpenSearch, OpenSettings, OpenSongs, Refresh,
+    ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar, ToggleQueue, ToggleSidebar,
+    ToggleWindowFullscreen, ZoomWindow,
 };
-use router::{Destination, NavigationEvent, back, forward, navigate};
+use router::{Destination, LibraryTab, NavigationEvent, back, forward, navigate};
 use state::{
-    ArtistDetail, Detail, GenreDetails, Genres, HistoryState, Home, Io, Library, LibraryState,
-    Network, Playback, Profile, Queue, Reconnected, SYSTEM_FONT, Scan, Search, Session,
-    SessionState, Shelf, SideTab, SongDetail, Sonicly,
+    ArtistDetail, Detail, DropTarget, FileDrop, GenreDetails, Genres, HistoryState, Home, Io,
+    Library, LibraryState, Network, Playback, Profile, Queue, Reconnected, SYSTEM_FONT, Scan,
+    Search, Session, SessionState, Shelf, SideTab, SongDetail, Sonicly,
 };
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use ui::WindowFrame;
@@ -19,6 +23,7 @@ use ui::{
     ThemeKind, clear_listing,
 };
 
+use crate::chrome::drop_zone::DropZone;
 use crate::chrome::{
     Busy, JamCode, JamInvite, JamJoin, PlayerBar, SessionCode, SessionJoin, ThemeInvite, TitleBar,
     TitleBarEvent, TitleBarOptions, ToastStack, Toolbar, Tooled,
@@ -27,6 +32,7 @@ use crate::screens::search::SearchView;
 use crate::screens::settings::SettingsHeader;
 use crate::shared::ambient::{self, Ambient};
 use crate::shared::confirm::Confirm;
+use crate::shared::link_download::LinkDownloadDialog;
 use crate::shared::playlist_editor::PlaylistEditor;
 use crate::shared::powerbar::{Powerbar, PowerbarEvent};
 use crate::shared::smart_playlist::SmartPlaylistEditor;
@@ -88,6 +94,7 @@ struct Dialogs {
     playlist_editor: Entity<PlaylistEditor>,
     smart_playlist_editor: Entity<SmartPlaylistEditor>,
     tag_editor: Entity<TagEditor>,
+    link_download: Entity<LinkDownloadDialog>,
     confirm: Entity<Confirm>,
     jam_join: Entity<JamJoin>,
     jam_code: Entity<JamCode>,
@@ -101,6 +108,7 @@ impl Dialogs {
             playlist_editor: PlaylistEditor::entity(cx),
             smart_playlist_editor: SmartPlaylistEditor::entity(cx),
             tag_editor: TagEditor::entity(cx),
+            link_download: LinkDownloadDialog::entity(cx),
             confirm: Confirm::entity(cx),
             jam_join: cx.new(JamJoin::new),
             jam_code: cx.new(JamCode::new),
@@ -109,11 +117,12 @@ impl Dialogs {
         }
     }
 
-    fn views(&self) -> [AnyView; 8] {
+    fn views(&self) -> [AnyView; 9] {
         [
             self.playlist_editor.clone().into(),
             self.smart_playlist_editor.clone().into(),
             self.tag_editor.clone().into(),
+            self.link_download.clone().into(),
             self.confirm.clone().into(),
             self.jam_join.clone().into(),
             self.jam_code.clone().into(),
@@ -160,6 +169,8 @@ pub struct Root {
     theme_invite: Entity<ThemeInvite>,
     /// The quick search, drawn over whichever shell is up so it opens in fullscreen too.
     powerbar: Entity<Powerbar>,
+    /// What files dragged in from the system would do, and the question their drop may ask.
+    drop_zone: Entity<DropZone>,
     dialogs: Dialogs,
     /// The toasts, hung above the player bar or the fullscreen dock, whichever shell is up.
     toasts: Entity<ToastStack>,
@@ -193,6 +204,9 @@ pub struct Root {
     font: Option<(String, Font)>,
     #[cfg(target_os = "windows")]
     rounded: Option<ui::Rounding>,
+    /// Whether DWM was last told the frame is dark, so the Mica under it matches the theme.
+    #[cfg(target_os = "windows")]
+    dark_frame: Option<bool>,
     /// The corners and traffic-light position last handed to AppKit.
     #[cfg(target_os = "macos")]
     framed: Option<(ui::Rounding, gpui::Point<gpui::Pixels>)>,
@@ -339,6 +353,15 @@ impl Root {
         })
         .detach();
 
+        // GPUI hands DWM the system's polarity on every system change, after this runs, so the
+        // next frame hands it Sonicly's again.
+        #[cfg(target_os = "windows")]
+        cx.observe_window_appearance(window, |this, _, cx| {
+            this.dark_frame = None;
+            cx.notify();
+        })
+        .detach();
+
         cx.observe_window_activation(window, |_, window, cx| update_focus_for_wake(window, cx))
             .detach();
         update_focus_for_wake(window, cx);
@@ -418,12 +441,15 @@ impl Root {
             jam_invite: cx.new(JamInvite::new),
             theme_invite: cx.new(ThemeInvite::new),
             powerbar,
+            drop_zone: cx.new(DropZone::new),
             dialogs: Dialogs::new(cx),
             toasts: cx.new(ToastStack::new),
             background: None,
             font: None,
             #[cfg(target_os = "windows")]
             rounded: None,
+            #[cfg(target_os = "windows")]
+            dark_frame: None,
             #[cfg(target_os = "macos")]
             framed: None,
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
@@ -1073,6 +1099,22 @@ impl Root {
     }
 }
 
+#[cfg(debug_assertions)]
+impl Root {
+    /// Debug builds only, for capture runs: opens the quick search for `powerbar`, and leaves
+    /// anything else to Home, which opens the first album, artist or playlist it lists or a
+    /// context menu once its feed lands.
+    pub fn stage(&mut self, what: &str, window: &mut Window, cx: &mut Context<Self>) {
+        match what {
+            "powerbar" => window.defer(cx, Powerbar::toggle),
+            _ => self
+                .screens
+                .home
+                .update(cx, |home, cx| home.stage(what, cx)),
+        }
+    }
+}
+
 const UI_FONT: &str = "Inter";
 
 const SCRIPTS: [&str; 18] = [
@@ -1096,7 +1138,8 @@ const SCRIPTS: [&str; 18] = [
     "Segoe UI Emoji",
 ];
 
-fn ui_font(chosen: &str) -> Font {
+/// The window font for the chosen typeface, with the bundled scripts behind it.
+pub(crate) fn ui_font(chosen: &str) -> Font {
     match chosen == SYSTEM_FONT {
         true => Font {
             fallbacks: Some(scripts(false).clone()),
@@ -1172,7 +1215,7 @@ impl Render for Root {
 
         let theme = *cx.theme();
         window.set_rem_size(theme.font_size);
-        let appearance = ui::backdrop(theme.blur_window, theme.transparent);
+        let appearance = ui::backdrop(theme.blur_window, theme.transparent, ui::material(cx));
         if self.background != Some(appearance) {
             self.background = Some(appearance);
             window.set_background_appearance(appearance);
@@ -1181,6 +1224,15 @@ impl Render for Root {
         // Windows can only round a window's corners while it's opaque (DWM never rounds a
         // per-pixel-alpha window), so this only takes effect once `backdrop` above lands on
         // `Opaque`; Linux/FreeBSD round their own chrome directly instead, below.
+        #[cfg(target_os = "windows")]
+        {
+            let dark = theme.background.l < 0.5;
+            if self.dark_frame != Some(dark) {
+                self.dark_frame = Some(dark);
+                state::apply_window_polarity(window, dark, cx);
+            }
+        }
+
         #[cfg(target_os = "windows")]
         {
             let rounding = match window.is_fullscreen() {
@@ -1251,6 +1303,7 @@ impl Render for Root {
         // the page colour under it would only stack a second alpha beneath that and leave a
         // see-through fullscreen reading nearly solid.
         let ambient = matches!(self.view, RootView::Fullscreen) && ambient::shown(cx);
+        let framed = matches!(self.view, RootView::Workspace) && !show_sign_in && ui::material(cx);
 
         // The shell enters the way a page enters the workspace. An opaque window fades it
         // under a scrim of the page colour, which leaves the workspace's cached views alone,
@@ -1372,7 +1425,9 @@ impl Render for Root {
             .when_some(radius, |this, radius| {
                 this.rounded(radius).overflow_hidden()
             })
-            .when(!ambient, |this| this.bg(theme.background))
+            // On the platform's material the workspace paints its own page and frame, and the
+            // window behind them stays clear for the material to show through.
+            .when(!ambient && !framed, |this| this.bg(theme.background))
             .text_color(theme.foreground)
             .capture_any_mouse_down(|_, window, cx| {
                 if ui::cancel_middle_scroll(cx) {
@@ -1401,6 +1456,18 @@ impl Render for Root {
             .on_mouse_move(|event, window, cx| {
                 ui::update_middle_scroll(event.position, window, cx);
             })
+            // Files from the system land in Local Music wherever nothing closer takes them: a
+            // local playlist in the sidebar and the queue have drops of their own.
+            .on_drag_move(|event: &DragMoveEvent<ExternalPaths>, _, cx| {
+                let paths = event.drag(cx).paths().to_vec();
+                let file_drop = FileDrop::entity(cx);
+                file_drop.update(cx, |drop, cx| drop.hover(&paths, cx));
+            })
+            .on_drop(|paths: &ExternalPaths, _, cx| {
+                let paths = paths.paths().to_vec();
+                let file_drop = FileDrop::entity(cx);
+                file_drop.update(cx, |drop, cx| drop.drop_on(paths, DropTarget::Library, cx));
+            })
             .on_mouse_down(
                 MouseButton::Navigate(NavigationDirection::Back),
                 |_, _, cx| back(cx),
@@ -1414,6 +1481,25 @@ impl Render for Root {
             .on_action(cx.listener(|this, _: &OpenFilter, window, cx| this.open_filter(window, cx)))
             .on_action(cx.listener(|this, _: &OpenSearch, _, cx| this.open_search(cx)))
             .on_action(cx.listener(|this, _: &OpenSettings, _, cx| this.open_settings(cx)))
+            .on_action(|_: &DownloadFromLink, window, cx| {
+                LinkDownloadDialog::open(None, window, cx)
+            })
+            .on_action(|_: &OpenHome, _, cx| navigate(Destination::Home, cx))
+            .on_action(|_: &OpenSongs, _, cx| navigate(Destination::Library(LibraryTab::Songs), cx))
+            .on_action(|_: &OpenAlbums, _, cx| {
+                navigate(Destination::Library(LibraryTab::Albums), cx)
+            })
+            .on_action(|_: &OpenArtists, _, cx| {
+                navigate(Destination::Library(LibraryTab::Artists), cx)
+            })
+            .on_action(|_: &OpenPlaylists, _, cx| {
+                navigate(Destination::Library(LibraryTab::Playlists), cx)
+            })
+            .on_action(cx.listener(|this, _: &ToggleSidebar, _, cx| {
+                this.shells
+                    .workspace
+                    .update(cx, |workspace, cx| workspace.toggle_sidebar(cx))
+            }))
             .on_action(cx.listener(|this, _: &Refresh, _, cx| this.refresh(cx)))
             .on_action(cx.listener(|this, _: &ToggleFullscreen, _, cx| this.toggle_fullscreen(cx)))
             .on_action(|_: &CloseWindow, window, _| window.remove_window())
@@ -1452,9 +1538,12 @@ impl Render for Root {
                         .flex_none(),
                 ),
             )
-            .when(!show_sign_in, |this| this.child(shell));
+            .when(!show_sign_in, |this| this.child(shell))
+            .child(self.drop_zone.clone());
         // A closed menu or dialog fades out here, over everything else in the window.
-        let root = root.child(ui::lingers());
+        let root = root
+            .child(ui::lingers())
+            .children(crate::chrome::cover_specimens(window, cx));
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         let root = root.child(WindowFrame::new());
         root

@@ -143,7 +143,8 @@ impl Shell for Workspace {
             navigation: true,
             sidebar_open: self.sidebar.read(cx).is_open(),
             sidebar_right: Some(self.sidebar_right.read(cx).is_open()),
-            border: true,
+            // The page's own top edge is the rule under the bar.
+            border: false,
             content,
             transparent: false,
         }
@@ -159,6 +160,7 @@ impl Render for Workspace {
         let left = self.sidebar.read(cx).occupied_width();
         let overlay_width = self.sidebar.read(cx).overlay_width();
         Chrome::publish(left, right, reserved, cx);
+        let theme = *cx.theme();
         let covered = self.sidebar_right.read(cx).covers_content(window);
         let overlay = self.sidebar.read(cx).overlays();
         let bar_height = PlayerBar::height(window, cx);
@@ -173,6 +175,7 @@ impl Render for Workspace {
         // flow at a width this knows: an overlaid sidebar places itself, and a
         // closed one hides itself and takes no space at all.
         let sidebar_width = self.sidebar.read(cx).occupied_width();
+        let edged = sidebar_width > Pixels::ZERO || overlay_width > Pixels::ZERO;
         let sidebar = match overlay || sidebar_width == gpui::Pixels::ZERO {
             true => self.sidebar.clone().into_any_element(),
             false => self
@@ -279,6 +282,12 @@ impl Render for Workspace {
                             .min_w_0()
                             .min_h_0()
                             .ml(overlay_width)
+                            // The page is one surface set into the frame: its own colour, and a
+                            // hairline along the edges it shares with the title bar and sidebar.
+                            .when(!theme.transparent, |this| this.bg(theme.background))
+                            .border_t_1()
+                            .when(edged, |this| this.border_l_1())
+                            .border_color(theme.sidebar_border)
                             .when(overlay, |this| this.overflow_hidden())
                             .when(covered, |this| this.hidden())
                             // A two-finger swipe across the page steps through its history,
