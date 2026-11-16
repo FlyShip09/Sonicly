@@ -16,9 +16,9 @@ use i18n::t;
 use music::{Contributor, Shape, Track, Voice};
 use router::{Destination, LibraryTab, Link as _};
 use state::{
-    AppSettings, Lyrics, LyricsState, Network, Playback, PlaybackState, Queue, QueuePosition,
-    QueueSections as Sections, QueueSlot as Slot, QueueView, RomanizationScripts, Shelf, SideTab,
-    Sonicly, Whence,
+    AppSettings, Lyrics, LyricsEmphasis, LyricsState, LyricsStyle, Network, Playback,
+    PlaybackState, Queue, QueuePosition, QueueSections as Sections, QueueSlot as Slot, QueueView,
+    RomanizationScripts, Shelf, SideTab, Sonicly, Whence,
 };
 use ui::{
     ActiveTheme as _, Avatar, Button, Card, DraggedPin, Edge, Glowing as _, Initials, Motion,
@@ -142,11 +142,55 @@ struct Sung {
     from: gpui::Point<f32>,
     /// Whether the lyrics mostly read right to left, which puts the lead voice on the right.
     mirrored: bool,
+    /// Whether every line sits in the middle of the sheet, duets included.
+    centered: bool,
+    /// How strongly lines away from the sung one show, as a share of the default.
+    inactive: f32,
+}
+
+/// How the lyrics style sets the lines: the face, the weights, the spacing, the side they sit
+/// on and how the sung line stands out.
+#[derive(Clone, PartialEq)]
+pub(crate) struct Face {
+    /// The family the lines are set in, `None` for the app's own.
+    family: Option<SharedString>,
+    weight: FontWeight,
+    /// The weight of the line being sung.
+    sung_weight: FontWeight,
+    /// Whether the line being sung grows.
+    grows: bool,
+    spacing: f32,
+    centered: bool,
+    inactive: f32,
+}
+
+impl Face {
+    pub(crate) fn of(style: &LyricsStyle) -> Self {
+        let weight = FontWeight(style.weight as f32);
+        Self {
+            family: (style.font != state::SYSTEM_FONT)
+                .then(|| SharedString::from(style.font.clone())),
+            weight,
+            sung_weight: match style.emphasis {
+                LyricsEmphasis::Weight => FontWeight((weight.0 + 200.).min(900.)),
+                LyricsEmphasis::Scale | LyricsEmphasis::Color => weight,
+            },
+            grows: style.emphasis == LyricsEmphasis::Scale,
+            spacing: style.spacing,
+            centered: style.align == state::LyricsAlign::Center,
+            inactive: style.inactive,
+        }
+    }
+
+    /// The space between and inside verses, as a share of the default.
+    pub(crate) fn spacing(&self) -> f32 {
+        self.spacing
+    }
 }
 
 /// How one verse is drawn outside the sheet, for a still picture of the lyrics such as the
 /// settings preview. The sizes are the sheet's own, before an active verse grows.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct VerseLook {
     pub(crate) active: bool,
     /// The verse's text size and its romanized lane's.
@@ -156,6 +200,7 @@ pub(crate) struct VerseLook {
     pub(crate) scripts: Option<RomanizationScripts>,
     /// How far out of focus the verse sits, from 0 for sharp to 1 at the sheet's edge.
     pub(crate) haze: f32,
+    pub(crate) face: Face,
 }
 
 #[derive(Clone, Copy)]
@@ -1087,6 +1132,7 @@ impl Aside {
                     .then(|| settings.romanization_scripts()),
             )
         };
+        let face = Face::of(&self.settings.read(cx).lyrics_style());
         let karaoke_effects = karaoke_lyrics && effects();
         let frame_scale = match self.titled {
             true => 1.,
@@ -1097,8 +1143,8 @@ impl Aside {
             false => self.settings.read(cx).fullscreen_lyrics_scale(),
         } * frame_scale;
         let (verse, lane_size) = verse_sizes(self.titled, scale, &theme);
-        let line_height = active_verse_size(verse) * ui::LEADING;
-        let phrase_gap = verse_gap(verse);
+        let line_height = active_verse_size(verse, face.grows) * ui::LEADING * face.spacing;
+        let phrase_gap = verse_gap(verse) * face.spacing;
         let sung = Sung {
             karaoke: karaoke_effects,
             lane: lane_size,
@@ -1108,6 +1154,8 @@ impl Aside {
             lift: 1.,
             from: gpui::point(0., 0.5),
             mirrored,
+            centered: face.centered,
+            inactive: face.inactive,
         };
 
         if let Some(following) = following {
@@ -1154,7 +1202,7 @@ impl Aside {
 
         let verse_pad = verse * VERSE_SIDE_PADDING;
         let sheet_padding = theme.metrics.pad * 0.75;
-        let wrap_size = active_verse_size(verse);
+        let wrap_size = active_verse_size(verse, face.grows);
         let scroll = self.verse_bar.read(cx).scroll().clone();
         let (nudges, presentation) = {
             let bar = self.verse_bar.read(cx);
@@ -1194,7 +1242,7 @@ impl Aside {
             scripts: romanization_scripts,
             rem: window.rem_size(),
             scale: window.scale_factor(),
-            font: font_key(self.settings.read(cx).font()),
+            font: font_key(self.settings.read(cx).font(), &face),
         };
         let measured = self.laid.replace(false) && self.sheet_layout == Some(layout);
         self.sheet_layout = Some(layout);
@@ -1346,7 +1394,7 @@ impl Aside {
                     {
                         let parts = lyrics_parts(&line.text, line.words.as_deref());
                         if let Some(wrapped) =
-                            lyrics_wrap_rows(&parts, wrap_size, wrap_width, window)
+                            lyrics_wrap_rows(&parts, wrap_size, wrap_width, &face, window)
                         {
                             slot.insert(wrapped);
                         }
@@ -1380,8 +1428,8 @@ impl Aside {
                     let shade = |singing: bool| match (singing, line_has_ended) {
                         (true, _) if worded => quiet(&theme),
                         (true, _) => theme.foreground,
-                        (false, true) => quiet(&theme).opacity(PAST),
-                        (false, false) => quiet(&theme).opacity(AHEAD),
+                        (false, true) => quiet(&theme).opacity(PAST * face.inactive),
+                        (false, false) => quiet(&theme).opacity(AHEAD * face.inactive),
                     };
                     let tint = shade(Some(index) == active_line);
 
@@ -1389,7 +1437,7 @@ impl Aside {
                     let growing =
                         animations && active && self.arrived.elapsed() < Motion::Base.span();
                     let shrinking = dimming.is_some();
-                    let active_size = active_verse_size(verse);
+                    let active_size = active_verse_size(verse, face.grows);
                     let small = verse / active_size;
                     let big = active_size / verse;
                     // both ways land on 1
@@ -1410,9 +1458,10 @@ impl Aside {
                             primary_karaoke_fade(line, active, position),
                         ),
                         lift,
-                        from: match hugs_end(line.voice, sung.mirrored) {
-                            true => gpui::point(1., 0.5),
-                            false => gpui::point(0., 0.5),
+                        from: match (face.centered, hugs_end(line.voice, sung.mirrored)) {
+                            (true, _) => gpui::point(0.5, 0.5),
+                            (false, true) => gpui::point(1., 0.5),
+                            (false, false) => gpui::point(0., 0.5),
                         },
                         ..sung
                     };
@@ -1444,6 +1493,7 @@ impl Aside {
                                 lane_size,
                                 line_height,
                                 wrap_width,
+                                &face,
                                 window,
                             );
                             self.lane_rooms.insert(index, room);
@@ -1460,7 +1510,9 @@ impl Aside {
                                 has_right_to_left(&lane.text)
                                     .then(|| {
                                         let parts = lyrics_parts(&lane.text, lane.words.as_deref());
-                                        lyrics_wrap_rows(&parts, lane_size, wrap_width, window)
+                                        lyrics_wrap_rows(
+                                            &parts, lane_size, wrap_width, &face, window,
+                                        )
                                     })
                                     .flatten()
                             })
@@ -1514,14 +1566,15 @@ impl Aside {
                         .min_w_0()
                         .px(verse_pad)
                         .when(spans_row, |this| this.w_full())
-                        .py(verse * VERSE_PADDING)
+                        .py(verse * VERSE_PADDING * face.spacing)
                         .rounded(theme.radius)
                         .when(warmth > 0., |this| {
                             this.bg(theme.table_hover.opacity(warmth))
                         })
-                        .when(hugs_end(line.voice, sung.mirrored), |this| {
+                        .when(hugs(line.voice, &sung), |this| {
                             this.items_end().text_right()
                         })
+                        .when(face.centered, |this| this.items_center().text_center())
                         .child(primary)
                         .when_some(
                             selected_romanization(&line.romanized, romanization_scripts),
@@ -1562,9 +1615,8 @@ impl Aside {
                         .aria_size_of_set(lines.len())
                         .w_full()
                         .flex()
-                        .when(hugs_end(line.voice, sung.mirrored), |this| {
-                            this.justify_end()
-                        })
+                        .when(hugs(line.voice, &sung), |this| this.justify_end())
+                        .when(face.centered, |this| this.justify_center())
                         .when(traded, |this| this.mt(phrase_gap * 0.5))
                         .cursor_pointer()
                         .on_mouse_down(
@@ -1576,7 +1628,7 @@ impl Aside {
                         .text_size(verse)
                         .line_height(line_height)
                         .text_color(tint)
-                        .font_weight(FontWeight::SEMIBOLD)
+                        .font_weight(face.weight)
                         .on_hover(cx.listener(move |this, over: &bool, _, cx| {
                             this.set_hovered(Warm::Verse(index), *over, cx)
                         }))
@@ -1593,9 +1645,10 @@ impl Aside {
                         });
                     let verse_line = match (growing, shrinking, active) {
                         (_, true, false) => verse_line.text_color(paint),
-                        (true, _, _) | (_, _, true) => {
-                            verse_line.text_size(active_size).text_color(paint)
-                        }
+                        (true, _, _) | (_, _, true) => verse_line
+                            .text_size(active_size)
+                            .font_weight(face.sung_weight)
+                            .text_color(paint),
                         _ => verse_line,
                     };
                     rendered.push(adrift(verse_line, translation, traded, window));
@@ -1620,6 +1673,7 @@ impl Aside {
                                         &lyrics_parts(line, None),
                                         plain_size,
                                         wrap_width,
+                                        &face,
                                         window,
                                     )
                                     .filter(|plan| !plan.text.is_empty())
@@ -1641,9 +1695,10 @@ impl Aside {
                                 .flex_col()
                                 .gap_1()
                                 .text_size(plain_size)
-                                .font_weight(FontWeight::SEMIBOLD)
+                                .font_weight(face.weight)
                                 .text_color(theme.foreground)
-                                .when(sung.mirrored, |this| this.text_right())
+                                .when(sung.mirrored && !face.centered, |this| this.text_right())
+                                .when(face.centered, |this| this.text_center())
                                 .map(|this| match (&rows, romanized.is_some()) {
                                     (None, false) => this.child(SharedString::from(text.clone())),
                                     _ => this.children(text.lines().enumerate().map(
@@ -1750,7 +1805,8 @@ impl Aside {
             .flex()
             .flex_col()
             .items_center()
-            .when(shown, |this| this.items_start())
+            .when(shown && !face.centered, |this| this.items_start())
+            .when_some(face.family.clone(), |this, family| this.font_family(family))
             .gap(phrase_gap)
             .flex_1()
             .min_h_0()
@@ -2251,7 +2307,8 @@ fn fixed_lyrics_lane(rows: &[SharedString], voice: Voice, sung: &Sung) -> Div {
                 div()
                     .w_full()
                     .whitespace_nowrap()
-                    .when(hugs_end(voice, sung.mirrored), |this| this.text_right())
+                    .when(hugs(voice, sung), |this| this.text_right())
+                    .when(sung.centered, |this| this.text_center())
                     .child(row.clone()),
                 sung,
             )
@@ -2272,10 +2329,11 @@ pub(crate) fn verse(
     let tint = match (look.active, ended) {
         (true, _) if worded => quiet(theme),
         (true, _) => theme.foreground,
-        (false, true) => quiet(theme).opacity(PAST),
-        (false, false) => quiet(theme).opacity(AHEAD),
+        (false, true) => quiet(theme).opacity(PAST * look.face.inactive),
+        (false, false) => quiet(theme).opacity(AHEAD * look.face.inactive),
     };
     let mirrored = right_to_left(&line.text);
+    let face = &look.face;
     let sung = Sung {
         karaoke,
         lane: look.lane,
@@ -2292,6 +2350,8 @@ pub(crate) fn verse(
             false => gpui::point(0., 0.5),
         },
         mirrored,
+        centered: face.centered,
+        inactive: face.inactive,
     };
     let primary = match (
         worded && primary_karaoke_visible(line, look.active, position),
@@ -2309,12 +2369,13 @@ pub(crate) fn verse(
         _ => lifted(
             div()
                 .w_full()
-                .when(hugs_end(line.voice, mirrored), |this| this.text_right())
+                .when(hugs(line.voice, &sung), |this| this.text_right())
+                .when(face.centered, |this| this.text_center())
                 .child(SharedString::from(line.text.clone())),
             &sung,
         ),
     };
-    let active_size = active_verse_size(look.size);
+    let active_size = active_verse_size(look.size, face.grows);
     let haze = match effects() {
         true => look.haze,
         false => 0.,
@@ -2323,22 +2384,27 @@ pub(crate) fn verse(
     div()
         .w_full()
         .px(look.size * VERSE_SIDE_PADDING)
-        .py(look.size * VERSE_PADDING)
+        .py(look.size * VERSE_PADDING * face.spacing)
         .text_size(match look.active {
             true => active_size,
             false => look.size,
         })
-        .line_height(active_size * ui::LEADING)
+        .line_height(active_size * ui::LEADING * face.spacing)
         .text_color(tint)
-        .font_weight(FontWeight::SEMIBOLD)
+        .font_weight(match look.active {
+            true => face.sung_weight,
+            false => face.weight,
+        })
+        .when_some(face.family.clone(), |this, family| this.font_family(family))
         .child(
             div()
                 .flex()
                 .flex_col()
                 .gap_1()
-                .when(hugs_end(line.voice, mirrored), |this| {
+                .when(hugs(line.voice, &sung), |this| {
                     this.items_end().text_right()
                 })
+                .when(face.centered, |this| this.items_center().text_center())
                 .child(primary)
                 .when_some(
                     selected_romanization(&line.romanized, look.scripts),
@@ -2467,7 +2533,8 @@ fn karaoke_lane(
                 lifted(
                     div()
                         .flex()
-                        .when(hugs_end(voice, sung.mirrored), |this| this.justify_end())
+                        .when(hugs(voice, sung), |this| this.justify_end())
+                        .when(sung.centered, |this| this.justify_center())
                         .child(lit(plan.text[row].clone(), reveal)),
                     sung,
                 )
@@ -2479,9 +2546,10 @@ fn karaoke_lane(
             // the far end of a row is its left
             .when(rtl, |this| this.flex_row_reverse())
             .text_left()
-            .when(hugs_end(voice, sung.mirrored) != rtl, |this| {
+            .when(hugs(voice, sung) != rtl && !sung.centered, |this| {
                 this.justify_end()
             })
+            .when(sung.centered, |this| this.justify_center())
             .children((0..fragments.len()).map(|index| {
                 let share = sweep(spoken.get(index).copied().unwrap_or(index));
                 let reveal = Reveal {
@@ -2583,8 +2651,8 @@ fn secondary_lyrics_lane(
         match (active, passed, karaoke) {
             (_, _, true) => quiet(theme),
             (true, _, false) => theme.foreground,
-            (false, true, false) => quiet(theme).opacity(PAST),
-            (false, false, false) => quiet(theme).opacity(AHEAD),
+            (false, true, false) => quiet(theme).opacity(PAST * sung.inactive),
+            (false, false, false) => quiet(theme).opacity(AHEAD * sung.inactive),
         }
     };
     // a lane only shows under the line being sung
@@ -2624,9 +2692,8 @@ fn secondary_lyrics_lane(
     div()
         .flex()
         .flex_col()
-        .when(hugs_end(voice, sung.mirrored), |this| {
-            this.items_end().text_right()
-        })
+        .when(hugs(voice, sung), |this| this.items_end().text_right())
+        .when(sung.centered, |this| this.items_center().text_center())
         .child(lyrics)
         .when_some(
             selected_romanization(&lane.romanized, sung.scripts),
@@ -2671,9 +2738,12 @@ fn credit_lines(source: &str, writers: &[String]) -> (SharedString, Option<Share
 }
 
 /// A fingerprint of a font name, so the sheet notices a change of font without keeping a copy.
-fn font_key(font: &str) -> u64 {
+fn font_key(font: &str, face: &Face) -> u64 {
     let mut hasher = DefaultHasher::new();
     font.hash(&mut hasher);
+    face.family.hash(&mut hasher);
+    face.sung_weight.0.to_bits().hash(&mut hasher);
+    face.spacing.to_bits().hash(&mut hasher);
     hasher.finish()
 }
 
@@ -2814,8 +2884,12 @@ fn lyrics_frame_scale(viewport: Size<Pixels>) -> f32 {
         .clamp(1., LYRICS_FRAME_MOST)
 }
 
-fn active_verse_size(verse: Pixels) -> Pixels {
-    verse + ACTIVE_VERSE_GROWTH
+/// The size of the line being sung: a little larger when it `grows`, the rest's otherwise.
+fn active_verse_size(verse: Pixels, grows: bool) -> Pixels {
+    match grows {
+        true => verse + ACTIVE_VERSE_GROWTH,
+        false => verse,
+    }
 }
 
 fn lyrics_parts(line: &str, words: Option<&[music::LyricsWord]>) -> Vec<(String, usize)> {
@@ -2868,14 +2942,19 @@ fn lyrics_wrap_rows(
     parts: &[(String, usize)],
     font_size: Pixels,
     width: Pixels,
+    face: &Face,
     window: &mut Window,
 ) -> Option<Wrapped> {
     if width <= px(0.) {
         return None;
     }
 
+    // measured at the sung line's weight, the widest a line is drawn at
     let mut style = window.text_style();
-    style.font_weight = FontWeight::SEMIBOLD;
+    style.font_weight = face.sung_weight;
+    if let Some(family) = &face.family {
+        style.font_family = family.clone();
+    }
     let fragments = parts
         .iter()
         .map(|(text, _)| SharedString::from(text.clone()))
@@ -3167,14 +3246,15 @@ fn lanes_room(
     size: Pixels,
     leading: Pixels,
     width: Pixels,
+    face: &Face,
     window: &mut Window,
 ) -> Pixels {
     let rows = lanes
         .iter()
         .map(|lane| {
-            let spoken = wrapped_rows(&lane.text, size, width, window);
+            let spoken = wrapped_rows(&lane.text, size, width, face, window);
             let romanized = selected_romanization(&lane.romanized, scripts)
-                .map_or(0, |text| wrapped_rows(&text, size, width, window));
+                .map_or(0, |text| wrapped_rows(&text, size, width, face, window));
             spoken + romanized
         })
         .sum::<usize>();
@@ -3185,9 +3265,16 @@ fn lanes_room(
     leading * (rows as f32 + LANE_SLACK) + gaps
 }
 
-fn wrapped_rows(text: &str, size: Pixels, width: Pixels, window: &mut Window) -> usize {
+fn wrapped_rows(
+    text: &str,
+    size: Pixels,
+    width: Pixels,
+    face: &Face,
+    window: &mut Window,
+) -> usize {
     let parts = lyrics_parts(text, None);
-    lyrics_wrap_rows(&parts, size, width, window).map_or(1, |wrapped| wrapped.rows.len().max(1))
+    lyrics_wrap_rows(&parts, size, width, face, window)
+        .map_or(1, |wrapped| wrapped.rows.len().max(1))
 }
 
 /// Draws a sheet row `shift` away from where layout put it. A moved row goes in a wrapper, so the
@@ -3375,6 +3462,12 @@ fn wordless(key: &'static str, icon: &'static str) -> gpui::AnyElement {
 
 /// Whether a line by `voice` sits against the right edge. The lead voice starts on the side its
 /// script starts from, and a counter voice answers from the other.
+/// Whether a line of `voice` sits against the sheet's far edge as `sung` lays it out: never on a
+/// centred sheet, and otherwise as `hugs_end` says.
+fn hugs(voice: Voice, sung: &Sung) -> bool {
+    !sung.centered && hugs_end(voice, sung.mirrored)
+}
+
 fn hugs_end(voice: Voice, mirrored: bool) -> bool {
     voice.lead() == mirrored
 }
