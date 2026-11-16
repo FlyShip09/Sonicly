@@ -32,10 +32,34 @@ const YOUTUBE: Guide = Guide {
     note: "login-cookie-step-note",
 };
 
-/// The guide for a provider slug. Every provider that signs in by a pasted request header
-/// shares YouTube's, whose wording names no cookie.
-fn guide(_slug: &str) -> &'static Guide {
-    &YOUTUBE
+const APPLE: Guide = Guide {
+    url: "https://music.apple.com",
+    title: "login-cookie-header-title",
+    hint: "login-cookie-hint",
+    steps: [
+        "login-cookie-named-step-1",
+        "login-cookie-step-2",
+        "login-cookie-apple-step-3",
+        "login-cookie-step-4",
+    ],
+    note: "login-cookie-apple-note",
+};
+
+/// The guide for a provider slug. YouTube's is the fallback: pasting a whole request header
+/// needs no cookie name, so its wording fits any header paste.
+fn guide(slug: &str) -> &'static Guide {
+    match slug {
+        "apple" => &APPLE,
+        _ => &YOUTUBE,
+    }
+}
+
+/// The site the devtools show and the cookie to copy, for the guides whose strings name them.
+fn named(slug: &str) -> Option<(&'static str, &'static str)> {
+    match slug {
+        "apple" => Some(("music.apple.com", "media-user-token")),
+        _ => None,
+    }
 }
 
 #[derive(IntoElement)]
@@ -97,6 +121,10 @@ impl RenderOnce for CookiePrompt {
 
         let mut args = FluentArgs::new();
         args.set("provider", provider.value());
+        if let Some((site, cookie)) = named(slug) {
+            args.set("site", site.value());
+            args.set("cookie", cookie.value());
+        }
 
         Modal::new("cookie-prompt", lookup(guide.title, Some(&args)))
             .w(px(560.))
