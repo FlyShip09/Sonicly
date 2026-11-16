@@ -441,7 +441,9 @@ impl DetailView {
         page::restore(&self.settings.clone(), &self.table, &key, cx);
     }
 
-    fn header(&self, window: &Window, cx: &Context<Self>) -> AnyElement {
+    /// The hero over the table, or in the column beside it when `column` gives that column's
+    /// width.
+    fn header(&self, column: Option<Pixels>, window: &Window, cx: &Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let muted = theme.muted_foreground;
         let header = self.detail.read(cx).header();
@@ -514,7 +516,9 @@ impl DetailView {
             true => {
                 let gap = ACTION_GAP.to_pixels(window.rem_size());
                 let step = Button::width(std::iter::empty::<SharedString>(), window) + gap;
-                let room = PageHero::room(self.width - theme.metrics.inset * 2., window, cx);
+                let room = column.unwrap_or_else(|| {
+                    PageHero::room(self.width - theme.metrics.inset * 2., window, cx)
+                });
                 ((room - play.width(window) - step) / step).floor().max(0.) as usize
             }
             false => usize::MAX,
@@ -571,6 +575,7 @@ impl DetailView {
         });
         PageHero::new("detail-hero", title)
             .washed()
+            .when_some(column, PageHero::stacked)
             .pending(header.is_none() && self.detail.read(cx).is_loading())
             .pin(pin)
             .cover(cover)
@@ -911,17 +916,32 @@ impl Render for DetailView {
 
         self.table.claim(cx);
         let inset = cx.theme().metrics.inset;
-        let framed = page::framed(window, cx);
-        let width = page::bleed_width(window, cx);
+        let column = side_column(window, cx);
+        let margin = crate::chrome::Chrome::margin(window, cx);
+        // Beside a column the table stands in what the column leaves, never framed.
+        let framed = column.is_none() && page::framed(window, cx);
+        let width = match column {
+            Some(column) => crate::chrome::Chrome::page(window, cx) - inset * 3. - column,
+            None => page::bleed_width(window, cx),
+        };
         if (width - self.width).abs() >= px(0.5) {
             self.width = width;
             self.table.set_width(width, cx);
         }
 
         let scroll = self.scrollbar.read(cx).scroll().clone();
-        let viewport = match framed {
-            true => page::past_border(page::viewport(&scroll, inset, window)),
-            false => page::viewport(&scroll, inset, window),
+        let viewport = match (column, framed) {
+            // the table leads its scroller, so its rows start one inset down
+            (Some(_), _) => {
+                ui::quantize(&scroll, window);
+                ui::Viewport::measured(
+                    ui::scrolled(&scroll) - inset,
+                    scroll.bounds().size.height,
+                    window,
+                )
+            }
+            (None, true) => page::past_border(page::viewport(&scroll, inset, window)),
+            (None, false) => page::viewport(&scroll, inset, window),
         };
         self.table
             .update(cx, |table, _| table.set_viewport(viewport));
@@ -960,22 +980,88 @@ impl Render for DetailView {
             })
             .unwrap_or_default();
         let past = inset + cx.theme().metrics.cover;
+        let bottom = crate::chrome::Chrome::bottom(cx);
+        let notices = self.notices(cx);
+        let rails = div().px(inset).pt_10().children(rails);
+
+        let Some(column) = column else {
+            return div()
+                .relative()
+                .size_full()
+                .child(
+                    Scroller::new("detail-page", &self.scrollbar)
+                        .headed(past, title, cover)
+                        .hold()
+                        .bottom_inset(bottom)
+                        .px(margin)
+                        .pt(inset)
+                        .pb(inset)
+                        .child(div().px(inset).child(self.header(None, window, cx)))
+                        .child(page::bleed(table(&self.table), framed, cx))
+                        .children(notices)
+                        .child(rails),
+                )
+                .when_some(context_menu, |this, menu| this.child(menu))
+                .child(self.cover_viewer.clone())
+                .into_any_element();
+        };
+
+        // Wide: the hero in a column of its own that stays in view, the table scrolling beside
+        // it, and the cover's wash behind both from the top of the page.
+        let theme = *cx.theme();
+        let wash = cover
+            .as_deref()
+            .filter(|_| {
+                !self.detail.read(cx).is_loading() || self.detail.read(cx).header().is_some()
+            })
+            .and_then(|cover| Some((cover, ui::cover_palette(cover, cx)?.primary?)))
+            .map(|(cover, tint)| {
+                div()
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .right_0()
+                    .h(column + inset * 2.)
+                    .child(crate::shared::hero::wash(
+                        cover,
+                        theme.header_wash(tint),
+                        Pixels::ZERO,
+                        Pixels::ZERO,
+                        cx,
+                    ))
+            });
 
         div()
             .relative()
             .size_full()
+            .flex()
+            .children(wash)
             .child(
-                Scroller::new("detail-page", &self.scrollbar)
-                    .headed(past, title, cover)
-                    .hold()
-                    .bottom_inset(crate::chrome::Chrome::bottom(cx))
-                    .px(crate::chrome::Chrome::margin(window, cx))
+                div()
+                    .id("detail-side")
+                    .flex_none()
+                    .w(margin + inset * 2. + column)
+                    .h_full()
+                    .overflow_y_scroll()
+                    .pl(margin + inset)
+                    .pr(inset)
                     .pt(inset)
-                    .pb(inset)
-                    .child(div().px(inset).child(self.header(window, cx)))
-                    .child(page::bleed(table(&self.table), framed, cx))
-                    .children(self.notices(cx))
-                    .child(div().px(inset).pt_10().children(rails)),
+                    .pb(bottom + inset)
+                    .child(self.header(Some(column), window, cx)),
+            )
+            .child(
+                div().flex_1().min_w_0().h_full().child(
+                    Scroller::new("detail-page", &self.scrollbar)
+                        .page()
+                        .hold()
+                        .bottom_inset(bottom)
+                        .pr(margin)
+                        .pt(inset)
+                        .pb(inset)
+                        .child(table(&self.table))
+                        .children(notices)
+                        .child(rails),
+                ),
             )
             .when_some(context_menu, |this, menu| this.child(menu))
             .child(self.cover_viewer.clone())
@@ -1076,5 +1162,16 @@ impl Tooled for DetailView {
                 cx,
             ),
         ]
+    }
+}
+
+/// The width of the column an album or playlist page stands its hero in once the content area
+/// is wide, or nothing while the hero belongs over the table.
+fn side_column(window: &Window, cx: &App) -> Option<Pixels> {
+    let cover = cx.theme().metrics.cover;
+    match Chrome::room(window, cx) {
+        ui::Room::Vast => Some(cover * 2.),
+        ui::Room::Wide => Some(cover * 1.75),
+        _ => None,
     }
 }
