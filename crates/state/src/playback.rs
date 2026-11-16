@@ -686,9 +686,16 @@ impl Playback {
                     return;
                 };
                 // an engine left from playing offline hands its track over where it stands
+                let barrier = playback.barrier();
                 match this.engine.is_some() && !this.local_active() {
                     true => this.rebind(playback, cx),
                     false => this.start_engine(playback, cx),
+                }
+                // said once at sign-in, rather than left for the first play to find out
+                if let Some(barrier) = barrier {
+                    let provider = session.read(cx).provider_name().unwrap_or("this provider");
+                    log::warn!("playback: {provider} {}", barred(barrier).1);
+                    Toasts::about(Outcome::Failed, barred(barrier).0, provider.to_owned(), cx);
                 }
                 this.adopt(cx);
             }
@@ -3523,16 +3530,7 @@ impl Playback {
             .read(cx)
             .provider_name()
             .unwrap_or("this provider");
-        let (key, why) = match barrier {
-            Barrier::Subscription => (
-                "toast-needs-subscription",
-                "plays whole tracks only with an active subscription",
-            ),
-            Barrier::Player => (
-                "toast-web-player-unavailable",
-                "plays through its web player, which this system's web view cannot run",
-            ),
-        };
+        let (key, why) = barred(barrier);
         log::warn!("playback: {provider} {why}");
         self.state = PlaybackState::Failed(format!("{provider} {why}"));
         Toasts::about(Outcome::Failed, key, provider.to_owned(), cx);
@@ -3637,6 +3635,20 @@ fn throttle_wait(throttles: u8) -> Duration {
     THROTTLE_WAIT
         .saturating_mul(1 << doublings)
         .min(THROTTLE_CAP)
+}
+
+/// The toast that tells the listener of a barrier, and the same in plain words for the log.
+fn barred(barrier: Barrier) -> (&'static str, &'static str) {
+    match barrier {
+        Barrier::Subscription => (
+            "toast-needs-subscription",
+            "plays whole tracks only with an active subscription",
+        ),
+        Barrier::Player => (
+            "toast-web-player-unavailable",
+            "plays through its web player, which this system's web view cannot run",
+        ),
+    }
 }
 
 /// Drops an engine on a thread of its own. Spotify's waits for its player thread to end, which

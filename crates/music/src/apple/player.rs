@@ -95,6 +95,12 @@ impl PlaybackFactory for Factory {
         });
         (Box::new(WebPlayer(machine)), Box::new(Events(receiver)))
     }
+
+    /// Where the app has no page to run Apple's player in, as on Linux, whose WebKitGTK ships
+    /// no module for protected audio, nothing of Apple Music plays.
+    fn barrier(&self) -> Option<Barrier> {
+        (!webplayer::served()).then_some(Barrier::Player)
+    }
 }
 
 struct WebPlayer(Arc<Mutex<Machine>>);

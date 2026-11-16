@@ -855,6 +855,12 @@ impl Fraction {
 
 pub trait PlaybackFactory: Send + Sync {
     fn start(&self, config: PlaybackConfig) -> (Box<dyn Player>, Box<dyn PlaybackEvents>);
+
+    /// What keeps every player this starts from playing anything on this system, known before
+    /// a track is asked for, so the listener hears of it at sign-in rather than at the first play.
+    fn barrier(&self) -> Option<Barrier> {
+        None
+    }
 }
 
 /// What a provider's library is made of. It decides which `MusicApi` methods fill the library

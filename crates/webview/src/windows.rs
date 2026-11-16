@@ -274,11 +274,16 @@ fn begin_environment(hwnd: HWND, setup: Setup) -> Result<()> {
 
 /// Sonicly's own cache folder for WebView2's browser state, as a wide string. WebView2 otherwise
 /// writes beside the executable, which an installed copy under Program Files cannot do. Player
-/// pages keep theirs apart, since their browser process runs with other arguments.
+/// pages keep theirs apart, since their browser process runs with other arguments. A separate
+/// profile (`SONICLY_PROFILE`) gets a folder of its own, like the rest of what Sonicly keeps.
 fn user_data_folder(player: bool) -> Result<Vec<u16>> {
+    let profile = match std::env::var("SONICLY_PROFILE") {
+        Ok(profile) if !profile.is_empty() => format!("sonicly-{profile}"),
+        _ => "sonicly".to_owned(),
+    };
     let folder = dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonicly")
+        .join(profile)
         .join(match player {
             true => "webview2-player",
             false => "webview2",
