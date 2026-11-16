@@ -39,7 +39,7 @@ use gpui::{
     div,
 };
 use ui::{
-    Button, Card, Checkbox, DraggedPin, Field, Form, GeneratedCover, Glowing as _, Input,
+    Button, Card, Checkbox, DraggedPin, Field, Form, GeneratedCover, Glowing as _, Input, Marquee,
     OptionCard, OtpInput, Pin, PinKind, Pinnable as _, Radio, RangeScrubber, RangeState, Scrubber,
     ScrubberState, Spot, Theme, Toast,
 };
@@ -240,6 +240,23 @@ async fn scrubber_advertises_role_and_value(cx: &mut TestAppContext) {
     assert!(
         lines.iter().any(|line| line.contains("0.5")),
         "scrubber exposes no numeric value, screen readers cannot announce position: {lines:?}"
+    );
+}
+
+/// A marquee only moves a line; the element around it names what the line says, so it must not
+/// put a nameless node of its own in the tree.
+#[gpui::test]
+async fn marquee_adds_no_node_of_its_own(cx: &mut TestAppContext) {
+    let lines = open_probe(cx, |window, cx| {
+        let element = Marquee::new("title-run", "A title too long for its box")
+            .render(window, cx)
+            .into_element();
+        snapshot("marquee", &element)
+    });
+    let lines = rendered(&lines, "marquee");
+    assert!(
+        lines.iter().any(|line| line.contains("NO NODE")),
+        "marquee claims a node of its own, screen readers would read it twice: {lines:?}"
     );
 }
 

@@ -22,6 +22,12 @@ const ENTRANCE_EXTRA: Duration = Duration::from_millis(50);
 /// How long a page takes to come in as the listener moves between pages: shorter than a shell's
 /// entrance, since it answers every click in the sidebar and never holds input back.
 const PAGE: Duration = Duration::from_millis(180);
+/// How long the pointer rests on a clipped line before it scrolls to show its end, how long it
+/// stays at the end before it comes back, and how fast it travels, in pixels a second: about the
+/// pace of reading, so the line can be read as it moves.
+pub const MARQUEE_DELAY: Duration = Duration::from_millis(600);
+pub const MARQUEE_PAUSE: Duration = Duration::from_millis(1200);
+pub const MARQUEE_SPEED: Pixels = px(40.);
 /// How far a page slides in from the side it came from, forward from the right and back from
 /// the left. Enough to say which way, never enough to read as a slide show.
 pub const PAGE_SHIFT: Pixels = px(14.);
