@@ -2,33 +2,43 @@
 
 Read this first in a new session.
 
-- **Branch:** `m0/setup`. `main` holds only the license. `archive/v0-native` is
-  the earlier from-scratch build (gpui-kit, own engine), kept for reference.
+- **Branch:** `integration`, cut from `m0/setup` with `m1/sources`, `m2/identity`,
+  `m6/floating` and `m5/lyrics-style` merged in that order (merge commits). Not
+  pushed, no pull request. The four branches and their worktrees under
+  `.claude/worktrees/` are untouched. `main` holds only the license;
+  `archive/v0-native` is the earlier from-scratch build, kept for reference.
 - **Base:** Sonora at commit `6e3cfb0` (full hash in `docs/UPSTREAM.md`), cloned
   read-only into the git-ignored `reference/sonora`. Do not build or run it.
-- **Done:** import; upstream's servers removed and the engine hardened; the
-  ownership pass of `docs/DESIGN.md` 13: every crate lives under `crates/`,
-  internals are named Sonicly, and Apple Music, Deezer, Widevine and Soloist are
-  deleted rather than gated. Spotify search and genre hashes are read from the
-  web player's own lazily loaded chunks. `fmt`, `check`, `clippy -D warnings` and
-  `cargo build -p sonicly` pass. `docs/UPSTREAM.md` is the provenance record.
-- **M2 identity (`m2/identity`):** frame and page with the frame on Mica /
-  vibrancy, one type scale, edged covers, cover washes on album, playlist and
-  song pages, shelf reveal, sidebar shortcuts; `docs/DESIGN.md` 17-24, captures
-  in `docs/screenshots/m2/`. Debug builds take `--screen`, `--theme` and
-  `--size` for `scripts/shot.ps1` captures (`crates/sonicly/src/staging.rs`).
-  Not seen on macOS or Linux.
-- **In progress:** nothing in the engine. The uncommitted ownership pass waits
-  for review and a commit.
-- **Not verified:** the app has not been launched since the pass, and no test
-  has been run, the new hash-lookup tests included.
-- **Next:** first off-screen launch (`scripts/shot.ps1`), Sonicly's own icon and
-  wordmark, then M1 (real playback) in `docs/PARITY.md` order.
-- **Requested on top of the brief:** download from a link through the user's own
-  yt-dlp; a user-styled lyrics page (background image or video, typeface, size);
-  a compact floating player; low memory use. See `docs/DESIGN.md` 8-11.
+- **Built:** the ported engine (`docs/DESIGN.md` 13); M1 sources (PLS, XSPF,
+  cue sheets, download from a link through the user's yt-dlp, sealed Spotify and
+  YouTube sign-ins, `docs/PRIVACY.md`; decisions 14-16); M2 identity (frame on
+  the system material, type scale, edged covers, cover washes, shelf reveal,
+  sidebar shortcuts; 17-24, captures in `docs/screenshots/m2/`); M6 floating
+  mini player, file drops and drawn covers (25-27, `docs/screenshots/m6/`); M5
+  lyrics style with a Media Foundation video background (28,
+  `docs/screenshots/m5/`).
+- **Checks:** `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D
+  warnings` and `cargo build -p sonicly` pass on `integration`. `cargo test` has
+  not been run.
+- **Verified in a running build:** local playback of eight formats, transport
+  controls, resume after a relaunch, playlist import and cue sheets. The table
+  and the method are in `docs/REPORT.md`; statuses are in `docs/PARITY.md`.
+- **Fixed here:** a song opened while Sonicly was restoring that same song from
+  the last run stayed paused at 0:00 (`state::Playback`, the `unsent` flag).
+- **Captures and checks without input:** every debug launch flag is
+  `--debug-<name>[=<value>]`, read in `crates/sonicly/src/debug.rs` and listed
+  in its header and in `CLAUDE.md`. `scripts/shot.ps1` takes `-Profile`,
+  `-Size`, `-Title`, `-ExeArgs` and prints memory and CPU. The scratch files of
+  the integration checks are in the git-ignored `.targets/integration/`.
+- **Not verified:** streaming sources, sign-ins and yt-dlp downloads (they need
+  the owner); macOS and Linux; a real drag from the system; gapless joins,
+  loudness normalization and the equalizer by ear; anything at audible volume.
+- **Known issues:** see the end of `docs/REPORT.md`.
+- **Next:** the owner's pass over streaming, sign-in and a yt-dlp download; then
+  the open items in `docs/REPORT.md`.
 - **Waiting on the owner:** GitHub repository (PRs, star count), Discord
-  application id, whether ffmpeg may be installed for multi-format test files.
+  application id, Inter Display (a download), review of `integration`.
 - **House rules:** never open tryliner/desktop; no DRM circumvention; no
   credentials in chat or files; windows open only through `scripts/shot.ps1`
-  (off-screen, unfocused); the owner prefers building over test runs.
+  (off-screen, unfocused, `--debug-mute` when something plays); the owner
+  prefers building over test runs.
