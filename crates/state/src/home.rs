@@ -68,6 +68,11 @@ impl Home {
             SessionEvent::SignedIn => this.reload(cx),
             SessionEvent::SignedOut => {
                 this.clear();
+                // Signed out with a music folder set is still a way to use the app, and the
+                // local library has a feed of its own.
+                if this.is_local(cx) {
+                    this.feed(cx);
+                }
                 cx.notify();
             }
             SessionEvent::LocalChanged => {
