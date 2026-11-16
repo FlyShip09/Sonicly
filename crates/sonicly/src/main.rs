@@ -12,6 +12,8 @@ mod http;
 mod logging;
 mod memory;
 mod single;
+#[cfg(debug_assertions)]
+mod staging;
 #[cfg(windows)]
 mod thumbbar;
 mod tray;
@@ -31,6 +33,8 @@ use gpui::{
 use music::LyricsProvider;
 use music::link::Linked;
 use router::{Destination, Screen};
+#[cfg(debug_assertions)]
+use staging::Staging;
 use state::{Opened, Outcome, Sonicly, Toasts};
 use ui::ActiveTheme as _;
 use ui::ThemeKind;
@@ -52,9 +56,12 @@ fn main() -> ExitCode {
     }
     // A command for the running Sonicly is sent and answered here, without a log file, a
     // runtime or a window. Older macOS adds a `-psn_` argument to a Finder launch.
-    let args = std::env::args_os()
+    #[allow(unused_mut)]
+    let mut args: Vec<_> = std::env::args_os()
         .filter(|arg| !arg.to_string_lossy().starts_with("-psn_"))
         .collect();
+    #[cfg(debug_assertions)]
+    let staging = Staging::take(&mut args);
     let command = cli::parse(args, state::version());
     if !matches!(command, Ok(CommandType::Launch(_))) {
         console::attach();
@@ -147,6 +154,8 @@ fn main() -> ExitCode {
         let start = Screen::from_id(&startup)
             .unwrap_or(Screen::Home)
             .destination();
+        #[cfg(debug_assertions)]
+        let start = staging.start(start, cx);
         router::init(start, cx);
         let (look, overrides, language, pack, stillness, pace, remembered) = {
             let settings = Sonicly::global(cx).settings.read(cx);
@@ -188,6 +197,8 @@ fn main() -> ExitCode {
         memory::watch(cx);
 
         open_window(cx);
+        #[cfg(debug_assertions)]
+        staging.stage(cx);
         let session = Sonicly::global(cx).session.clone();
         session.update(cx, |session, cx| session.restore(cx));
 
@@ -361,6 +372,10 @@ fn open_window(cx: &mut App) {
                 None,
             )
         });
+    #[cfg(debug_assertions)]
+    let placement = staging::window_size()
+        .map(|size| WindowBounds::Windowed(Bounds::centered(None, size, cx)))
+        .unwrap_or(placement);
 
     let settings = Sonicly::global(cx).settings.read(cx);
     let saver = settings.saver();

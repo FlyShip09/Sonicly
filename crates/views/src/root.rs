@@ -1073,6 +1073,22 @@ impl Root {
     }
 }
 
+#[cfg(debug_assertions)]
+impl Root {
+    /// Debug builds only, for capture runs: opens the quick search for `powerbar`, and leaves
+    /// anything else to Home, which opens the first album, artist or playlist it lists or a
+    /// context menu once its feed lands.
+    pub fn stage(&mut self, what: &str, window: &mut Window, cx: &mut Context<Self>) {
+        match what {
+            "powerbar" => window.defer(cx, |window, cx| Powerbar::toggle(window, cx)),
+            _ => self
+                .screens
+                .home
+                .update(cx, |home, cx| home.stage(what, cx)),
+        }
+    }
+}
+
 const UI_FONT: &str = "Inter";
 
 const SCRIPTS: [&str; 18] = [

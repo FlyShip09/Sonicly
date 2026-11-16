@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
 use crate::chrome::Chrome;
+#[cfg(debug_assertions)]
+use crate::shared::menus::CardMenu;
 use crate::shared::menus::{Item, ItemMenu};
 use gpui::accesskit::Role;
 use gpui::prelude::*;
@@ -20,6 +22,9 @@ use crate::shared::tracks::{PlaybackStatus, playback_status};
 use crate::shared::trouble;
 
 const STEADY: Pixels = px(0.5);
+/// Where a capture run opens a context menu, from the window's top left on both axes.
+#[cfg(debug_assertions)]
+const STAGED_MENU: Pixels = px(360.);
 
 pub(crate) struct HomeView {
     home: Entity<Home>,
@@ -109,6 +114,51 @@ impl HomeView {
     /// Fetches the feed and the library it mixes from again.
     pub(crate) fn refresh(&mut self, cx: &mut Context<Self>) {
         self.home.update(cx, |home, cx| home.refresh(cx));
+    }
+
+    /// Debug builds only, for capture runs: once the feed lists one, opens the first album,
+    /// artist or playlist on it, or the context menu of the first album for `menu`.
+    #[cfg(debug_assertions)]
+    pub(crate) fn stage(&mut self, what: &str, cx: &mut Context<Self>) {
+        let what = what.to_owned();
+        let done = Rc::new(std::cell::Cell::new(false));
+        cx.observe(&self.home, move |this, home, cx| {
+            if done.get() {
+                return;
+            }
+            let sections = home.read(cx).sections();
+            let found = sections
+                .iter()
+                .flat_map(|section| section.items.iter())
+                .find(|item| {
+                    matches!(
+                        (what.as_str(), item),
+                        ("album" | "menu", GenreItem::Album(_))
+                            | ("artist", GenreItem::Artist(_))
+                            | ("playlist", GenreItem::Playlist(_))
+                    )
+                })
+                .cloned();
+            let Some(item) = found else {
+                return;
+            };
+            done.set(true);
+            let destination = match &item {
+                _ if what == "menu" => {
+                    if let Some(item) = Item::of(&item) {
+                        let at = gpui::point(STAGED_MENU, STAGED_MENU);
+                        CardMenu::open(item, this.playback.clone(), at, cx);
+                    }
+                    return;
+                }
+                GenreItem::Album(album) => router::Destination::Album(album.id.clone().into()),
+                GenreItem::Artist(artist) => router::Destination::Artist(artist.id.clone().into()),
+                GenreItem::Playlist(list) => router::Destination::Playlist(list.id.clone().into()),
+                GenreItem::Genre(_) | GenreItem::Track(_) => return,
+            };
+            router::navigate(destination, cx);
+        })
+        .detach();
     }
 
     /// Whether Quick picks or the shelves are still on their way.
