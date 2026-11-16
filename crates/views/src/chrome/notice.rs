@@ -202,7 +202,7 @@ fn card_element(card: Card, cx: &App) -> AnyElement {
         .rounded(outer)
         .border_1()
         .border_color(theme.border)
-        .shadow_md()
+        .shadow(ui::lifted(cx))
         .bg(theme.popover)
         .text_color(theme.foreground)
         .child(

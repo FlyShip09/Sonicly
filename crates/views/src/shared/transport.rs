@@ -91,6 +91,7 @@ pub(crate) fn like(track: Option<&music::Track>, playback: &Entity<Playback>, cx
             true => theme.primary,
             false => theme.muted_foreground,
         })
+        .bounce(saved)
         .disabled(id.is_none())
         .on_click(move |_, _, cx| {
             if let Some(track) = playback.read(cx).track().cloned() {

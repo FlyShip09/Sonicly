@@ -362,7 +362,8 @@ const DEFAULT_VOLUME: f32 = 0.7;
 const PICKS: usize = 40;
 const DEFAULT_SIDEBAR_WIDTH: f32 = 195.;
 const DEFAULT_SIDEBAR_RIGHT_WIDTH: f32 = 254.;
-const DEFAULT_FONT_SIZE: f32 = 14.;
+/// The base text size: 13 px, the size a desktop app's body text and list rows read at.
+const DEFAULT_FONT_SIZE: f32 = 13.;
 const DEFAULT_LYRICS_SCALE: f32 = 1.;
 const DEFAULT_STARTUP: &str = "home";
 /// "Whatever the platform uses".

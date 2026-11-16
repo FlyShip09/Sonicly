@@ -6,10 +6,15 @@
 # layouts larger than the monitor allows a new window to be.
 # -Title "Sonicly mini player" captures the process's window with that exact title instead of
 # its main window, and moves that one off-screen too the moment it exists.
+# -Frames 8 -Every 30 saves a contact sheet instead of one still: that many captures, the
+# given milliseconds apart once -Wait is over, side by side in rows of -Cols (default 4), each
+# labelled with its time since the process started. -Crop x,y,w,h (physical pixels) keeps only
+# that part of each capture, so a small animation stays at full size on the sheet. A capture
+# itself takes some tens of milliseconds, so the labels say when each one really happened.
 # The child gets SONICLY_SHOT=1; Sonicly's binaries honor it by opening their
 # window unfocused. Whatever the exe does, the window is moved off-screen the
 # moment it exists, and captured there.
-param([string]$Exe, [int]$ProcId = 0, [string]$Out = "shot.png", [double]$Wait = 4, [switch]$Keep, [string]$ExeArgs = "", [string]$Size = "", [string]$Profile = "shot", [string]$Title = "")
+param([string]$Exe, [int]$ProcId = 0, [string]$Out = "shot.png", [double]$Wait = 4, [switch]$Keep, [string]$ExeArgs = "", [string]$Size = "", [string]$Profile = "shot", [string]$Title = "", [int]$Frames = 0, [int]$Every = 30, [int]$Cols = 4, [string]$Crop = "")
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System; using System.Text; using System.Runtime.InteropServices;
@@ -82,12 +87,39 @@ if (-not $Title -and $Size -match '^(\d+)x(\d+)$') {
 $r = New-Object SonShot+RECT
 [void][SonShot]::GetWindowRect($h, [ref]$r)
 $w = $r.R - $r.L; $ht = $r.B - $r.T
-$bmp = New-Object System.Drawing.Bitmap $w, $ht
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$dc = $g.GetHdc()
-# PW_RENDERFULLCONTENT: captures DirectX-composed content even when not visible on a monitor.
-[void][SonShot]::PrintWindow($h, $dc, 2)
-$g.ReleaseHdc($dc); $g.Dispose()
+# One capture of the whole window. PW_RENDERFULLCONTENT captures DirectX-composed content even
+# when not visible on a monitor.
+function Grab {
+  $b = New-Object System.Drawing.Bitmap $w, $ht
+  $g = [System.Drawing.Graphics]::FromImage($b)
+  $dc = $g.GetHdc()
+  [void][SonShot]::PrintWindow($h, $dc, 2)
+  $g.ReleaseHdc($dc); $g.Dispose()
+  $b
+}
+if ($Frames -gt 0) {
+  $cx = 0; $cy = 0; $cw = $w; $ch = $ht
+  if ($Crop -match '^(\d+),(\d+),(\d+),(\d+)$') { $cx = [int]$Matches[1]; $cy = [int]$Matches[2]; $cw = [int]$Matches[3]; $ch = [int]$Matches[4] }
+  $shots = @(); $times = @()
+  for ($i = 0; $i -lt $Frames; $i++) {
+    $due = $clock.ElapsedMilliseconds + $Every
+    $times += $clock.ElapsedMilliseconds
+    $full = Grab
+    $shots += $full.Clone((New-Object System.Drawing.Rectangle $cx, $cy, $cw, $ch), $full.PixelFormat); $full.Dispose()
+    while ($clock.ElapsedMilliseconds -lt $due) { Start-Sleep -Milliseconds 2 }
+  }
+  $rows = [math]::Ceiling($Frames / $Cols); $label = 18
+  $bmp = New-Object System.Drawing.Bitmap ([math]::Min($Frames, $Cols) * ($cw + 4)), ($rows * ($ch + $label + 4))
+  $g = [System.Drawing.Graphics]::FromImage($bmp); $g.Clear([System.Drawing.Color]::FromArgb(255, 255, 0, 255))
+  $font = New-Object System.Drawing.Font "Consolas", 10
+  for ($i = 0; $i -lt $Frames; $i++) {
+    $x = ($i % $Cols) * ($cw + 4); $y = [math]::Floor($i / $Cols) * ($ch + $label + 4)
+    $g.FillRectangle([System.Drawing.Brushes]::Black, $x, $y, $cw, $label)
+    $g.DrawString("$i  $($times[$i]) ms", $font, [System.Drawing.Brushes]::White, $x + 2, $y + 1)
+    $g.DrawImage($shots[$i], $x, $y + $label, $cw, $ch); $shots[$i].Dispose()
+  }
+  $g.Dispose()
+} else { $bmp = Grab }
 $bmp.Save((Join-Path (Get-Location) $Out), [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose()
 $mem = "ws=$([math]::Round($p.WorkingSet64/1MB))MB private=$([math]::Round($p.PrivateMemorySize64/1MB))MB cpu=$([math]::Round($p.TotalProcessorTime.TotalSeconds,1))s$window"
 Write-Output "OK $mem pid=$($p.Id) title='$($p.MainWindowTitle)' size=${w}x${ht} at=$($r.L),$($r.T) out=$Out"

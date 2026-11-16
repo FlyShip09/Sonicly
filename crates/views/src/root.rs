@@ -858,10 +858,11 @@ impl Root {
         }
 
         self.show(destination, cx);
+        let step = router::trail(cx).read(cx).step();
         let enter = self
             .shells
             .workspace
-            .update(cx, |workspace, cx| workspace.reveal_content(cx));
+            .update(cx, |workspace, cx| workspace.reveal_content(step, cx));
         self.navigation_transition = Some(cx.spawn(async move |this, cx| {
             cx.background_executor().timer(enter).await;
             this.update(cx, |this, cx| {

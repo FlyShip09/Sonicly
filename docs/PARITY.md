@@ -30,7 +30,7 @@ running Sonicly.
 | Integrations | Last.fm, ListenBrainz, Maloja scrobbling | Ported |
 | Integrations | Discord Rich Presence | Ported, disabled until Sonicly has an application id; its settings page says so in one row, seen |
 | Integrations | Shared listening sessions | Ported; needs a user-supplied server, which the settings row now explains on screen |
-| App | Themes, theme files, adaptive tint | Ported; theme previews redrawn as frame, page and player bar, seen |
+| App | Themes, theme files, adaptive tint | Ported; theme previews redrawn as frame, page and player bar, seen. Built-in dark and light moved to calm desktop neutrals (decision 38), Home, Songs, Settings, a menu, Now playing and the welcome screen seen in both; theme files not re-captured |
 | App | Keyboard shortcuts, quick search, CLI control | Ported; CLI `current`, `pause`, `play`, `seek`, `next`, `prev`, `add`, `queue` and `lyrics` seen against a running Sonicly on Windows; Tab walks buttons, switches and option cards (built, not yet driven from a keyboard); quick search dims instead of blurring |
 | App | Tray, single instance, deep links (`sonicly://`) | Ported |
 | App | Auto-update | The code that downloaded and ran an installer is deleted. What is left can tell you a newer release exists and link to its page; it is off until Sonicly has releases |

@@ -3,8 +3,8 @@ use std::rc::Rc;
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Bounds, Div, ElementId, Pixels, Stateful, StyleRefinement, Window, deferred,
-    div, px,
+    AnyElement, App, Bounds, Div, ElementId, Pixels, Point, Stateful, StyleRefinement, Window,
+    deferred, div, px,
 };
 
 use crate::glass::{GLASS_BLUR, blurring, popover_fill};
@@ -16,6 +16,8 @@ use crate::theme::ActiveTheme as _;
 const GAP: Pixels = px(6.);
 /// Paints the panel over the page under it but under menus and popups opened from it.
 const PRIORITY: usize = 1;
+/// Where the panel grows from: the middle of its top edge, under the field it drops from.
+const DROPS: Point<f32> = Point { x: 0.5, y: 0. };
 
 type Close = Box<dyn Fn(&mut Window, &mut App) + 'static>;
 
@@ -88,15 +90,15 @@ impl RenderOnce for Dropdown {
             .flex_col()
             .p_1()
             .gap_px()
-            .rounded(theme.radius)
+            .rounded(crate::glass::rim(theme.radius))
             .border_1()
             .border_color(theme.border)
             .bg(popover_fill(cx))
             .text_color(theme.popover_foreground)
-            .shadow_md()
+            .shadow(crate::glass::lifted(cx))
             .occlude()
             .children(children)
-            .rising("dropdown-rise");
+            .rising_from("dropdown-rise", DROPS);
         // The entrance is a paint filter, which drops a backdrop inside it, so the frost is a
         // sibling under the panel fading in on the same curve, as a context menu does it.
         let frosted = Linger::new(
@@ -114,7 +116,8 @@ impl RenderOnce for Dropdown {
                     )
                 })
                 .child(panel),
-        );
+        )
+        .towards(DROPS);
 
         base.relative()
             .child(anchor)

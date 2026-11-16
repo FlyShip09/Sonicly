@@ -22,6 +22,8 @@ one line about what someone using Sonicly can now do.
 ### Changed
 
 - The window has Sonicly's own look: a neutral frame on the system material, one type scale, covers with an edge, and album, playlist and song pages washed with the cover's colour.
+- A calmer desktop look: soft charcoal and white pages, a full-height sidebar whose highlight glides between rows, the page running up under the title bar, bold page titles, 13 px text by default, grouped settings, inset list rows and a player bar that floats above the page.
+- Small motion that answers what you do: a liked heart pops, a card's play button rises under the pointer, segmented controls slide, pages come in from the side you moved towards, and a new song's title rises into the player bar. Reduce motion turns all of it off.
 - An empty local library and a page that failed to load say what to do next.
 - `settings.json` now records its version, so a later Sonicly can rename a setting without losing yours. A file written by a newer Sonicly is copied to `settings.v<version>.json` before an older one saves over it.
 - The licence text is in `LICENSE` (it was `COPYING`).

@@ -532,6 +532,7 @@ impl TrackSource {
         Some(
             Button::new(("toggle-liked-track", cell.row))
                 .ghost()
+                .bounce(saved)
                 .backgroundless()
                 .small()
                 .icon(match saved {

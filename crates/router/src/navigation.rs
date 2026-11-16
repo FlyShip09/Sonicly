@@ -6,9 +6,21 @@ pub enum NavigationEvent {
     Moved(Destination),
 }
 
+/// Which way the last move went along the trail, so a page can enter from the side it came
+/// from.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Step {
+    /// A new page, or forward again along the trail.
+    #[default]
+    Forward,
+    /// Back along the trail.
+    Back,
+}
+
 pub struct Navigation {
     trail: Vec<Destination>,
     at: usize,
+    step: Step,
     /// The settings destination last on show, which opening settings again returns to.
     last_settings: Option<Destination>,
 }
@@ -20,8 +32,14 @@ impl Navigation {
         Self {
             trail: vec![start],
             at: 0,
+            step: Step::Forward,
             last_settings: None,
         }
+    }
+
+    /// Which way the last move went.
+    pub fn step(&self) -> Step {
+        self.step
     }
 
     pub fn current(&self) -> Destination {
@@ -42,6 +60,7 @@ impl Navigation {
         }
 
         let replacing = self.current() == Destination::Fullscreen;
+        self.step = Step::Forward;
         self.trail.truncate(self.at + 1);
         match replacing {
             true => self.trail[self.at] = destination,
@@ -58,6 +77,7 @@ impl Navigation {
             return;
         }
         self.at -= 1;
+        self.step = Step::Back;
         self.arrive(cx);
     }
 
@@ -99,6 +119,7 @@ impl Navigation {
             return;
         }
         self.at += 1;
+        self.step = Step::Forward;
         self.arrive(cx);
     }
 

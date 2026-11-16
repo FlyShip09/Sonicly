@@ -136,13 +136,22 @@ pub fn spoken_vacant(
         .aria_value(label)
 }
 
-/// A heading at `step`: semibold, the one weight every title in Sonicly takes, at the step's own
-/// line height.
+/// A heading at `step`, at the step's own line height and tracking: a page's title bold, a
+/// section's semibold.
 fn titled(step: Text, label: impl Into<SharedString>, cx: &App) -> Div {
     div()
         .flex_none()
         .text_size(cx.theme().text(step))
         .line_height(gpui::relative(step.leading()))
-        .font_weight(FontWeight::SEMIBOLD)
+        .letter_spacing(step.tracking())
+        .font_weight(title_weight(step))
         .child(label.into())
+}
+
+/// The weight a title at `step` takes: bold from a page's title up, semibold below it.
+pub fn title_weight(step: Text) -> FontWeight {
+    match step {
+        Text::Title | Text::Display => FontWeight::BOLD,
+        _ => FontWeight::SEMIBOLD,
+    }
 }

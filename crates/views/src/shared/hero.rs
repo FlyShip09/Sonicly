@@ -650,7 +650,8 @@ impl RenderOnce for PageHero {
                             .min_w_0()
                             .text_size(theme.text(Text::Display))
                             .line_height(relative(Text::Display.leading()))
-                            .font_weight(FontWeight::SEMIBOLD)
+                            .letter_spacing(Text::Display.tracking())
+                            .font_weight(ui::title_weight(Text::Display))
                             .child(
                                 div()
                                     .id((self.id.clone(), "title"))

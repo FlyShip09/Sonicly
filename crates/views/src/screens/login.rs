@@ -3,8 +3,8 @@ use crate::shared::popups::{AccountPicker, CookiePrompt, Credentials, Credential
 use gpui::accesskit::Role;
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, ClipboardItem, Context, Entity, FontWeight, IntoElement, Pixels, Render,
-    SharedString, Window, div, img, px, relative, svg,
+    AnyElement, App, ClipboardItem, Context, Entity, IntoElement, Pixels, Render, SharedString,
+    Window, div, img, px, relative, svg,
 };
 use i18n::t;
 use music::{AccountChoices, SignIn, SignInPrompt};
@@ -183,7 +183,8 @@ impl LoginView {
                     .aria_level(1)
                     .aria_label(title.clone())
                     .text_size(theme.text(Text::Title))
-                    .font_weight(FontWeight::SEMIBOLD)
+                    .letter_spacing(Text::Title.tracking())
+                    .font_weight(ui::title_weight(Text::Title))
                     .child(title),
             )
             .child(

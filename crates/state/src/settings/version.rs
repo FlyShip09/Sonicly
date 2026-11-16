@@ -14,13 +14,17 @@ type Step = fn(&mut Map<String, Value>);
 
 /// Every change of shape so far, oldest first: `STEPS[0]` takes a version 1 file to version 2.
 /// To rename or retype a key, append a step. A step that has shipped is never edited.
-const STEPS: &[Step] = &[];
+const STEPS: &[Step] = &[thirteen];
 
 /// The shape this build reads and writes, stamped into the file as `version`.
 pub(super) const CURRENT: u32 = STEPS.len() as u32 + 1;
 
 /// The shape of a file with no `version` key, which is how Sonicly wrote it before versions.
 const FIRST: u32 = 1;
+
+/// The base text size every file carried before the default moved to 13, and the new default.
+const OLD_DEFAULT_FONT: f64 = 14.;
+const NEW_DEFAULT_FONT: f64 = 13.;
 
 /// The `version` key of a settings file, read on its own before the rest is.
 #[derive(Deserialize)]
@@ -58,6 +62,17 @@ fn migrate(steps: &[Step], from: u32, mut value: Value) -> Value {
         }
     }
     value
+}
+
+/// Version 1 to 2: the default text size went from 14 to 13 px. The size is always written, so a
+/// file that holds the old default moves with it; any other size was a choice and stays.
+fn thirteen(keys: &mut Map<String, Value>) {
+    let Some(appearance) = keys.get_mut("appearance").and_then(Value::as_object_mut) else {
+        return;
+    };
+    if appearance.get("font_size").and_then(Value::as_f64) == Some(OLD_DEFAULT_FONT) {
+        appearance.insert("font_size".to_owned(), Value::from(NEW_DEFAULT_FONT));
+    }
 }
 
 /// Keeps a copy of a settings file that a newer Sonicly wrote, as `settings.v<version>.json`,
@@ -126,6 +141,24 @@ mod tests {
     }
 
     #[test]
+    fn the_old_default_text_size_moves_to_thirteen() {
+        let mut moved = json!({ "appearance": { "font_size": 14.0, "theme": "dark" } });
+        thirteen(moved.as_object_mut().unwrap());
+        assert_eq!(
+            moved,
+            json!({ "appearance": { "font_size": 13.0, "theme": "dark" } })
+        );
+
+        let mut chosen = json!({ "appearance": { "font_size": 16.0 } });
+        thirteen(chosen.as_object_mut().unwrap());
+        assert_eq!(chosen, json!({ "appearance": { "font_size": 16.0 } }));
+
+        let mut bare = json!({ "gapless": true });
+        thirteen(bare.as_object_mut().unwrap());
+        assert_eq!(bare, json!({ "gapless": true }));
+    }
+
+    #[test]
     fn a_current_or_newer_file_is_left_as_it_is() {
         let steps: &[Step] = &[renamed, retyped];
         let file = json!({ "old": "3" });
@@ -167,7 +200,8 @@ mod tests {
         let error = parse(b"{\n  \"gapless\": maybe\n}").unwrap_err();
         assert_eq!(error.line(), 2);
 
-        let mistyped = parse(b"{\n  \"version\": 1,\n  \"gapless\": \"yes\"\n}").unwrap_err();
+        let mistyped = format!("{{\n  \"version\": {CURRENT},\n  \"gapless\": \"yes\"\n}}");
+        let mistyped = parse(mistyped.as_bytes()).unwrap_err();
         assert_eq!(mistyped.line(), 3);
     }
 

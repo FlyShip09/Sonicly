@@ -1,6 +1,6 @@
 //! A miniature of the Now playing view: the ambient field, the visualizer, artwork, title and
-//! artist. The visualizer draws random levels rather than the spectrum, so it moves whether or
-//! not anything plays.
+//! artist. The visualizer draws random levels rather than the spectrum, so it shows its style
+//! with nothing loaded, and holds them still while nothing plays, as fullscreen's would.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
 use gpui::{AnyElement, Bounds, Context, EntityId, FontWeight, Pixels, Window, canvas, div};
+use state::{PlaybackState, Sonicly};
 use ui::{ActiveTheme as _, Artwork, Levels, Text, Visualizer};
 
 use crate::screens::settings::{Layout, SettingsView};
@@ -157,7 +158,11 @@ pub(in crate::screens::settings) fn preview(
     };
     let side = (height * COVER).round();
 
-    let still = cx.reduce_motion();
+    let playing = matches!(
+        Sonicly::global(cx).playback.read(cx).state(),
+        PlaybackState::Playing
+    );
+    let still = cx.reduce_motion() || !playing;
     let levels = style
         .shown()
         .then(|| state.levels.borrow_mut().step(Instant::now(), still));

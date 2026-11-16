@@ -208,6 +208,7 @@ impl RenderOnce for Picks {
             .flex()
             .flex_col()
             .gap_3()
+            .group(super::shelves::SHELF_GROUP)
             .child(
                 div()
                     .flex()
@@ -239,6 +240,8 @@ impl RenderOnce for Picks {
                             .flex()
                             .items_center()
                             .gap_1()
+                            .invisible()
+                            .group_hover(super::shelves::SHELF_GROUP, |style| style.visible())
                             .child(
                                 Button::new(SharedString::from(format!("{id}-previous")))
                                     .small()

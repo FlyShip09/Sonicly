@@ -7,9 +7,9 @@ use std::time::{Duration, Instant};
 
 use gpui::{
     Animation, AnimationElement, AnimationExt as _, App, ElementId, Entity, HoverListenerMode,
-    Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, RenderOnce, Rgba,
-    SharedString, SpringConfig, SpringState, StatefulInteractiveElement, StyleRefinement, Styled,
-    Window, canvas, ease_in_out, ease_out_quint, px,
+    Hsla, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point, RenderOnce,
+    Rgba, SharedString, SpringConfig, SpringState, StatefulInteractiveElement, StyleRefinement,
+    Styled, Window, canvas, ease_in_out, ease_out_quint, px,
 };
 use i18n::t;
 
@@ -19,8 +19,20 @@ const BASE: Duration = Duration::from_millis(200);
 const SLOW: Duration = Duration::from_millis(320);
 
 const ENTRANCE_EXTRA: Duration = Duration::from_millis(50);
+/// How long a page takes to come in as the listener moves between pages: shorter than a shell's
+/// entrance, since it answers every click in the sidebar and never holds input back.
+const PAGE: Duration = Duration::from_millis(180);
+/// How far a page slides in from the side it came from, forward from the right and back from
+/// the left. Enough to say which way, never enough to read as a slide show.
+pub const PAGE_SHIFT: Pixels = px(14.);
 pub(crate) const ENTRANCE_BLUR: Pixels = px(1.5);
 pub(crate) const ENTRANCE_ZOOM: f32 = 0.01;
+/// How far a menu, popover or dialog is shrunk as it starts to open and once it has left. More
+/// than a page's entrance, since a 1% change on something this small does not read.
+pub(crate) const POP_ZOOM: f32 = 0.04;
+/// How long an overlay takes to leave: quicker than it came, since the listener has already
+/// moved on.
+const EXIT: Duration = Duration::from_millis(150);
 
 /// How long a hover highlight takes to fade out, before the listener's pace stretches it.
 const DIM: Duration = Duration::from_millis(100);
@@ -65,6 +77,12 @@ impl Springs {
     pub const RESIZE: SpringConfig = spring(0.18, 0.);
     /// A swapped icon growing into place.
     pub const SWAP_IN: SpringConfig = spring(0.3, 0.);
+    /// A swapped icon growing a little past its size and settling, for a toggle turning on that
+    /// deserves a moment of its own, such as a like. One swing, never a wobble.
+    pub const POP: SpringConfig = spring(0.4, 0.55);
+    /// A selection gliding from one row to another, such as the sidebar's highlight following
+    /// the page that opened. Barely a swing, so it lands where the eye already is.
+    pub const GLIDE: SpringConfig = spring(0.26, 0.06);
     /// A belt of icons moving on by one icon.
     pub const BELT: SpringConfig = spring(0.4, 0.);
     /// The icon it replaced shrinking away, a little quicker.
@@ -228,6 +246,11 @@ pub fn entrance_span() -> Duration {
     Motion::Base.span() + ENTRANCE_EXTRA
 }
 
+/// How long a menu, popover or dialog takes to leave, at the listener's pace.
+pub fn exit_span() -> Duration {
+    paced(EXIT)
+}
+
 /// One run of the entrance a screen makes as it appears. The renderer reads how much of the
 /// screen is still hidden on every frame and asks for another frame while it runs.
 #[derive(Clone, Copy, Debug)]
@@ -241,6 +264,14 @@ impl Entrance {
         Self {
             started: Instant::now(),
             span: entrance_span(),
+        }
+    }
+
+    /// The entrance of a page the listener moved to, on the shorter page span.
+    pub fn page() -> Self {
+        Self {
+            started: Instant::now(),
+            span: paced(PAGE),
         }
     }
 
@@ -301,16 +332,38 @@ impl<E: Styled + IntoElement + 'static> Fading for E {
     }
 }
 
+/// The way a menu, popover or dialog opens: it fades in and grows from a little smaller, out of
+/// its middle or, with [`rising_from`](Rising::rising_from), out of the point it is anchored to.
+/// [`Linger`](crate::Linger) plays it backwards, quicker, as the surface leaves.
 pub trait Rising: Sized {
-    fn rising(self, id: impl Into<ElementId>) -> AnimationElement<Self>;
+    fn rising(self, id: impl Into<ElementId>) -> AnimationElement<Self> {
+        self.rising_from(id, CENTRE)
+    }
+
+    /// Grows from `origin`, a fraction of the surface's own bounds: `(0., 1.)` is its bottom
+    /// left corner, for a menu that opens up and to the right of what it came from.
+    fn rising_from(self, id: impl Into<ElementId>, origin: Point<f32>) -> AnimationElement<Self>;
 }
 
 impl<E: Styled + IntoElement + 'static> Rising for E {
-    fn rising(self, id: impl Into<ElementId>) -> AnimationElement<Self> {
-        self.with_animation(id, entrance(), |element, delta| {
-            entering(element, 1. - delta)
+    fn rising_from(self, id: impl Into<ElementId>, origin: Point<f32>) -> AnimationElement<Self> {
+        self.with_animation(id, entrance(), move |element, delta| {
+            popped(element, 1. - delta, origin)
         })
     }
+}
+
+/// The middle of a surface, where a dialog grows from.
+pub(crate) const CENTRE: Point<f32> = Point { x: 0.5, y: 0.5 };
+
+/// An overlay `hidden` of the way from open, as [`Rising`] draws it.
+fn popped<E: Styled>(element: E, hidden: f32, origin: Point<f32>) -> E {
+    let hidden = hidden.clamp(0., 1.);
+    element
+        .layer_scale(1. - POP_ZOOM * hidden)
+        .layer_scale_origin(origin)
+        .blur(ENTRANCE_BLUR * hidden)
+        .opacity(1. - hidden)
 }
 
 pub fn mix(from: Hsla, to: Hsla, t: f32) -> Hsla {
@@ -488,6 +541,8 @@ pub struct HoverFade {
     from: f32,
     since: Option<Instant>,
     span: Duration,
+    /// How long the way back takes once the pointer leaves.
+    exit: Duration,
 }
 
 impl HoverFade {
@@ -497,7 +552,14 @@ impl HoverFade {
             from: 0.,
             since: None,
             span,
+            exit: span,
         }
+    }
+
+    /// Fades back over `exit` once the pointer leaves, rather than over the span it came in on.
+    pub fn leaving(mut self, exit: Duration) -> Self {
+        self.exit = exit;
+        self
     }
 
     /// Turns the fade towards `hovered`, starting from wherever it stands now.
@@ -535,7 +597,11 @@ impl HoverFade {
         let Some(since) = self.since else {
             return self.from;
         };
-        let travelled = since.elapsed().as_secs_f32() / self.span.as_secs_f32().max(f32::EPSILON);
+        let span = match self.hovered {
+            true => self.span,
+            false => self.exit,
+        };
+        let travelled = since.elapsed().as_secs_f32() / span.as_secs_f32().max(f32::EPSILON);
         match self.hovered {
             true => (self.from + travelled).min(target),
             false => (self.from - travelled).max(target),
@@ -554,6 +620,8 @@ pub struct Glow {
     lit: f32,
     /// When the light went off and the level it fades from, while the fade still runs.
     dimming: Option<(Instant, f32)>,
+    /// What the pointer brings up over the element, kept once [`risen`](Self::risen) is read.
+    rise: Option<HoverFade>,
 }
 
 impl Glow {
@@ -567,6 +635,23 @@ impl Glow {
     /// Tells the glow whether the pointer is over its element.
     pub fn hover(&mut self, hovered: bool) {
         self.hovered = hovered;
+        if let Some(rise) = self.rise.as_mut() {
+            rise.set(hovered);
+        }
+    }
+
+    /// How far something the pointer brings up over the element has come, from 0 to 1: eased in
+    /// over `span` as the pointer arrives and out over the quicker hover dim as it leaves, from
+    /// wherever it stands. For a card's play button, read on every frame the card draws.
+    pub fn risen(&mut self, span: Duration, window: &mut Window, cx: &App) -> f32 {
+        let hovered = self.hovered;
+        self.rise
+            .get_or_insert_with(|| {
+                let mut rise = HoverFade::new(span).leaving(dim_span());
+                rise.set(hovered);
+                rise
+            })
+            .level(window, cx)
     }
 
     /// How lit the element is, from 0 to 1, counting it lit while `on` as well as under the

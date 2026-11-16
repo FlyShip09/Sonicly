@@ -313,7 +313,7 @@ impl Render for Input {
         let ring = (shown > 0.).then(|| BoxShadow {
             color: match self.invalid {
                 true => theme.danger.opacity(RING),
-                false => theme.muted_foreground.opacity(RING * shown),
+                false => theme.primary.opacity(RING * shown),
             },
             offset: point(Pixels::ZERO, Pixels::ZERO),
             blur_radius: Pixels::ZERO,

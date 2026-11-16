@@ -622,6 +622,7 @@ impl DetailView {
 
         let heart = Button::new("detail-toggle-library")
             .outline()
+            .bounce(saved)
             .icon(match saved {
                 true => "icons/heart-filled.svg",
                 false => "icons/heart.svg",
