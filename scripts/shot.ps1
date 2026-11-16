@@ -1,7 +1,7 @@
 # Dev tool: launch (or attach to) a windowed exe and save a PNG of its window,
 # without showing it to the person at the keyboard.
-#   powershell -File tools/shot.ps1 -Exe target\debug\sonicly.exe -Out shot.png [-Wait 4] [-Keep] [-ExeArgs "..."]
-#   powershell -File tools/shot.ps1 -ProcId 1234 -Out shot.png
+#   powershell -File scripts/shot.ps1 -Exe target\debug\sonicly.exe -Out shot.png [-Wait 4] [-Keep] [-ExeArgs "..."] [-Profile shot]
+#   powershell -File scripts/shot.ps1 -ProcId 1234 -Out shot.png
 # -Size 1600x1000 resizes the window (physical pixels) once it is off-screen, to test
 # layouts larger than the monitor allows a new window to be.
 # -Title "Sonicly mini player" captures the process's window with that exact title instead of

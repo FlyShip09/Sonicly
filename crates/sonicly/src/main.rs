@@ -5,6 +5,7 @@ mod actions;
 mod app_icon;
 mod assets;
 mod console;
+#[cfg(debug_assertions)]
 mod debug;
 mod dock;
 #[cfg(target_os = "macos")]
@@ -14,8 +15,6 @@ mod logging;
 mod memory;
 mod mini;
 mod single;
-#[cfg(debug_assertions)]
-mod staging;
 #[cfg(windows)]
 mod thumbbar;
 mod tray;
@@ -35,8 +34,6 @@ use gpui::{
 use music::LyricsProvider;
 use music::link::Linked;
 use router::{Destination, Screen};
-#[cfg(debug_assertions)]
-use staging::Staging;
 use state::{Opened, Outcome, Sonicly, Toasts};
 use ui::ActiveTheme as _;
 use ui::ThemeKind;
@@ -58,12 +55,10 @@ fn main() -> ExitCode {
     }
     // A command for the running Sonicly is sent and answered here, without a log file, a
     // runtime or a window. Older macOS adds a `-psn_` argument to a Finder launch.
-    #[allow(unused_mut)]
-    let mut args: Vec<_> = std::env::args_os()
+    let args: Vec<_> = std::env::args_os()
         .filter(|arg| !arg.to_string_lossy().starts_with("-psn_"))
         .collect();
     #[cfg(debug_assertions)]
-    let staging = Staging::take(&mut args);
     let (args, debug) = debug::take(args);
     let command = cli::parse(args, state::version());
     if !matches!(command, Ok(CommandType::Launch(_))) {
@@ -160,7 +155,7 @@ fn main() -> ExitCode {
             .unwrap_or(Screen::Home)
             .destination();
         #[cfg(debug_assertions)]
-        let start = staging.start(start, cx);
+        let start = debug.start(start, cx);
         router::init(start, cx);
         let (look, overrides, language, pack, stillness, pace, remembered) = {
             let settings = Sonicly::global(cx).settings.read(cx);
@@ -201,12 +196,9 @@ fn main() -> ExitCode {
         #[cfg(target_os = "macos")]
         gestures::install(cx);
         memory::watch(cx);
-        #[cfg(debug_assertions)]
-        capture_setup(cx);
 
         open_window(cx);
         #[cfg(debug_assertions)]
-        staging.stage(cx);
         debug.apply(cx);
         let session = Sonicly::global(cx).session.clone();
         session.update(cx, |session, cx| session.restore(cx));
@@ -300,20 +292,6 @@ fn follow(items: &[String], tail: bool, cx: &mut App) {
 }
 
 /// The page a link opens on, for the kinds of link that open a page.
-/// Debug builds only: readies a run of `scripts/shot.ps1` without any input. `SONICLY_MUTE=1`
-/// plays at no volume, so a capture that opens a song makes no sound, and
-/// `SONICLY_SHOW=lyrics-settings` opens the Lyrics settings page.
-#[cfg(debug_assertions)]
-fn capture_setup(cx: &mut gpui::App) {
-    if std::env::var_os("SONICLY_MUTE").is_some() {
-        let playback = Sonicly::global(cx).playback.clone();
-        playback.update(cx, |playback, cx| playback.set_volume(0., cx));
-    }
-    if std::env::var("SONICLY_SHOW").as_deref() == Ok("lyrics-settings") {
-        router::navigate(Destination::Settings(router::SettingsPage::Lyrics), cx);
-    }
-}
-
 fn destination(linked: &Linked) -> Option<Destination> {
     match linked {
         Linked::Track(id) => Some(Destination::Song(id.clone().into())),
@@ -401,7 +379,7 @@ fn open_window(cx: &mut App) {
             )
         });
     #[cfg(debug_assertions)]
-    let placement = staging::window_size()
+    let placement = debug::window_size()
         .map(|size| WindowBounds::Windowed(Bounds::centered(None, size, cx)))
         .unwrap_or(placement);
 

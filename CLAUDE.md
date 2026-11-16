@@ -180,10 +180,16 @@ nobody can see needs none.
   calls to servers of our own. Apple Music, Deezer and the Widevine host were removed on purpose.
 - **Never ask for or store credentials** in chat or files. Account sign-in happens inside the app.
 - **Windows never pop up in front of the owner.** Launch the app only through
-  `scripts/shot.ps1` (`-Exe target/debug/sonicly.exe -Out <png> [-Wait s] [-Size WxH] [-ExeArgs ..]`):
-  it opens unfocused, off-screen, in a separate `sonicly-shot` profile, and prints memory use.
-  Use `-Profile <name>` for your own profile when several sessions capture at once. A handful of
-  purposeful captures, never loops.
+  `scripts/shot.ps1` (`-Exe target/debug/sonicly.exe -Out <png> [-Wait s] [-Size WxH]
+  [-Title <window title>] [-Keep] [-ExeArgs ..]`): it opens unfocused, off-screen, in a separate
+  `sonicly-shot` profile, and prints memory and CPU use. Use `-Profile <name>` for your own
+  profile when several sessions capture at once. A handful of purposeful captures, never loops.
+  Debug builds reach a state without input through `--debug-*` launch arguments passed in
+  `-ExeArgs`, all read in `crates/sonicly/src/debug.rs` and listed in its header:
+  `--debug-screen=<page or overlay>` (`settings:lyrics`, `now-playing`, `lyrics`, `powerbar`),
+  `--debug-theme=<kind>`, `--debug-size=<w>x<h>`, `--debug-mute`, `--debug-open=<path>`,
+  `--debug-mini=card|bar`, `--debug-drop=<path>`, `--debug-ask=<path>` and `--debug-covers`.
+  Always pass `--debug-mute` when a capture plays something.
 - **The owner prefers building over test runs.** Verify with `cargo fmt`, `cargo check`,
   `cargo clippy --workspace --all-targets -- -D warnings` and `cargo build -p sonicly`. Write unit
   tests for new non-UI logic; run `cargo test` only when asked.
