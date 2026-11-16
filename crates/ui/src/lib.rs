@@ -21,7 +21,6 @@ mod inline_links;
 mod input;
 mod kbd;
 mod label;
-mod lattice;
 mod layout;
 mod lazy;
 mod level_meter;
@@ -110,7 +109,6 @@ pub use label::{
     Tails, eyebrow, eyebrow_with, faint, heading, section_heading, spoken, spoken_eyebrow,
     spoken_heading, spoken_vacant, vacant,
 };
-pub use lattice::Lattice;
 pub use layout::{ALWAYS, MIN_CONTENT, ROOMY, Room, SNUG, VAST, WIDE};
 pub use lazy::Lazy;
 pub use level_meter::LevelMeter;

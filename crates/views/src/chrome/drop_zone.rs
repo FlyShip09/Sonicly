@@ -26,6 +26,9 @@ pub(crate) struct DropZone {
     file_drop: Entity<FileDrop>,
     /// The answer the question has picked, an index into its choices.
     choice: usize,
+    /// Whether the sheet covers the whole window under the title bar, as it does over the
+    /// welcome screen, which has no sidebars or player bar to keep clear.
+    whole: bool,
 }
 
 impl DropZone {
@@ -41,7 +44,13 @@ impl DropZone {
         Self {
             file_drop,
             choice: 0,
+            whole: false,
         }
+    }
+
+    /// Lets the sheet cover the whole window while the welcome screen is up.
+    pub fn whole_window(&mut self, whole: bool) {
+        self.whole = whole;
     }
 
     /// The sheet over the page while files hover, or nothing.
@@ -85,9 +94,13 @@ impl DropZone {
                 .aria_label(headline.clone())
                 .absolute()
                 .top(ui::snapped(theme.metrics.title_bar, window))
-                .bottom(PlayerBar::height(window, cx))
-                .left(chrome.left())
-                .right(chrome.right())
+                .map(|this| match self.whole {
+                    true => this.bottom_0().left_0().right_0(),
+                    false => this
+                        .bottom(PlayerBar::height(window, cx))
+                        .left(chrome.left())
+                        .right(chrome.right()),
+                })
                 .p(theme.metrics.inset)
                 // Opaque: a page half seen through it only competes with the one message.
                 .bg(theme.background)

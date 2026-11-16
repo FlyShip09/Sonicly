@@ -135,7 +135,7 @@ impl Home {
 
     fn client(&self, cx: &App) -> Option<Arc<dyn MusicApi>> {
         let session = self.session.read(cx);
-        if session.guest() && session.local_client().is_some() {
+        if self.is_local(cx) && session.local_client().is_some() {
             session.local_client()
         } else {
             session.client()
@@ -144,7 +144,7 @@ impl Home {
 
     fn shelf(&self, cx: &App) -> Shelf {
         let session = self.session.read(cx);
-        if session.guest() {
+        if session.guest() || session.local_only() {
             Shelf::Local
         } else {
             Shelf::Streaming

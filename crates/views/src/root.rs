@@ -240,6 +240,12 @@ impl Root {
                 this.screens.playlist = None;
                 this.screens.playlist_detail = None;
             }
+            // A folder picked or dropped on the welcome screen opens the library, where its
+            // first scan shows.
+            if this.signing_in && session.read(cx).local_only() {
+                this.signing_in = false;
+                router::replace(Destination::Library(LibraryTab::Songs), cx);
+            }
             cx.notify();
         })
         .detach();
@@ -1175,13 +1181,16 @@ impl Render for Root {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // An account that could not be reached is still an account, so nothing about a lost
         // network puts the sign-in page up: the workspace stays, on what the library kept and
-        // on the local files.
-        let show_sign_in = match self.session.read(cx).state() {
-            SessionState::SignedOut | SessionState::Failed(_) => true,
+        // on the local files. Local files alone keep it too.
+        let session = self.session.read(cx);
+        let show_sign_in = match session.state() {
+            SessionState::SignedOut | SessionState::Failed(_) => !session.local_only(),
             SessionState::Restoring | SessionState::SignedIn(_) | SessionState::Offline(_) => false,
             SessionState::Authorizing(_) => self.signing_in,
         };
         self.signing_in = show_sign_in;
+        self.drop_zone
+            .update(cx, |zone, _| zone.whole_window(show_sign_in));
 
         match self.pending.take() {
             Some(Focus::Search) => self
