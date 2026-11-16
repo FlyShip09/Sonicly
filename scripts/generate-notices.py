@@ -9,6 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "THIRD-PARTY.md"
+REPO = "https://github.com/FlyShip09/Sonicly"
 
 COPYRIGHT = re.compile(r"^\s*(?:#\s*)?Copyright\b.*$", re.MULTILINE)
 
@@ -54,6 +55,7 @@ def harvest():
         cwd=ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
     if done.returncode != 0:
         sys.exit(done.stderr.strip() or "cannot run cargo about")
@@ -71,7 +73,13 @@ def notices(text):
 
 def link(crate):
     name = crate["name"]
-    url = crate.get("repository") or f"https://crates.io/crates/{name}"
+    source = crate.get("source") or ""
+    url = crate.get("repository")
+    if not url and source.startswith("git+"):
+        url = source[4:].split("?")[0].split("#")[0]
+    if not url:
+        # a crate with no source is one of Sonicly's own, not its namesake on crates.io
+        url = f"https://crates.io/crates/{name}" if source else REPO
     return f"[{name} {crate['version']}]({url})"
 
 
@@ -130,7 +138,7 @@ def dedent(text):
 def main():
     report = harvest()
     groups = collect(report)
-    OUTPUT.write_text(render(report, groups), encoding="utf-8")
+    OUTPUT.write_text(render(report, groups), encoding="utf-8", newline="\n")
     crates = sum(row["count"] for row in report["overview"])
     print(f"notices: {len(groups)} licenses, {crates} crates")
 
