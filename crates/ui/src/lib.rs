@@ -72,7 +72,7 @@ pub use arrow_ring::ArrowRing;
 pub use artwork::{
     Artwork, Avatar, PREFETCH_REACH, Prefetch, artwork_usage, cover_palette, prefetch, prefetching,
 };
-pub use button::{Button, SMALL_INSET};
+pub use button::{Button, CONTROL_CONTEXT, SMALL_INSET, keyboard_control};
 pub use card::CARD_GROUP;
 pub use card::Card;
 pub use checkbox::Checkbox;

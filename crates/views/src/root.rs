@@ -5,10 +5,10 @@ use gpui::{
 use gpui::{App, Font, FontFallbacks, SharedString, StyleRefinement, font, prelude::*};
 use gpui::{Window, deferred, div};
 use input::{
-    CloseWindow, DownloadFromLink, MinimizeWindow, NavigateBack, NavigateForward, OpenAlbums,
-    OpenArtists, OpenFilter, OpenHome, OpenPlaylists, OpenSearch, OpenSettings, OpenSongs, Refresh,
-    ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar, ToggleQueue, ToggleSidebar,
-    ToggleWindowFullscreen, ZoomWindow,
+    CloseWindow, DownloadFromLink, FocusNext, FocusPrevious, MinimizeWindow, NavigateBack,
+    NavigateForward, OpenAlbums, OpenArtists, OpenFilter, OpenHome, OpenPlaylists, OpenSearch,
+    OpenSettings, OpenSongs, Refresh, ShowMembers, ToggleFullscreen, ToggleLyrics, TogglePowerbar,
+    ToggleQueue, ToggleSidebar, ToggleWindowFullscreen, ZoomWindow,
 };
 use router::{Destination, LibraryTab, NavigationEvent, back, forward, navigate};
 use state::{
@@ -1494,6 +1494,8 @@ impl Render for Root {
                 LinkDownloadDialog::open(None, window, cx)
             })
             .on_action(|_: &OpenHome, _, cx| navigate(Destination::Home, cx))
+            .on_action(|_: &FocusNext, window, cx| window.focus_next(cx))
+            .on_action(|_: &FocusPrevious, window, cx| window.focus_prev(cx))
             .on_action(|_: &OpenSongs, _, cx| navigate(Destination::Library(LibraryTab::Songs), cx))
             .on_action(|_: &OpenAlbums, _, cx| {
                 navigate(Destination::Library(LibraryTab::Albums), cx)

@@ -389,7 +389,8 @@ impl RenderOnce for OptionCard {
             )
             .when(interactive, |this| {
                 this.when_some(on_click, |this, handler| {
-                    this.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    crate::button::keyboard_control(this, cx)
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(move |event, window, cx| handler(event, window, cx))
                 })
             });
