@@ -15,7 +15,7 @@ use input::{ShowMembers, ToggleFullscreen, ToggleLyrics, ToggleMiniPlayer, Toggl
 use state::{AppSettings, Playback, PlayerBarLayout, Queue, SideTab, Sonicly};
 use ui::{
     Artwork, Badge, Button, Flight, InlineLink, InlineLinks, Perch, Pinnable, Popup, Room,
-    Scrollbar, Scrubber, ScrubberState,
+    Scrollbar, Scrubber, ScrubberState, Springs, Sprung,
 };
 
 use crate::chrome::sessions_button::SessionsButton;
@@ -58,6 +58,10 @@ const STACK_GAP: f32 = 0.5;
 const BAR_INSET: Pixels = px(10.);
 /// The hairline along the sidebar's edge, carried down past the bar.
 const EDGE: Pixels = px(1.);
+/// How far below its place a new track's title and artist start as they rise in.
+const ARRIVAL_RISE: Pixels = px(6.);
+/// How close the arrival comes to its end before it counts as there.
+const ARRIVAL_REST: f32 = 1e-3;
 
 /// How the bar draws its volume control.
 #[derive(Clone, Copy)]
@@ -81,6 +85,11 @@ pub(crate) struct PlayerBar {
     /// over the button where the bar has no room for one beside it.
     rising: RisingVolume,
     over_volume: Option<f32>,
+    /// The track whose title the bar shows, and how far that title has risen into place since
+    /// the track changed, from 0 to 1.
+    arrival: (Option<String>, Sprung),
+    /// What the arrival stood at when this frame was drawn.
+    arrived: f32,
 }
 
 impl VolumeHost for PlayerBar {
@@ -123,7 +132,27 @@ impl PlayerBar {
             volume: ScrubberState::new("volume"),
             over_volume: None,
             rising: RisingVolume::new("volume-rise"),
+            arrival: (None, Sprung::at(1.)),
+            arrived: 1.,
         }
+    }
+
+    /// Steps the rise of the title and artist after a track change. The first track the bar
+    /// shows is simply there; each change after it starts the rise again from below.
+    fn arrive(&mut self, window: &Window, cx: &mut Context<Self>) {
+        let id = self
+            .playback
+            .read(cx)
+            .shown_track(cx)
+            .and_then(|track| track.id.clone());
+        let (shown, rise) = &mut self.arrival;
+        if *shown != id {
+            if shown.is_some() && id.is_some() {
+                rise.jump(0.);
+            }
+            *shown = id;
+        }
+        self.arrived = rise.follow(1., Springs::SWAP_IN, ARRIVAL_REST, window, cx);
     }
 
     fn open_context_menu(
@@ -478,11 +507,18 @@ impl PlayerBar {
                 .child(title)
                 .child(actions),
         };
+        let arrived = self.arrived;
         div()
             .flex()
             .flex_col()
             .line_height(gpui::relative(ui::LEADING))
             .gap(theme.metrics.pad / 2.)
+            // a new track's words rise into place and fade up, so the change reads at a glance
+            .when(arrived < 1., |this| {
+                this.relative()
+                    .top(ARRIVAL_RISE * (1. - arrived))
+                    .opacity(arrived)
+            })
             .when(centered, |this| this.items_center())
             .justify_center()
             .flex_1()
@@ -598,6 +634,7 @@ impl PlayerBar {
 
 impl Render for PlayerBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.arrive(window, cx);
         let theme = *cx.theme();
         let span = Chrome::window_room(window);
         let layout = self.settings.read(cx).player_bar_layout();
