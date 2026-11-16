@@ -96,8 +96,8 @@ pub fn window_size() -> Option<Size<Pixels>> {
     SIZE.get().copied()
 }
 
-/// The page `what` names: a screen id, `settings:<page>`, or `album:<id>`, `artist:<id>` and
-/// `playlist:<id>`.
+/// The page `what` names: a screen id, `settings:<page>`, `equalizer`, or `album:<id>`,
+/// `artist:<id>` and `playlist:<id>`.
 fn destination(what: &str) -> Option<Destination> {
     let (kind, id) = what.split_once(':').unwrap_or((what, ""));
     let id = SharedString::from(id.to_owned());
@@ -105,6 +105,7 @@ fn destination(what: &str) -> Option<Destination> {
         "settings" => Some(Destination::Settings(
             SettingsPage::from_id(&id).unwrap_or(SettingsPage::General),
         )),
+        "equalizer" => Some(Destination::Equalizer),
         "album" | "artist" | "playlist" if id.is_empty() => None,
         "album" => Some(Destination::Album(id)),
         "artist" => Some(Destination::Artist(id)),
