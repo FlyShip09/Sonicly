@@ -365,3 +365,63 @@ Newest last. One entry per decision: what was chosen, and why.
     worth a later look: the Now playing preview animates its visualizer while nothing
     plays, and the player bar menu still offers to start or join a session when no
     server is saved.
+37. **Apple Music is back, played by Apple's own web player.** Supersedes decision 9
+    and the Apple Music half of decision 13's deletions; decision 3 stands. Sonicly
+    still ships no content decryption module, asks for no licence, holds no key and
+    decrypts nothing. What changed is where a track plays: in `music.apple.com`, opened
+    in a hidden page of the system web view (WebView2 on Windows), where Apple's own
+    MusicKit fetches the stream and the web view's licensed module plays it straight to
+    the system's output. Sonicly tells the page what to queue, when to play, pause and
+    seek and how loud to be (`crates/music/src/apple/player.js`, run in the page), and
+    reads back the state, position, length and errors the page posts
+    (`apple/player.rs`). No audio, key or licence crosses into Sonicly, so there is
+    nothing to keep either: an Apple Music track cannot be downloaded or cached
+    (`Player::download` is the trait's refusal, and `Capabilities` has `downloads` and
+    `keeps` off). A subscription is needed exactly as in a browser; an account without
+    one is turned away at sign-in, and a track Apple will only preview for an account
+    stops with a toast saying so.
+    - **Account.** The listener signs in on Apple's page in the app's sign-in window;
+      the one cookie that is the account, `media-user-token`, is stored sealed like
+      every other sign-in (decision 16) and handed to the hidden page's private session
+      before its first load. The library, search, albums, artists, playlists and
+      stations come from the endpoints Apple's web player calls
+      (`amp-api.music.apple.com`), with the web player's own bearer token read off its
+      page, as upstream did. That token is Apple's, not registered by Sonicly, and Apple
+      can change the page or object to the use; both are risks this decision accepts and
+      names.
+    - **The hand-off.** `music` has no browser, and `state` names no provider. A
+      provider sends orders through `music::webplayer` (open this page, run this line
+      of script, mute, close) and `state::WebPlayer` carries them out in
+      `webview::Page`. `crates/webview` gained three things for it: cookies put into
+      the session before the first load, a message channel from the page
+      (`chrome.webview.postMessage`, heard only from the top document of the player's
+      own host, read as untrusted text of at most 4 KiB), and a browser process started
+      with `--autoplay-policy=no-user-gesture-required` in a data folder of its own.
+      The page is muted at the engine before it loads when the volume is zero.
+    - **What does not apply.** The sound goes past Sonicly, so the equalizer, the
+      spectrum and visualizer, loudness normalization, gapless joins, the chosen output
+      device and downloads do nothing for these tracks. The engine says so through
+      `TrackSignal::direct`: the sound chain in Settings shows "Web player" in place
+      of the equalizer and device steps, and the equalizer page's status says the
+      service's player plays past Sonicly. Volume and mute do apply (the page's own
+      volume). Lyrics from Apple are missing, since the web token has no permission
+      for them; the other lyrics sources still answer by title and artist. Plays are
+      reported to Apple by its own page, so Sonicly posts no play activity of its own.
+    - **Cost and lifetime.** The page is a browser: seven `msedgewebview2` processes
+      with a summed working set of 506 to 531 MB while a track played (debug build,
+      Windows 11, one run; shared pages are counted once per process, so the true cost
+      is lower). It opens when an Apple Music track is first asked to play, never at
+      sign-in or for a track restored paused, and closes three minutes after the last
+      track paused, ended or failed, or at once when the account signs out. A paused
+      track keeps its place and the next play opens a new page there.
+    - **Platforms.** Windows only. WebKitGTK ships no module for protected audio, and
+      the macOS backend has no message channel yet, so `webview::plays()` is false on
+      both: browsing works, and a toast at sign-in and at any play says Apple Music's
+      songs cannot play on this system.
+    - **Seen and not seen.** Seen, with no account (`--debug-guest=apple`, a debug-only
+      session that plays the unprotected previews Apple gives any visitor, muted):
+      catalog search, the page opening hidden with no visible window, play, position in
+      real time, pause, resume, seek, next, the end of a track moving the queue on, the
+      idle close and the reopen. Not seen: a signed-in account, a whole protected
+      track, the subscription and sign-in-again errors. Those need the owner to sign in
+      inside the app.

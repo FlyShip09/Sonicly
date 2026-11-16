@@ -18,7 +18,8 @@ running Sonicly.
 | Sources | YouTube Music (guest and signed in) | Ported; guest home seen |
 | Sources | Spotify (Premium, librespot) | Ported; search/genre lookup rewritten, not yet seen |
 | Sources | Tidal, Subsonic/Navidrome, Jellyfin | Ported |
-| Sources | Apple Music, Deezer | Removed (DRM) |
+| Sources | Apple Music | Back, played by Apple's own web player in a hidden page of the system web view (`docs/DESIGN.md`, decision 37); upstream's Widevine path is not ported. Windows only. Seen without an account: catalog search, and Apple's previews play, pause, seek, skip and advance at their end. A signed-in account and a whole track not seen. No equalizer, visualizer, normalization, gapless, device choice or download for these tracks |
+| Sources | Deezer | Removed (DRM) |
 | Sources | Downloaded Spotify helper ("Soloist") | Removed (ran an unverified download) |
 | Library | Songs, albums, artists, playlists, favorites, recents | Ported |
 | Queue | Shuffle, repeat, reorder, play next/last | Ported |

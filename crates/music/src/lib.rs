@@ -1,4 +1,5 @@
 mod aac;
+pub mod apple;
 pub mod artwork;
 mod audio;
 pub mod binimum;
@@ -38,6 +39,7 @@ pub mod tidal;
 mod trim;
 pub mod trouble;
 pub mod vault;
+pub mod webplayer;
 pub mod youtube;
 pub mod ytdlp;
 
@@ -599,6 +601,10 @@ pub struct TrackSignal {
     pub rate: u32,
     pub channels: u16,
     pub normalisation: Normalisation,
+    /// Whether the engine plays it to the system's output by itself, as a service's own web
+    /// player does. Nothing of Sonicly's own sound path then touches it: no equalizer, no
+    /// visualizer, no resampler, no chosen device.
+    pub direct: bool,
 }
 
 /// What loudness normalisation does to a track.
@@ -710,6 +716,9 @@ pub enum PlaybackEvent {
     },
     Refused,
     Gated,
+    /// The provider's own player will not play for this listener on this system, and no other
+    /// track would fare better.
+    Barred(Barrier),
     /// The audio output was lost or changed, so the engine is gone. `heard` is the track being
     /// heard and how far into it the output had played, when the engine knew. A restart resumes
     /// there rather than where a clock that kept running during the switch would say.
@@ -741,6 +750,15 @@ impl PlaybackEvent {
             _ => None,
         }
     }
+}
+
+/// Why a player Sonicly only commands, such as a service's web player, plays nothing at all.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Barrier {
+    /// The service plays whole tracks only to a subscriber, and the account is not one.
+    Subscription,
+    /// The system's web view cannot run the service's player, or cannot play protected audio.
+    Player,
 }
 
 /// Transport control of one engine. Every call is fire-and-forget: the outcome arrives as a
@@ -837,6 +855,12 @@ impl Fraction {
 
 pub trait PlaybackFactory: Send + Sync {
     fn start(&self, config: PlaybackConfig) -> (Box<dyn Player>, Box<dyn PlaybackEvents>);
+
+    /// What keeps every player this starts from playing anything on this system, known before
+    /// a track is asked for, so the listener hears of it at sign-in rather than at the first play.
+    fn barrier(&self) -> Option<Barrier> {
+        None
+    }
 }
 
 /// What a provider's library is made of. It decides which `MusicApi` methods fill the library
@@ -1004,6 +1028,8 @@ pub enum SignInProblem {
     Network,
     Cancelled,
     Refused,
+    /// Apple Music says the signed-in Apple ID has no active subscription.
+    Subscription,
 }
 
 /// A provider refusing for now because too much was asked of it too quickly. Whoever asked can
@@ -1032,6 +1058,7 @@ impl std::fmt::Display for SignInFailure {
             SignInProblem::Network => "the provider could not be reached",
             SignInProblem::Cancelled => "authorization was cancelled in the browser",
             SignInProblem::Refused => "Spotify refused the session",
+            SignInProblem::Subscription => "the account has no active Apple Music subscription",
         };
         write!(f, "{reason}")
     }

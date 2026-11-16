@@ -15,9 +15,12 @@ a port of [Sonora](https://github.com/sonorahq/sonora); see `NOTICE.md`.
 | YouTube Music | nothing as a guest; sign in for your library |
 | Spotify | a Premium account |
 | Tidal | a Tidal account |
+| Apple Music (Windows) | an Apple Music subscription |
 | Subsonic / Navidrome, Jellyfin | your own server |
 
-Sonicly does not circumvent DRM. Apple Music and Deezer are not supported.
+Sonicly does not circumvent DRM. Apple Music plays inside Apple's own web player, in a hidden
+page of the system web view, so the equalizer, the visualizer and downloads do not apply to it.
+Deezer is not supported.
 
 ## Build
 

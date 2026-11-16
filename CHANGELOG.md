@@ -7,6 +7,7 @@ one line about what someone using Sonicly can now do.
 
 ### Added
 
+- Apple Music on Windows, for subscribers: sign in on Apple's page inside Sonicly, browse your library and the catalog, and play. Songs play in Apple's own web player, hidden, so the equalizer, visualizer, loudness normalization, output device choice and downloads do not apply to them.
 - Import PLS and XSPF playlists into Local Music, the same way as M3U.
 - An album kept as one file with a cue sheet beside it shows and plays as its separate tracks.
 - Download audio from a link with your own yt-dlp, into a music folder of your choice (Ctrl+Shift+D, the link button on Local Music, or paste a link into quick search).

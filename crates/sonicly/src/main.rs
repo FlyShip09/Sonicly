@@ -116,12 +116,17 @@ fn main() -> ExitCode {
         }
 
         let database = storage::Database::standard();
+        #[cfg(debug_assertions)]
+        let apple_visitor = debug.guest() == Some("apple");
+        #[cfg(not(debug_assertions))]
+        let apple_visitor = false;
         let providers: Vec<Arc<dyn music::MusicProvider>> = vec![
             Arc::new(music::spotify::SpotifyProvider::from_env()),
             Arc::new(music::youtube::YouTubeProvider::new()),
             Arc::new(music::subsonic::SubsonicProvider::new()),
             Arc::new(music::jellyfin::JellyfinProvider::new()),
             Arc::new(music::tidal::TidalProvider::new()),
+            Arc::new(music::apple::AppleProvider::new().visitor(apple_visitor)),
         ];
         let local_provider: Arc<dyn music::MusicProvider> =
             Arc::new(music::local::LocalProvider::new(
