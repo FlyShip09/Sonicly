@@ -186,6 +186,8 @@ fn main() -> ExitCode {
         #[cfg(target_os = "macos")]
         gestures::install(cx);
         memory::watch(cx);
+        #[cfg(debug_assertions)]
+        capture_setup(cx);
 
         open_window(cx);
         let session = Sonicly::global(cx).session.clone();
@@ -280,6 +282,20 @@ fn follow(items: &[String], tail: bool, cx: &mut App) {
 }
 
 /// The page a link opens on, for the kinds of link that open a page.
+/// Debug builds only: readies a run of `scripts/shot.ps1` without any input. `SONICLY_MUTE=1`
+/// plays at no volume, so a capture that opens a song makes no sound, and
+/// `SONICLY_SHOW=lyrics-settings` opens the Lyrics settings page.
+#[cfg(debug_assertions)]
+fn capture_setup(cx: &mut gpui::App) {
+    if std::env::var_os("SONICLY_MUTE").is_some() {
+        let playback = Sonicly::global(cx).playback.clone();
+        playback.update(cx, |playback, cx| playback.set_volume(0., cx));
+    }
+    if std::env::var("SONICLY_SHOW").as_deref() == Ok("lyrics-settings") {
+        router::navigate(Destination::Settings(router::SettingsPage::Lyrics), cx);
+    }
+}
+
 fn destination(linked: &Linked) -> Option<Destination> {
     match linked {
         Linked::Track(id) => Some(Destination::Song(id.clone().into())),
