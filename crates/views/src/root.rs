@@ -1,4 +1,7 @@
-use gpui::{AnyView, Context, Entity, MouseButton, NavigationDirection, Render, Task};
+use gpui::{
+    AnyView, Context, DragMoveEvent, Entity, ExternalPaths, MouseButton, NavigationDirection,
+    Render, Task,
+};
 use gpui::{App, Font, FontFallbacks, SharedString, StyleRefinement, font, prelude::*};
 use gpui::{Window, deferred, div};
 use input::{
@@ -8,9 +11,9 @@ use input::{
 };
 use router::{Destination, NavigationEvent, back, forward, navigate};
 use state::{
-    ArtistDetail, Detail, GenreDetails, Genres, HistoryState, Home, Io, Library, LibraryState,
-    Network, Playback, Profile, Queue, Reconnected, SYSTEM_FONT, Scan, Search, Session,
-    SessionState, Shelf, SideTab, SongDetail, Sonicly,
+    ArtistDetail, Detail, DropTarget, FileDrop, GenreDetails, Genres, HistoryState, Home, Io,
+    Library, LibraryState, Network, Playback, Profile, Queue, Reconnected, SYSTEM_FONT, Scan,
+    Search, Session, SessionState, Shelf, SideTab, SongDetail, Sonicly,
 };
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use ui::WindowFrame;
@@ -19,6 +22,7 @@ use ui::{
     ThemeKind, clear_listing,
 };
 
+use crate::chrome::drop_zone::DropZone;
 use crate::chrome::{
     Busy, JamCode, JamInvite, JamJoin, PlayerBar, SessionCode, SessionJoin, ThemeInvite, TitleBar,
     TitleBarEvent, TitleBarOptions, ToastStack, Toolbar, Tooled,
@@ -160,6 +164,8 @@ pub struct Root {
     theme_invite: Entity<ThemeInvite>,
     /// The quick search, drawn over whichever shell is up so it opens in fullscreen too.
     powerbar: Entity<Powerbar>,
+    /// What files dragged in from the system would do, and the question their drop may ask.
+    drop_zone: Entity<DropZone>,
     dialogs: Dialogs,
     /// The toasts, hung above the player bar or the fullscreen dock, whichever shell is up.
     toasts: Entity<ToastStack>,
@@ -418,6 +424,7 @@ impl Root {
             jam_invite: cx.new(JamInvite::new),
             theme_invite: cx.new(ThemeInvite::new),
             powerbar,
+            drop_zone: cx.new(DropZone::new),
             dialogs: Dialogs::new(cx),
             toasts: cx.new(ToastStack::new),
             background: None,
@@ -1402,6 +1409,18 @@ impl Render for Root {
             .on_mouse_move(|event, window, cx| {
                 ui::update_middle_scroll(event.position, window, cx);
             })
+            // Files from the system land in Local Music wherever nothing closer takes them: a
+            // local playlist in the sidebar and the queue have drops of their own.
+            .on_drag_move(|event: &DragMoveEvent<ExternalPaths>, _, cx| {
+                let paths = event.drag(cx).paths().to_vec();
+                let file_drop = FileDrop::entity(cx);
+                file_drop.update(cx, |drop, cx| drop.hover(&paths, cx));
+            })
+            .on_drop(|paths: &ExternalPaths, _, cx| {
+                let paths = paths.paths().to_vec();
+                let file_drop = FileDrop::entity(cx);
+                file_drop.update(cx, |drop, cx| drop.drop_on(paths, DropTarget::Library, cx));
+            })
             .on_mouse_down(
                 MouseButton::Navigate(NavigationDirection::Back),
                 |_, _, cx| back(cx),
@@ -1453,7 +1472,8 @@ impl Render for Root {
                         .flex_none(),
                 ),
             )
-            .when(!show_sign_in, |this| this.child(shell));
+            .when(!show_sign_in, |this| this.child(shell))
+            .child(self.drop_zone.clone());
         // A closed menu or dialog fades out here, over everything else in the window.
         let root = root
             .child(ui::lingers())

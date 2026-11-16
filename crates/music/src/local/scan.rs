@@ -654,7 +654,7 @@ fn folder_name(dir: &Path) -> String {
         .unwrap_or_else(|| dir.display().to_string())
 }
 
-fn is_audio_file(path: &Path) -> bool {
+pub(super) fn is_audio_file(path: &Path) -> bool {
     if path
         .file_name()
         .is_some_and(|name| name.as_encoded_bytes().starts_with(b"._"))

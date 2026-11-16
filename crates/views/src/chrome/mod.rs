@@ -1,5 +1,6 @@
 mod aside;
 mod downloads;
+pub(crate) mod drop_zone;
 mod jam;
 mod members;
 mod mini_player;
@@ -125,6 +126,16 @@ impl Chrome {
         cx.try_global::<Installed>()
             .map(|installed| *installed.0.read(cx))
             .unwrap_or_default()
+    }
+
+    /// How wide the left sidebar stands now, nothing while it is closed.
+    pub fn left(&self) -> Pixels {
+        self.sidebar_left
+    }
+
+    /// How wide the right sidebar stands now, nothing while it is closed.
+    pub fn right(&self) -> Pixels {
+        self.sidebar_right
     }
 
     pub fn reserved_right(cx: &App) -> Pixels {

@@ -620,6 +620,14 @@ impl SidebarLeft {
         let origin = Origin::from(&pin);
         let playing = self.playback.read(cx).engaged(&origin, cx);
         let warmed = origin.clone();
+        // A local playlist takes files dropped from the system as well as songs from the app.
+        let takes_files = (pin.kind == PinKind::Playlist
+            && Shelf::of(&pin.id) == Shelf::Local
+            && self.library.read(cx).is_editable(&pin.id))
+        .then(|| state::DropTarget::Playlist {
+            id: pin.id.clone(),
+            name: pin.title.clone(),
+        });
 
         let key = format!("{}-{}", pin.kind.key(), pin.id);
         let card = Card::new(SharedString::from(format!("pinned-{key}")), pin.label())
@@ -658,6 +666,9 @@ impl SidebarLeft {
                 |card| card.pin_from(pin.clone(), Spot::new(PINS, index)),
                 |card| card.pin(pin.clone()),
             )
+            .when_some(takes_files, |card, target| {
+                super::drop_zone::takes_files(card, target, cx)
+            })
             .on_drag_move(
                 cx.listener(move |this, event: &DragMoveEvent<DraggedPin>, _, cx| {
                     let Some(gap) = drop_gap(event.bounds, event.event.position, index) else {

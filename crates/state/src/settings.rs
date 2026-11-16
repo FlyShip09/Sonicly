@@ -279,6 +279,17 @@ impl Default for VisualizerScreens {
     }
 }
 
+/// Where songs dropped on the window from outside the music folders go. Either way the
+/// originals are left where they are.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Placement {
+    /// Their folder joins the music folders and is read where it is.
+    Folder,
+    /// They are copied into this music folder.
+    Copy(PathBuf),
+}
+
 /// A window's saved position and size in logical pixels, plus whether it was maximized.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -504,6 +515,10 @@ struct Values {
     startup: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     local_folders: Vec<PathBuf>,
+    /// Where songs dropped on the window from outside the music folders go, once the listener
+    /// has said. `None` asks on the next such drop.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dropped_files: Option<Placement>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     hidden_nav: Vec<String>,
     /// The optional sidebar rows the user added, which stay out of the sidebar otherwise.
@@ -729,6 +744,7 @@ impl Default for Values {
             font: system_font(),
             startup: DEFAULT_STARTUP.to_owned(),
             local_folders: Vec::new(),
+            dropped_files: None,
             hidden_nav: Vec::new(),
             added_nav: Vec::new(),
             silenced_requirements: Vec::new(),
@@ -1381,6 +1397,18 @@ impl AppSettings {
 
     pub fn local_folders(&self) -> &[PathBuf] {
         &self.values.local_folders
+    }
+
+    /// Where songs dropped from outside the music folders go, or `None` to ask.
+    pub fn dropped_files(&self) -> Option<&Placement> {
+        self.values.dropped_files.as_ref()
+    }
+
+    pub fn set_dropped_files(&mut self, placement: Option<Placement>, cx: &mut Context<Self>) {
+        if self.values.dropped_files.as_ref() != placement.as_ref() {
+            self.values.dropped_files = placement;
+            self.schedule_save(cx);
+        }
     }
 
     pub fn startup(&self) -> &str {
