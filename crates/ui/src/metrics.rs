@@ -76,7 +76,7 @@ pub struct Metrics {
 
 impl Default for Metrics {
     fn default() -> Self {
-        Self::new(px(14.))
+        Self::new(px(13.))
     }
 }
 
@@ -105,8 +105,8 @@ impl Metrics {
     }
 }
 
-/// Sonicly's type scale, as steps of the listener's base size: 11, 12, 13, 14, 16, 19, 24 and
-/// 32 at the default 14. The steps widen as they climb, so a page title, a section and a row
+/// Sonicly's type scale, as steps of the listener's base size: 10, 11, 12, 13, 15, 18, 22 and
+/// 30 at the default 13. The steps widen as they climb, so a page title, a section and a row
 /// never read as near neighbours, and the artwork between them leads.
 #[derive(Clone, Copy)]
 pub enum Text {
