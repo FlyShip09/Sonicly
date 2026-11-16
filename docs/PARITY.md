@@ -32,6 +32,7 @@ running Sonicly.
 | App | Tray, single instance, deep links (`sonicly://`) | Ported |
 | App | Auto-update | Disabled (no releases yet) |
 | App | Install counter | Removed |
-| UI | Lyrics page styling (image/video background, typeface) | Planned |
+| UI | Lyrics page styling (background, typeface, spacing, emphasis, saved looks) | Not in upstream; built, seen on Windows |
+| UI | Lyrics video background | Windows only (Media Foundation). Hidden on macOS and Linux, which have no decoder in Sonicly yet |
 | UI | Floating mini player | Planned |
 | UI | Drag files onto the window to import | Planned |
