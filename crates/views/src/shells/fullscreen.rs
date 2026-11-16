@@ -726,7 +726,8 @@ impl FullscreenView {
                             .whitespace_nowrap()
                             .text_ellipsis()
                             .text_size(theme.text(Text::Title))
-                            .font_weight(FontWeight::SEMIBOLD)
+                            .letter_spacing(Text::Title.tracking())
+                            .font_weight(ui::title_weight(Text::Title))
                             .when_some(album, |this, album| {
                                 this.cursor_pointer()
                                     .hover(|style| style.underline())

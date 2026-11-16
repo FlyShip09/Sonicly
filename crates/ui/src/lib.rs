@@ -107,7 +107,7 @@ pub use input::{
 pub use kbd::Kbd;
 pub use label::{
     Tails, eyebrow, eyebrow_with, faint, heading, section_heading, spoken, spoken_eyebrow,
-    spoken_heading, spoken_vacant, vacant,
+    spoken_heading, spoken_vacant, title_weight, vacant,
 };
 pub use layout::{ALWAYS, MIN_CONTENT, ROOMY, Room, SNUG, VAST, WIDE};
 pub use lazy::Lazy;

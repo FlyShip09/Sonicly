@@ -65,6 +65,9 @@ pub struct Metrics {
     pub title_bar: Pixels,
     pub player_bar: Pixels,
     pub list_row: Pixels,
+    /// A row of a source list, such as the sidebar's navigation: one line of body text with a
+    /// little air, as a desktop sidebar sets it.
+    pub nav_row: Pixels,
     /// The room between one section of a page and the next, such as two shelves on Home.
     pub section: Pixels,
     pub thumb: Pixels,
@@ -97,6 +100,7 @@ impl Metrics {
             title_bar: roomy(36., 2.4),
             player_bar: roomy(76., 5.),
             list_row: roomy(52., 3.2),
+            nav_row: roomy(28., 2.15),
             section: roomy(32., 2.3),
             thumb: px(34.),
             cover: px(140.),
@@ -139,6 +143,17 @@ impl Text {
             Self::Large => 1.38,
             Self::Title => 1.69,
             Self::Display => 2.29,
+        }
+    }
+
+    /// How far apart this step sets its letters, in ems. Large type is drawn a little tighter,
+    /// since the spacing a face keeps for reading sizes looks loose on a title.
+    pub fn tracking(self) -> f32 {
+        match self {
+            Self::Display => -0.022,
+            Self::Title => -0.016,
+            Self::Large => -0.008,
+            _ => 0.,
         }
     }
 
