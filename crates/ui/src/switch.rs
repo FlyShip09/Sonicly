@@ -1,7 +1,7 @@
 use gpui::prelude::*;
 use gpui::{
-    App, ClickEvent, Div, ElementId, Hsla, Interactivity, SharedString, Stateful, StyleRefinement,
-    Window, div, px,
+    App, BoxShadow, ClickEvent, Div, ElementId, Hsla, Interactivity, Pixels, SharedString,
+    Stateful, StyleRefinement, Window, div, point, px,
 };
 
 use crate::motion::{Motion, Motioned as _, Movement, glow_fill, glowing};
@@ -11,6 +11,13 @@ const SCALE: f32 = 0.85;
 const INSET: f32 = 2.;
 const WIDTH: f32 = 1.75;
 const BORDER: f32 = 1.;
+/// The knob's own small shadow, which lifts it off the track in either state.
+const KNOB_DROP: Pixels = px(1.);
+const KNOB_BLUR: Pixels = px(2.5);
+const KNOB_SHADOW: f32 = 0.6;
+/// A track lighter than this is too pale for a white knob, which then takes the colour text
+/// takes on the track instead.
+const PALE_TRACK: f32 = 0.8;
 
 type Click = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
@@ -109,15 +116,33 @@ impl RenderOnce for Switch {
             true => (theme.secondary_hover, theme.primary_hover),
             false => (theme.primary_hover, theme.secondary_hover),
         };
+        // A white knob in both states, as a desktop switch has, unless the track it sits on when
+        // on is itself near white.
+        let knob_off = theme.overlay_foreground;
+        let knob_on = match theme.primary.l > PALE_TRACK {
+            true => theme.primary_foreground,
+            false => theme.overlay_foreground,
+        };
         let (knob_was, knob_is) = match checked {
-            true => (theme.muted_foreground, theme.primary_foreground),
-            false => (theme.primary_foreground, theme.muted_foreground),
+            true => (knob_off, knob_on),
+            false => (knob_on, knob_off),
+        };
+        let lift = BoxShadow {
+            color: theme.overlay.opacity(KNOB_SHADOW),
+            offset: point(Pixels::ZERO, KNOB_DROP),
+            blur_radius: KNOB_BLUR,
+            spread_radius: Pixels::ZERO,
+            inset: false,
         };
 
         let movement =
             window.use_keyed_state((id.clone(), "movement"), cx, |_, _| Movement::new(checked));
         let animates = movement.update(cx, |movement, _| movement.turning(checked));
-        let knob = div().size(thumb).flex_none().rounded(thumb / 2.);
+        let knob = div()
+            .size(thumb)
+            .flex_none()
+            .rounded(thumb / 2.)
+            .shadow(vec![lift]);
 
         let mut switch = base
             // The role sits on the inner div because the animation wrapper
