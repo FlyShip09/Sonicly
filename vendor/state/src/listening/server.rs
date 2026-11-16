@@ -10,7 +10,7 @@ use reqwest::Url;
 pub(crate) const OFFICIAL: &str = "wss://sessions.sonorahq.org/ws";
 /// Points the app at another server whatever the settings say, as one run locally while working
 /// on it.
-pub(crate) const VARIABLE: &str = "SONORA_SESSION_SERVER";
+pub(crate) const VARIABLE: &str = "SONICLY_SESSION_SERVER";
 /// How long a health check waits for an answer.
 const PATIENCE: Duration = Duration::from_secs(6);
 
@@ -60,7 +60,7 @@ pub(crate) async fn check(http: reqwest::Client, socket: Url) -> Result<()> {
     }
     let body = answer.text().await.context("cannot read the answer")?;
     if body.trim() != "ok" {
-        bail!("the server does not answer as a Sonora Sessions server");
+        bail!("the server does not answer as a Sonicly Sessions server");
     }
     Ok(())
 }

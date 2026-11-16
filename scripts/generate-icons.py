@@ -358,7 +358,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         workdir = Path(tmp)
 
-        scalable = assets / "linux" / "sonora.svg"
+        scalable = assets / "linux" / "sonicly.svg"
         scalable.parent.mkdir(parents=True, exist_ok=True)
         scalable.write_text(round_svg(master, 512), encoding="utf-8")
 
@@ -366,9 +366,9 @@ def main():
             readme_svg(master), encoding="utf-8"
         )
         (assets / "macos").mkdir(parents=True, exist_ok=True)
-        (assets / "macos" / "sonora.svg").write_text(readme_svg(master), encoding="utf-8")
+        (assets / "macos" / "sonicly.svg").write_text(readme_svg(master), encoding="utf-8")
         (assets / "windows").mkdir(parents=True, exist_ok=True)
-        (assets / "windows" / "sonora.svg").write_text(
+        (assets / "windows" / "sonicly.svg").write_text(
             rounded_svg(master, 512), encoding="utf-8"
         )
 
@@ -381,7 +381,7 @@ def main():
                 / "hicolor"
                 / f"{pixels}x{pixels}"
                 / "apps"
-                / "sonora.png"
+                / "sonicly.png"
             )
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(blob)
@@ -392,7 +392,7 @@ def main():
                 squircle_svg(master, points), points * scale, workdir, kind
             )
             icns.append((kind, blob))
-        write_icns(icns, assets / "macos" / "sonora.icns")
+        write_icns(icns, assets / "macos" / "sonicly.icns")
 
         ico = [
             (
@@ -403,22 +403,22 @@ def main():
         ]
         windows = assets / "windows"
         windows.mkdir(parents=True, exist_ok=True)
-        write_ico(ico, windows / "sonora.ico")
+        write_ico(ico, windows / "sonicly.ico")
 
         tray = assets / "tray"
         tray.mkdir(parents=True, exist_ok=True)
         for pixels in TRAY_SIZES:
             blob = rasterize(template_svg(master), pixels, workdir, f"t{pixels}")
             (tray / f"template-{pixels}.png").write_bytes(blob)
-        for obsolete in ["template-32.png", "template-64.png", "sonora.png"]:
+        for obsolete in ["template-32.png", "template-64.png", "sonicly.png"]:
             (tray / obsolete).unlink(missing_ok=True)
 
         # Last, so an actool failure leaves every other icon already written.
-        bundle = assets / "macos" / "sonora.icon"
+        bundle = assets / "macos" / "sonicly.icon"
         car = assets / "macos" / "Assets.car"
         compiled = False
         if sys.platform != "darwin":
-            print("icons: actool needs macOS, sonora.icon and Assets.car left as they were")
+            print("icons: actool needs macOS, sonicly.icon and Assets.car left as they were")
         elif write_icon_bundle(master, bundle) or not car.exists():
             car.unlink(missing_ok=True)
             compile_icon_bundle(bundle, workdir, car)

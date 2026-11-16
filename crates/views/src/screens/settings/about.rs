@@ -14,7 +14,7 @@ use super::{Group, SettingsView, Slot, group_heading};
 /// How large the app icon stands, in covers.
 const MARK_TILE: f32 = 0.5;
 /// The app icon as this platform shows it, registered by the binary's asset source.
-const APP_ICON: &str = "brand/sonora.svg";
+const APP_ICON: &str = "brand/sonicly.svg";
 const LICENSE_URL: &str = "https://www.gnu.org/licenses/gpl-3.0.html";
 const SOURCE_URL: &str = "https://github.com/sonorahq/sonora";
 
@@ -254,7 +254,7 @@ impl SettingsView {
 /// Notepad on Windows refuses a file that Sonora still writes to, so the button opens a copy.
 /// `File::open` shares write access, and `fs::copy` documents no share mode.
 fn snapshot(log: &Path) -> io::Result<PathBuf> {
-    let copy = log.with_file_name("sonora.copy.log");
+    let copy = log.with_file_name("sonicly.copy.log");
     io::copy(&mut File::open(log)?, &mut File::create(&copy)?)?;
     Ok(copy)
 }

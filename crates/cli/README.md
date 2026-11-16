@@ -1,56 +1,56 @@
 # cli
 
-Sonora's command line: control a running Sonora from a terminal or a script. 
-It is the same `sonora` binary the app starts from, so there is nothing else to install.
+Sonicly's command line: control a running Sonicly from a terminal or a script. 
+It is the same `sonicly` binary the app starts from, so there is nothing else to install.
 
 ```sh
-sonora toggle
-sonora current | jq .track.title
-sonora search crescent shaped depression | fzf | awk '{print $NF}' | xargs sonora play-next
+sonicly toggle
+sonicly current | jq .track.title
+sonicly search crescent shaped depression | fzf | awk '{print $NF}' | xargs sonicly play-next
 ```
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `sonora` | Start Sonora, or bring the running one to the front |
-| `sonora <file\|link>...` | Play files, or open a provider's link, as a file manager's "Open With" does |
-| `sonora play` / `pause` / `toggle` | Resume, pause, or switch between the two |
-| `sonora play <file\|link>...` | Play now; the rest of the queue carries on after |
-| `sonora play -s <query> [-t TYPE]` | Find the best hit of a search and play it now |
-| `sonora next` / `prev` | Skip to the next track, or go back to the previous one |
-| `sonora seek <0-100\|TIME\|±STEP>` | Jump to a percent of the current track, a time such as `1:30`, or a step such as `+10` |
-| `sonora current` | Print what plays now as JSON, or `null` when nothing is loaded |
-| `sonora queue` | Print the queue: what played, what plays and what follows, without changing it |
-| `sonora lyrics` | Print the lyrics of the current track, without looking any up |
-| `sonora like [on\|off\|toggle]` | Print or change whether the current track is a favorite |
-| `sonora watch [--position]` | Print what plays again on every change, one line of JSON each, until stopped |
-| `sonora volume [N\|+N\|-N]` | Print the volume, set it from 0 to 100, or step it |
-| `sonora mute [on\|off\|toggle]` | Print or change whether playback is muted |
-| `sonora shuffle [on\|off\|toggle]` | Print shuffle, or switch it |
-| `sonora repeat [off\|all\|one]` | Print repeat, or set it |
-| `sonora add <file\|link>...` | Queue after the tracks queued by hand |
-| `sonora play-next <file\|link>...` | Queue right after the current track |
-| `sonora add -s <query> [-t TYPE]` | Queue the best hit of a search, the one `search` lists first |
-| `sonora play -s <query> --local` | Search the local library instead of the current provider; `add` and `play-next` take `--local` too |
-| `sonora search <query> [-t TYPE] [-n N]` | Search the current provider |
-| `sonora providers` | List the providers and which one is current |
-| `sonora provider [slug]` | Print the current provider, or switch to one that has an account |
-| `sonora completions <shell>` | Print a completion script for bash, zsh, fish, elvish or PowerShell |
-| `sonora -v` | Print the version |
+| `sonicly` | Start Sonicly, or bring the running one to the front |
+| `sonicly <file\|link>...` | Play files, or open a provider's link, as a file manager's "Open With" does |
+| `sonicly play` / `pause` / `toggle` | Resume, pause, or switch between the two |
+| `sonicly play <file\|link>...` | Play now; the rest of the queue carries on after |
+| `sonicly play -s <query> [-t TYPE]` | Find the best hit of a search and play it now |
+| `sonicly next` / `prev` | Skip to the next track, or go back to the previous one |
+| `sonicly seek <0-100\|TIME\|±STEP>` | Jump to a percent of the current track, a time such as `1:30`, or a step such as `+10` |
+| `sonicly current` | Print what plays now as JSON, or `null` when nothing is loaded |
+| `sonicly queue` | Print the queue: what played, what plays and what follows, without changing it |
+| `sonicly lyrics` | Print the lyrics of the current track, without looking any up |
+| `sonicly like [on\|off\|toggle]` | Print or change whether the current track is a favorite |
+| `sonicly watch [--position]` | Print what plays again on every change, one line of JSON each, until stopped |
+| `sonicly volume [N\|+N\|-N]` | Print the volume, set it from 0 to 100, or step it |
+| `sonicly mute [on\|off\|toggle]` | Print or change whether playback is muted |
+| `sonicly shuffle [on\|off\|toggle]` | Print shuffle, or switch it |
+| `sonicly repeat [off\|all\|one]` | Print repeat, or set it |
+| `sonicly add <file\|link>...` | Queue after the tracks queued by hand |
+| `sonicly play-next <file\|link>...` | Queue right after the current track |
+| `sonicly add -s <query> [-t TYPE]` | Queue the best hit of a search, the one `search` lists first |
+| `sonicly play -s <query> --local` | Search the local library instead of the current provider; `add` and `play-next` take `--local` too |
+| `sonicly search <query> [-t TYPE] [-n N]` | Search the current provider |
+| `sonicly providers` | List the providers and which one is current |
+| `sonicly provider [slug]` | Print the current provider, or switch to one that has an account |
+| `sonicly completions <shell>` | Print a completion script for bash, zsh, fish, elvish or PowerShell |
+| `sonicly -v` | Print the version |
 
-`TYPE` is `song`, `album`, `artist` or `playlist`; `-s` takes a song unless told otherwise. `sonora <command> --help` describes each one.
+`TYPE` is `song`, `album`, `artist` or `playlist`; `-s` takes a song unless told otherwise. `sonicly <command> --help` describes each one.
 
 `--local` (`-l`) finds the best match in the local library with the same ranking the search page uses, and asks no provider. An album, artist or playlist queues all of its local songs. With no match, the command prints `nothing found for '<query>'`, exits with 1 and leaves playback as it is.
 
 `like` prints `on` or `off`; `--json` prints the state as a boolean. `on` and `off` are
 idempotent, and `toggle` flips the current track's favorite state. The same state appears in
-`sonora current` as `liked`.
+`sonicly current` as `liked`.
 
 `mute` prints `on` or `off`; `--json` prints a boolean. Muting remembers the current volume for
 unmute, and a volume change while muted clears that remembered level.
 
-Playback commands go to the device that has playback, so while Sonora steers another device over
+Playback commands go to the device that has playback, so while Sonicly steers another device over
 Spotify Connect, that device is the one that pauses or skips.
 
 ### Queueing
@@ -63,7 +63,7 @@ given. `play` puts them right after the current track and skips to them, as `pla
   refused before anything is sent.
 - A link has to belong to the current provider: a track, an album, a playlist or an artist, whose
   top tracks are queued. A link of another provider is refused with both names, switch first with
-  `sonora provider`.
+  `sonicly provider`.
 - Everything is fetched before anything is queued. When one item fails, nothing is queued and the
   command says which item it was.
 
@@ -74,17 +74,17 @@ step from where the track plays as `+10`, `-10` or `-1:30`, in seconds. A step s
 track, so `-10` near the start goes back to it. Bound to keys, as in Hyprland:
 
 ```
-bind = SUPER, right, exec, sonora seek +10
-bind = SUPER, left, exec, sonora seek -10
+bind = SUPER, right, exec, sonicly seek +10
+bind = SUPER, left, exec, sonicly seek -10
 ```
 
 ### Searching
 
-The words of a query need no quotes, `sonora search one more time` works as it is. Quote them
+The words of a query need no quotes, `sonicly search one more time` works as it is. Quote them
 when they hold characters the shell reads first, such as `'`, `?`, `&` or `!`:
 
 ```sh
-sonora play -s "What's Up?"
+sonicly play -s "What's Up?"
 ```
 
 `search` ranks the provider's answers against your library the way the search page does. Each row
@@ -106,9 +106,9 @@ is JSON either way.
 `--json` prints any answer as one line of JSON for a script, without an envelope:
 
 ```sh
-sonora volume --json          # 80
-sonora providers --json       # [{"slug":"spotify","stored":true,"current":true},…]
-sonora search daft punk --json | jq -r '.[0].link'
+sonicly volume --json          # 80
+sonicly providers --json       # [{"slug":"spotify","stored":true,"current":true},…]
+sonicly search daft punk --json | jq -r '.[0].link'
 ```
 
 `current` answers:
@@ -138,13 +138,13 @@ sonora search daft punk --json | jq -r '.[0].link'
 anything from a provider. Each track carries `id`, `title`, `artists`, `album`, `cover` and
 `duration`, and a `kind`: `context` for the collection being played, `queued` for a track added
 by hand, or `suggested` for a recommendation, when that is known. While another device is
-steered over Spotify Connect, only the tracks whose metadata Sonora has already read are
+steered over Spotify Connect, only the tracks whose metadata Sonicly has already read are
 listed. At most 100 previous and 100 upcoming tracks are listed (`wire::QUEUE_LIMIT`), most
 recent previous and next upcoming first in play order, with `truncated` set when either was cut:
 
 ```sh
-sonora queue
-sonora queue --json | jq '.upcoming[].track.title'
+sonicly queue
+sonicly queue --json | jq '.upcoming[].track.title'
 ```
 
 ```json
@@ -155,7 +155,7 @@ An empty queue prints `Queue is empty.` as text, and the same shape with empty l
 `null` current as JSON.
 
 `state` is `playing`, `paused`, `loading` or `idle`. Times are whole seconds, the volume a percent.
-`provider` is the slug `sonora providers` lists, `local` for a file. `origin` is what the track was
+`provider` is the slug `sonicly providers` lists, `local` for a file. `origin` is what the track was
 queued from, `null` when it was queued on its own; its `kind` is `album`, `playlist`, `artist`,
 `radio`, `liked` or `local`.
 
@@ -166,11 +166,11 @@ the volume, shuffle or repeat, one line of JSON each, for a status bar to follow
 every second. `--position` also prints a line every second while a track plays, for a clock.
 
 ```sh
-sonora watch | jq --unbuffered -r '.track.title // ""'
-sonora watch --position > nowplaying.json    # read by a stream overlay
+sonicly watch | jq --unbuffered -r '.track.title // ""'
+sonicly watch --position > nowplaying.json    # read by a stream overlay
 ```
 
-A line is `null` while nothing is loaded. It runs until stopped, and ends with code 0 when Sonora
+A line is `null` while nothing is loaded. It runs until stopped, and ends with code 0 when Sonicly
 quits. With nothing reading its lines any more, as after `| head -1`, it ends at its next line, as
 `tail -f` does, so within a second with `--position` and at the next change without.
 
@@ -179,28 +179,28 @@ quits. With nothing reading its lines any more, as after `| head -1`, it ends at
 | Code | Meaning |
 |---|---|
 | 0 | Done |
-| 1 | Sonora refused the command, or did not answer |
+| 1 | Sonicly refused the command, or did not answer |
 | 2 | The command line is wrong; nothing was sent |
-| 3 | Sonora is not running |
+| 3 | Sonicly is not running |
 
-A command never starts Sonora: with none running it exits with 3.
+A command never starts Sonicly: with none running it exits with 3.
 
 ### Completions
 
 ```sh
-sonora completions bash > ~/.local/share/bash-completion/completions/sonora
-sonora completions zsh > "${fpath[1]}/_sonora"
-sonora completions fish > ~/.config/fish/completions/sonora.fish
+sonicly completions bash > ~/.local/share/bash-completion/completions/sonicly
+sonicly completions zsh > "${fpath[1]}/_sonicly"
+sonicly completions fish > ~/.config/fish/completions/sonicly.fish
 ```
 
 ## How it works
 
-A command starts a second, short-lived `sonora` process. It reads the command line, sends the
-command to the running Sonora over the instance socket, prints the answer and exits. It never
+A command starts a second, short-lived `sonicly` process. It reads the command line, sends the
+command to the running Sonicly over the instance socket, prints the answer and exits. It never
 opens a window, a log file or a runtime.
 
 ```
-sonora next                                     running Sonora
+sonicly next                                     running Sonicly
 ───────────                                     ──────────────
 cli::parse  → CommandType::Remote               single::serve reads one line
 single::connect, wire::exchange   ── request ─▶ state::Control::answer
@@ -208,18 +208,18 @@ single::connect, wire::exchange   ── request ─▶ state::Control::answer
 print, exit with its code         ◀── reply ───
 ```
 
-The socket is the one that keeps Sonora to a single instance. It lives where only your account
+The socket is the one that keeps Sonicly to a single instance. It lives where only your account
 can reach it:
 
 | Platform | Socket |
 |---|---|
-| Linux | `$XDG_RUNTIME_DIR/sonora.sock`, or `$XDG_RUNTIME_DIR/app/<id>/` in Flatpak |
+| Linux | `$XDG_RUNTIME_DIR/sonicly.sock`, or `$XDG_RUNTIME_DIR/app/<id>/` in Flatpak |
 | macOS | the per-user temporary folder |
-| Windows | the named pipe `sonora.sock`, open to your account only |
+| Windows | the named pipe `sonicly.sock`, open to your account only |
 
-A debug build uses `sonora-dev.sock`, so it never talks to an installed Sonora.
+A debug build uses `sonicly-dev.sock`, so it never talks to an installed Sonicly.
 
-A Flatpak Sonora is reached from inside its sandbox, so run commands through it:
+A Flatpak Sonicly is reached from inside its sandbox, so run commands through it:
 `flatpak run <id> next`.
 
 ### Protocol
@@ -239,7 +239,7 @@ comes again on every change, on the same connection, until the command line hang
 ```
 
 `v` is `wire::VERSION`. A line of another version is refused before its body is read, so an older
-or newer Sonora never misreads a command. Bump it on any change an older Sonora would misread.
+or newer Sonicly never misreads a command. Bump it on any change an older Sonicly would misread.
 The types of `body` are `commands::Request` and `wire::Reply`; they are the contract, so a field
 is added, never renamed or removed, without a bump.
 
@@ -259,7 +259,7 @@ a file manager's launch still uses.
 Outside this crate:
 
 - `crates/state/src/control.rs` carries a `Request` out against the app's state.
-- `crates/sonora/src/single.rs` is the socket, `crates/sonora/src/console.rs` the Windows
+- `crates/sonicly/src/single.rs` is the socket, `crates/sonicly/src/console.rs` the Windows
   console, and `main.rs` calls `cli::parse` before anything else starts.
 
 The crate knows nothing of GPUI or of the app's state, so it can be built and read on its own.
@@ -278,9 +278,9 @@ The crate knows nothing of GPUI or of the app's state, so it can be built and re
 
 - **Messages through Fluent.** Errors, table headers, statuses and `--help` are in English in
   the code for now. They move to `assets/i18n/en-US/main.ftl`, in the language the running
-  Sonora uses or, for `--help` with none running, the system's.
+  Sonicly uses or, for `--help` with none running, the system's.
 
-`lyrics` answers what Sonora already holds for the track shown, on the steered device while
+`lyrics` answers what Sonicly already holds for the track shown, on the steered device while
 another is steered over Spotify Connect, and never looks anything up. Its `state` is `ready`,
 `loading`, `missing`, `instrumental`, `failed`, `disabled` when lyrics are off in the settings, or
 `idle` when nothing is loaded; only `ready` has `lines`. A synced text gives each line the time it
@@ -292,8 +292,8 @@ with `truncated` set when there were more; `current` and `next` are picked befor
 text form prints one line each, with its time when synced and its romanization under it:
 
 ```sh
-sonora lyrics
-sonora lyrics --json | jq -r .current.text
+sonicly lyrics
+sonicly lyrics --json | jq -r .current.text
 ```
 
 ```json

@@ -197,8 +197,8 @@ impl SettingsView {
                         });
                         cx.notify();
                     })),
-                Button::new("discord-button-sonora")
-                    .label(t!("settings-discord-name-sonora"))
+                Button::new("discord-button-sonicly")
+                    .label(t!("settings-discord-name-sonicly"))
                     .small()
                     .ghost()
                     .selected(sonora)

@@ -428,7 +428,7 @@ impl DeezerClient {
 
     /// Uploads a JPEG as a playlist picture and answers the token `updatePlaylist` takes.
     async fn upload_picture(&self, jwt: &str, jpeg: Vec<u8>) -> Result<String> {
-        let boundary = format!("sonora{:016x}", fastrand::u64(..));
+        let boundary = format!("sonicly{:016x}", fastrand::u64(..));
         let mut body = format!(
             "--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"cover.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
         )

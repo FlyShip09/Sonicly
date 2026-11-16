@@ -41,11 +41,11 @@ async fn apple_labels_an_ep_as_one() -> Result<()> {
 #[ignore = "needs a Subsonic server holding the EP"]
 async fn subsonic_labels_an_ep_as_one() -> Result<()> {
     let variable = |name: &str| std::env::var(name).with_context(|| format!("{name} is not set"));
-    let username = variable("SONORA_SUBSONIC_USERNAME")?;
-    let password = variable("SONORA_SUBSONIC_PASSWORD")?;
+    let username = variable("SONICLY_SUBSONIC_USERNAME")?;
+    let password = variable("SONICLY_SUBSONIC_PASSWORD")?;
     let signature = auth::sign(&username, &password);
     let client = SubsonicClient::new(
-        variable("SONORA_SUBSONIC_SERVER")?,
+        variable("SONICLY_SUBSONIC_SERVER")?,
         username,
         password,
         &signature,
@@ -61,7 +61,7 @@ async fn album_is_an_ep(provider: &dyn MusicProvider) -> Result<()> {
     let session = provider
         .restore()
         .await?
-        .with_context(|| format!("{} has no stored Sonora session", provider.name()))?;
+        .with_context(|| format!("{} has no stored Sonicly session", provider.name()))?;
     ep_is_labelled(provider.name(), session.api.as_ref()).await
 }
 

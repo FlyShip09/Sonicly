@@ -1,5 +1,5 @@
 #!/bin/bash
-# Packs Sonora's licence, the third-party notices and the font and icon licences into the
+# Packs Sonicly's licence, the third-party notices and the font and icon licences into the
 # tarball every release and nightly publishes beside its binaries.
 set -euo pipefail
 

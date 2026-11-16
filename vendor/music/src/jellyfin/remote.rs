@@ -764,7 +764,7 @@ fn kind(client: &str) -> DeviceKind {
             "desktop",
             "jellyfin mpv",
             "feishin",
-            "sonora",
+            "sonicly",
         ]
         .iter()
         .any(|name| client.contains(name)) =>

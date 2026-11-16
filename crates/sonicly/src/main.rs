@@ -99,7 +99,7 @@ fn main() -> ExitCode {
     let io = match state::Io::new() {
         Ok(io) => io,
         Err(error) => {
-            eprintln!("sonora: cannot start runtime: {error:#}");
+            eprintln!("sonicly: cannot start runtime: {error:#}");
             return ExitCode::FAILURE;
         }
     };
@@ -117,7 +117,7 @@ fn main() -> ExitCode {
         #[cfg(target_os = "macos")]
         dock::install_icon();
         if let Err(error) = assets::Assets.load_fonts(cx) {
-            log::error!("sonora: cannot load bundled fonts: {error:#}");
+            log::error!("sonicly: cannot load bundled fonts: {error:#}");
         }
 
         let database = storage::Database::standard();
@@ -134,7 +134,7 @@ fn main() -> ExitCode {
             Arc::new(music::local::LocalProvider::new(
                 dirs::cache_dir()
                     .unwrap_or_else(std::env::temp_dir)
-                    .join("sonora"),
+                    .join("sonicly"),
                 database.clone(),
                 storage::Cache::standard(),
             ));
@@ -391,7 +391,7 @@ fn open_window(cx: &mut App) {
             display_id,
             window_background: background,
             titlebar: Some(TitlebarOptions {
-                title: Some("Sonora".into()),
+                title: Some("Sonicly".into()),
                 appears_transparent: true,
                 traffic_light_position: Some(traffic_lights),
             }),
@@ -496,7 +496,7 @@ fn set_toolbar_style(window: &gpui::Window, rounding: ui::Rounding) {
             if native.toolbar().is_none() {
                 let toolbar = NSToolbar::initWithIdentifier(
                     NSToolbar::alloc(mtm),
-                    &NSString::from_str("sonora.corners"),
+                    &NSString::from_str("sonicly.corners"),
                 );
                 native.setToolbar(Some(&toolbar));
             }

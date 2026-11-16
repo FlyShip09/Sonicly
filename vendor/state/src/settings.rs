@@ -61,7 +61,7 @@ impl ConnectName {
 
     pub fn id(self) -> &'static str {
         match self {
-            Self::Sonora => "sonora",
+            Self::Sonora => "sonicly",
             Self::Both => "both",
             Self::Computer => "computer",
             Self::Custom => "custom",
@@ -70,7 +70,7 @@ impl ConnectName {
 
     pub fn key(self) -> &'static str {
         match self {
-            Self::Sonora => "settings-spotify-connect-name-sonora",
+            Self::Sonora => "settings-spotify-connect-name-sonicly",
             Self::Both => "settings-spotify-connect-name-both",
             Self::Computer => "settings-spotify-connect-name-computer",
             Self::Custom => "settings-spotify-connect-name-custom",
@@ -107,7 +107,7 @@ impl DiscordName {
 
     pub fn id(self) -> &'static str {
         match self {
-            Self::Sonora => "sonora",
+            Self::Sonora => "sonicly",
             Self::Provider => "provider",
             Self::Music => "music",
             Self::Title => "title",
@@ -119,7 +119,7 @@ impl DiscordName {
 
     pub fn key(self) -> &'static str {
         match self {
-            Self::Sonora => "settings-discord-name-sonora",
+            Self::Sonora => "settings-discord-name-sonicly",
             Self::Provider => "settings-discord-name-provider",
             Self::Music => "settings-discord-name-music",
             Self::Title => "settings-discord-name-title",
@@ -3096,7 +3096,7 @@ fn save_settings(path: &Path, bytes: &[u8], previous: Option<&[u8]>) -> Result<(
     if let Some(previous) =
         previous.filter(|previous| serde_json::from_slice::<Values>(json(previous)).is_ok())
     {
-        write_settings(&path.with_file_name("sonora.backup.json"), previous)
+        write_settings(&path.with_file_name("sonicly.backup.json"), previous)
             .context("cannot back up settings")?;
     }
     write_settings(path, bytes)
@@ -3156,7 +3156,7 @@ fn write_settings(path: &Path, bytes: &[u8]) -> Result<()> {
 fn settings_path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("sonora")
+        .join("sonicly")
         .join("settings.json")
 }
 
@@ -3532,7 +3532,7 @@ mod tests {
     fn scratch(name: &str) -> PathBuf {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         std::env::temp_dir().join(format!(
-            "sonora-{name}-{}-{}",
+            "sonicly-{name}-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ))

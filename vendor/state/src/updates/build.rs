@@ -30,10 +30,10 @@ impl Build {
                     Some(build)
                 })
                 .unwrap_or_else(|| Self {
-                    version: option_env!("SONORA_VERSION")
+                    version: option_env!("SONICLY_VERSION")
                         .unwrap_or(env!("CARGO_PKG_VERSION"))
                         .to_owned(),
-                    channel: match option_env!("SONORA_CHANNEL") {
+                    channel: match option_env!("SONICLY_CHANNEL") {
                         Some("nightly") => Channel::Nightly,
                         _ => Channel::Stable,
                     },
@@ -46,7 +46,7 @@ impl Build {
     /// Falls back to the commit compiled in through `SONORA_COMMIT` when the metadata names none.
     fn with_compiled_commit(mut self) -> Self {
         if self.commit.is_none() {
-            self.commit = option_env!("SONORA_COMMIT")
+            self.commit = option_env!("SONICLY_COMMIT")
                 .filter(|commit| !commit.is_empty())
                 .map(str::to_owned);
         }
@@ -64,10 +64,10 @@ fn metadata() -> Vec<PathBuf> {
     let Some(directory) = exe.parent() else {
         return Vec::new();
     };
-    let mut paths = vec![directory.join("sonora-build.json")];
+    let mut paths = vec![directory.join("sonicly-build.json")];
     if let Some(prefix) = directory.parent() {
-        paths.push(prefix.join("Resources/sonora-build.json"));
-        paths.push(prefix.join("lib/sonora/build.json"));
+        paths.push(prefix.join("Resources/sonicly-build.json"));
+        paths.push(prefix.join("lib/sonicly/build.json"));
     }
     paths
 }

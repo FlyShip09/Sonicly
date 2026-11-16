@@ -22,7 +22,7 @@ pub enum VeilEdge {
 /// cannot afford them, and every haze falls back to its flat colour.
 pub fn effects() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var("SONORA_BLUR").as_deref() != Ok("0"))
+    *ON.get_or_init(|| std::env::var("SONICLY_BLUR").as_deref() != Ok("0"))
 }
 
 /// A band that blurs what passes under it, at full strength along `edge` and fading to nothing

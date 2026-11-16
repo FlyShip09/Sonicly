@@ -1402,7 +1402,7 @@ fn named<'a>(entries: &[Entry], window: impl Iterator<Item = &'a Track>) -> Vec<
 
 /// Makes a fresh identity for a newly queued occurrence, never for a change of position.
 fn queue_uid() -> String {
-    format!("sonora-{:016x}", fastrand::u64(..))
+    format!("sonicly-{:016x}", fastrand::u64(..))
 }
 
 /// Keeps an anonymous Soloist occurrence stable across its next reported queue window.

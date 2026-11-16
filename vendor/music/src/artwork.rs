@@ -33,7 +33,7 @@ const UPLOAD_LIMITS: CoverLimits = CoverLimits {
 };
 /// MusicBrainz refuses a client that does not say who it is.
 const AGENT: &str = concat!(
-    "sonora/",
+    "sonicly/",
     env!("CARGO_PKG_VERSION"),
     " (https://github.com/sonorahq/sonora)"
 );
@@ -354,7 +354,7 @@ impl ArtworkSearch {
         };
         let jpeg = square_jpeg(&picture, UPLOAD_LIMITS)?;
 
-        let boundary = format!("sonora{:016x}", fastrand::u64(..));
+        let boundary = format!("sonicly{:016x}", fastrand::u64(..));
         let mut body = format!(
             "--{boundary}\r\nContent-Disposition: form-data; name=\"files[]\"; filename=\"cover.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
         )

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{credentials, escape};
 
 /// What Jellyfin's dashboard lists the session under.
-const CLIENT: &str = "Sonora";
+const CLIENT: &str = "Sonicly";
 
 /// A Jellyfin sign-in as it is kept on disk. The password is never kept: the server hands out
 /// an access token for it, and that token is what every later request carries.
@@ -23,7 +23,7 @@ pub struct Credentials {
 
 /// A fresh device id, made once per sign-in.
 pub fn device_id() -> String {
-    format!("sonora-{:016x}", fastrand::u64(..))
+    format!("sonicly-{:016x}", fastrand::u64(..))
 }
 
 /// The name this machine goes by on the server's devices page.
@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn header_names_the_client_and_carries_the_token() {
-        let header = header("desk top", "sonora-1", Some("abc123"));
+        let header = header("desk top", "sonicly-1", Some("abc123"));
         assert_eq!(
             header,
             format!(

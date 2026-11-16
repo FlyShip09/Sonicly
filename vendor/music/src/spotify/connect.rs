@@ -46,7 +46,7 @@ use crate::connect::{
     Naming, QueuedTrack, Repeat, Request as Input, Roster, Snapshot, Start,
 };
 
-const DEVICE_NAME: &str = "Sonora";
+const DEVICE_NAME: &str = "Sonicly";
 const TRACK_PREFIX: &str = "spotify:track:";
 /// The context a state names when it has none, which Spotify needs to see to keep the device
 /// active.
@@ -1792,7 +1792,7 @@ fn play_command(start: &Start, username: &str) -> Option<serde_json::Value> {
     Some(serde_json::json!({
         "endpoint": "play",
         "context": { "uri": context, "url": format!("context://{context}"), "metadata": {} },
-        "play_origin": { "feature_identifier": "sonora", "feature_version": SEMVER },
+        "play_origin": { "feature_identifier": "sonicly", "feature_version": SEMVER },
         "options": {
             "skip_to": track.map(|uri| serde_json::json!({ "track_uri": uri })),
             "seek_to": start.position.as_millis() as u64,

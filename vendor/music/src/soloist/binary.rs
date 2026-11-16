@@ -96,7 +96,7 @@ pub(crate) fn archive() -> Option<&'static str> {
 pub(crate) fn store() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonora")
+        .join("sonicly")
         .join("soloist")
 }
 
@@ -117,8 +117,8 @@ pub(crate) fn command(program: &Path) -> Command {
 /// handler it never starts anyway.
 #[cfg(target_os = "linux")]
 fn loaded(program: &Path) -> Command {
-    const LOADER: Option<&str> = option_env!("SONORA_SOLOIST_LOADER");
-    const LIBRARIES: Option<&str> = option_env!("SONORA_SOLOIST_LIBRARIES");
+    const LOADER: Option<&str> = option_env!("SONICLY_SOLOIST_LOADER");
+    const LIBRARIES: Option<&str> = option_env!("SONICLY_SOLOIST_LIBRARIES");
     let Some(loader) = LOADER else {
         return Command::new(program);
     };

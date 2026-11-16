@@ -20,7 +20,7 @@ const NIGHTLY_TITLE: &str = "Nightly ";
 /// How many leading hex digits of a commit hash the version row shows, as `git` abbreviates it.
 const SHORT_COMMIT: usize = 7;
 const AGENT: &str = concat!(
-    "sonora/",
+    "sonicly/",
     env!("CARGO_PKG_VERSION"),
     " (https://github.com/sonorahq/sonora)"
 );
@@ -345,7 +345,7 @@ async fn download(
         .error_for_status()
         .context("the update is missing")?;
 
-    let path = std::env::temp_dir().join(format!("sonora-{version}-{}", package.name));
+    let path = std::env::temp_dir().join(format!("sonicly-{version}-{}", package.name));
     let mut file = std::fs::File::create(&path).context("cannot keep the update")?;
     let mut hasher = Sha256::new();
     while let Some(chunk) = response.chunk().await.context("cannot read the update")? {

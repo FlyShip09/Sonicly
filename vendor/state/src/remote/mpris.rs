@@ -13,7 +13,7 @@ use super::{BUS_NAME, Command, DISPLAY_NAME};
 use crate::{PlaybackState, Repeat, Shelf, Sonora};
 
 /// The desktop entry a native install ships, `sonora.desktop`.
-const DESKTOP_ENTRY: &str = "sonora";
+const DESKTOP_ENTRY: &str = "sonicly";
 
 /// A change to publish on the MPRIS player, applied in the order it was sent.
 enum Update {
@@ -233,7 +233,7 @@ fn metadata(track: &Track, cover: Option<&str>, cx: &App) -> Metadata {
 fn track_id(track: &Track) -> TrackId {
     let mut hasher = DefaultHasher::new();
     track.id.as_ref().unwrap_or(&track.name).hash(&mut hasher);
-    TrackId::try_from(format!("/app/sonora/track/t{:016x}", hasher.finish()))
+    TrackId::try_from(format!("/app/sonicly/track/t{:016x}", hasher.finish()))
         .unwrap_or(TrackId::NO_TRACK)
 }
 

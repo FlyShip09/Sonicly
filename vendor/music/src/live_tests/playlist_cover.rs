@@ -14,7 +14,7 @@ use crate::tidal::TidalProvider;
 use crate::youtube::YouTubeProvider;
 use crate::{MusicApi, MusicProvider, ProviderSession, SignIn};
 
-const NAME: &str = "Sonora live cover test - safe to delete";
+const NAME: &str = "Sonicly live cover test - safe to delete";
 const VERIFY_ATTEMPTS: usize = 30;
 
 #[tokio::test]
@@ -47,11 +47,11 @@ async fn tidal_can_change_a_playlist_cover() -> Result<()> {
 #[ignore = "creates, changes, and deletes a playlist on a Navidrome server"]
 async fn navidrome_can_change_a_playlist_cover() -> Result<()> {
     let variable = |name: &str| std::env::var(name).with_context(|| format!("{name} is not set"));
-    let username = variable("SONORA_SUBSONIC_USERNAME")?;
-    let password = variable("SONORA_SUBSONIC_PASSWORD")?;
+    let username = variable("SONICLY_SUBSONIC_USERNAME")?;
+    let password = variable("SONICLY_SUBSONIC_PASSWORD")?;
     let signature = auth::sign(&username, &password);
     let client = SubsonicClient::new(
-        variable("SONORA_SUBSONIC_SERVER")?,
+        variable("SONICLY_SUBSONIC_SERVER")?,
         username,
         password,
         &signature,
@@ -64,7 +64,7 @@ async fn navidrome_can_change_a_playlist_cover() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "writes a cover into Sonora's data folder"]
+#[ignore = "writes a cover into Sonicly's data folder"]
 async fn local_can_change_a_playlist_cover() -> Result<()> {
     let folder = tempfile::tempdir()?;
     let provider = LocalProvider::new(
@@ -86,7 +86,7 @@ async fn connected(provider: &dyn MusicProvider) -> Result<ProviderSession> {
     let session = provider
         .restore()
         .await?
-        .with_context(|| format!("{} has no stored Sonora session", provider.name()))?;
+        .with_context(|| format!("{} has no stored Sonicly session", provider.name()))?;
     if !session.authenticated {
         bail!(
             "{} restored a guest session, not an account",

@@ -40,15 +40,15 @@ pub fn run<S: Read + Write>(stream: &mut S, request: &Request, format: Format) -
             ExitCode::SUCCESS
         }
         Ok(Reply::Failed(failure)) => {
-            eprintln!("sonora: {}", describe(&failure));
+            eprintln!("sonicly: {}", describe(&failure));
             ExitCode::from(FAILED)
         }
         Err(wire::Error::Closed) => {
-            eprintln!("sonora: the running Sonora did not answer; it may be older, restart it");
+            eprintln!("sonicly: the running Sonicly did not answer; it may be older, restart it");
             ExitCode::from(FAILED)
         }
         Err(error) => {
-            eprintln!("sonora: {error}");
+            eprintln!("sonicly: {error}");
             ExitCode::from(FAILED)
         }
     }
@@ -60,7 +60,7 @@ pub fn run<S: Read + Write>(stream: &mut S, request: &Request, format: Format) -
 /// nothing reads them any more, as when they go into `head`.
 fn follow<S: Read + Write>(stream: &mut S, request: &Request) -> ExitCode {
     if let Err(error) = wire::send(stream, request) {
-        eprintln!("sonora: {error}");
+        eprintln!("sonicly: {error}");
         return ExitCode::from(FAILED);
     }
     let mut reader = BufReader::new(stream);
@@ -75,12 +75,12 @@ fn follow<S: Read + Write>(stream: &mut S, request: &Request) -> ExitCode {
             }
             Ok(Reply::Done) => {}
             Ok(Reply::Failed(failure)) => {
-                eprintln!("sonora: {}", describe(&failure));
+                eprintln!("sonicly: {}", describe(&failure));
                 return ExitCode::from(FAILED);
             }
             Err(wire::Error::Closed) => return ExitCode::SUCCESS,
             Err(error) => {
-                eprintln!("sonora: {error}");
+                eprintln!("sonicly: {error}");
                 return ExitCode::from(FAILED);
             }
         }
@@ -89,7 +89,7 @@ fn follow<S: Read + Write>(stream: &mut S, request: &Request) -> ExitCode {
 
 /// Says that no Sonora runs, for a command that has nowhere to go.
 pub fn not_running() -> ExitCode {
-    eprintln!("sonora: Sonora is not running");
+    eprintln!("sonicly: Sonicly is not running");
     ExitCode::from(NOT_RUNNING)
 }
 
@@ -301,9 +301,9 @@ fn clock(seconds: u64) -> String {
 
 fn describe(failure: &Failure) -> String {
     match failure {
-        Failure::Version(v) => format!("the running Sonora speaks protocol {v}; restart it"),
+        Failure::Version(v) => format!("the running Sonicly speaks protocol {v}; restart it"),
         Failure::Malformed => {
-            "the running Sonora could not read the command; if it is older, restart it".to_owned()
+            "the running Sonicly could not read the command; if it is older, restart it".to_owned()
         }
         Failure::Unsupported => "this command is not supported yet".to_owned(),
         Failure::SignedOut => "no provider is signed in".to_owned(),
@@ -316,11 +316,11 @@ fn describe(failure: &Failure) -> String {
         Failure::Unreadable(path) => format!("cannot read '{path}'"),
         Failure::Unfetched(link) => format!("cannot fetch '{link}'"),
         Failure::UnknownProvider(slug) => {
-            format!("no provider is called '{slug}'; see `sonora providers`")
+            format!("no provider is called '{slug}'; see `sonicly providers`")
         }
         Failure::NoAccount(name) => format!("{name} has no account to switch to; sign in first"),
         Failure::SignInFailed(name) => format!("{name} did not sign in"),
-        Failure::Busy => "Sonora is busy; try again in a moment".to_owned(),
+        Failure::Busy => "Sonicly is busy; try again in a moment".to_owned(),
         Failure::FavoriteUpdateFailed => {
             "could not update the current track's favorite state".to_owned()
         }

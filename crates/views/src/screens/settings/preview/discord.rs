@@ -84,7 +84,7 @@ const BUTTON_GAP: Pixels = px(8.);
 /// How far through the track the card starts, as a share of its length, before it counts on.
 const START_SHARE: f32 = 0.3;
 /// What the status calls itself when the setting names Sonora, Discord's name for the app.
-const SONORA: &str = "Sonora";
+const SONORA: &str = "Sonicly";
 
 /// What the Discord page's preview keeps between frames.
 pub(in crate::screens::settings) struct DiscordPreview {
@@ -200,7 +200,7 @@ pub(in crate::screens::settings) fn preview(
         buttons.push(t!("settings-discord-preview-listen-on", provider = name));
     }
     if sonora_button {
-        buttons.push(t!("get-sonora"));
+        buttons.push(t!("get-sonicly"));
     }
 
     let (title, artist, album) = match hidden {
@@ -296,7 +296,7 @@ fn image(art: Option<String>, badge: Option<(&'static str, &'static str)>, cx: &
             .bg(rgb(APP_ICON))
             .child(
                 svg()
-                    .path(icons::path("icons/sonora.svg"))
+                    .path(icons::path("icons/sonicly.svg"))
                     .size(ART * APP_MARK_SHARE)
                     .text_color(rgb(APP_MARK)),
             )

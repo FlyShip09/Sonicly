@@ -9,7 +9,7 @@ use crate::{Io, Session, SessionEvent, join, version};
 
 const ENDPOINT: &str = "https://sonora-stats.nolight.dev/install";
 const AGENT: &str = concat!(
-    "sonora/",
+    "sonicly/",
     env!("CARGO_PKG_VERSION"),
     " (https://github.com/sonorahq/sonora)"
 );

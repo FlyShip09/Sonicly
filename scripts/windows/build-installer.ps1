@@ -1,6 +1,6 @@
 param(
     [string]$Version = "0.0.0",
-    [string]$Executable = "target/release/sonora.exe",
+    [string]$Executable = "target/release/sonicly.exe",
     [string]$Output = "dist"
 )
 
@@ -18,11 +18,11 @@ if (-not $iscc) {
     throw "Inno Setup 6 is not installed"
 }
 
-$env:SONORA_VERSION = $Version.TrimStart("v")
-$env:SONORA_EXE = $source.Path
-$env:SONORA_DIST = (Resolve-Path $outputPath).Path
+$env:SONICLY_VERSION = $Version.TrimStart("v")
+$env:SONICLY_EXE = $source.Path
+$env:SONICLY_DIST = (Resolve-Path $outputPath).Path
 
-& $iscc (Join-Path $PSScriptRoot "sonora.iss")
+& $iscc (Join-Path $PSScriptRoot "sonicly.iss")
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup failed with exit code $LASTEXITCODE"
 }

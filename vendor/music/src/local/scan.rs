@@ -717,7 +717,7 @@ mod tests {
     #[test]
     fn scans_ignore_new_and_previously_indexed_appledouble_files() {
         let _scanning = alone();
-        let name = "sonora-scan-test-appledouble";
+        let name = "sonicly-scan-test-appledouble";
         let (dir, index) = scratch(name);
         let track = dir.join("track.flac");
         let sidecar = dir.join("._track.flac");
@@ -762,7 +762,7 @@ mod tests {
     #[test]
     fn ignores_non_audio_files() {
         let _scanning = alone();
-        let (dir, index) = scratch("sonora-scan-test-ignore");
+        let (dir, index) = scratch("sonicly-scan-test-ignore");
         touch(&dir.join("notes.txt"));
         let scanned = scan(std::slice::from_ref(&dir), &dir, &index);
         assert!(scanned.tracks.is_empty());
@@ -772,7 +772,7 @@ mod tests {
     #[test]
     fn empty_root_yields_nothing() {
         let _scanning = alone();
-        let (dir, index) = scratch("sonora-scan-test-missing");
+        let (dir, index) = scratch("sonicly-scan-test-missing");
         let scanned = scan(std::slice::from_ref(&dir), &dir, &index);
         assert!(scanned.tracks.is_empty());
         assert!(scanned.albums.is_empty());
@@ -793,7 +793,7 @@ mod tests {
     #[test]
     fn walks_nested_folders_for_stray_audio_files() {
         let _scanning = alone();
-        let (dir, _) = scratch("sonora-scan-test-stragglers");
+        let (dir, _) = scratch("sonicly-scan-test-stragglers");
         touch(&dir.join("top.mp3"));
         touch(&dir.join("a/b/c/deep.flac"));
         touch(&dir.join("a/b/c/notes.txt"));
@@ -830,7 +830,7 @@ mod tests {
     #[test]
     fn an_album_keeps_its_release_type_across_an_index_from_before_it() {
         let _scanning = alone();
-        let name = "sonora-scan-test-release-type";
+        let name = "sonicly-scan-test-release-type";
         let (dir, index) = scratch(name);
         let album = dir.join("Sylosis/The Path");
         fs::create_dir_all(&album).unwrap();

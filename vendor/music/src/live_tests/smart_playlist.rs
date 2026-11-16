@@ -4,7 +4,7 @@ use crate::MusicApi;
 use crate::smart::{RuleGroup, SmartPlaylistUpdate, SmartRules};
 use crate::subsonic::{SubsonicClient, auth};
 
-const NAME: &str = "Sonora live smart playlist test - safe to delete";
+const NAME: &str = "Sonicly live smart playlist test - safe to delete";
 
 /// Runs against the Navidrome in `SONORA_SUBSONIC_SERVER`, signed in with
 /// `SONORA_SUBSONIC_USERNAME` and `SONORA_SUBSONIC_PASSWORD`. When
@@ -14,11 +14,11 @@ const NAME: &str = "Sonora live smart playlist test - safe to delete";
 #[ignore = "creates, changes, and deletes a smart playlist on a Navidrome server"]
 async fn navidrome_can_create_and_edit_a_smart_playlist() -> Result<()> {
     let variable = |name: &str| std::env::var(name).with_context(|| format!("{name} is not set"));
-    let server = variable("SONORA_SUBSONIC_SERVER")?;
+    let server = variable("SONICLY_SUBSONIC_SERVER")?;
     let client = connect(
         &server,
-        &variable("SONORA_SUBSONIC_USERNAME")?,
-        &variable("SONORA_SUBSONIC_PASSWORD")?,
+        &variable("SONICLY_SUBSONIC_USERNAME")?,
+        &variable("SONICLY_SUBSONIC_PASSWORD")?,
     )?;
     if !client.takes_smart_playlists().await {
         bail!("the server is not a Navidrome whose own API edits smart playlists");
@@ -142,10 +142,10 @@ async fn exercise(client: &SubsonicClient) -> Result<()> {
     // must be a regular user. The playlist is created by the primary account
     // and the edit is attempted by the second.
     if let (Ok(username), Ok(password)) = (
-        std::env::var("SONORA_SUBSONIC_OTHER_USERNAME"),
-        std::env::var("SONORA_SUBSONIC_OTHER_PASSWORD"),
+        std::env::var("SONICLY_SUBSONIC_OTHER_USERNAME"),
+        std::env::var("SONICLY_SUBSONIC_OTHER_PASSWORD"),
     ) {
-        let server = std::env::var("SONORA_SUBSONIC_SERVER")?;
+        let server = std::env::var("SONICLY_SUBSONIC_SERVER")?;
         let other = connect(&server, &username, &password)?;
         let foreign = client.create_smart_playlist(NAME, &rules).await?;
         let refused = other

@@ -48,7 +48,7 @@ const SCOPE_PAGES: i32 = 100;
 /// it again, so albums added on the server show up without a restart.
 const SCOPE_TTL: Duration = Duration::from_secs(10 * 60);
 const API_VERSION: &str = "1.16.1";
-const CLIENT_NAME: &str = "sonora";
+const CLIENT_NAME: &str = "sonicly";
 /// The first Navidrome that takes a playlist picture through its own API.
 const NAVIDROME_COVERS: (u32, u32) = (0, 61);
 /// The first Navidrome declared to take smart playlists through its own API. The create,
@@ -1070,7 +1070,7 @@ impl MusicApi for SubsonicClient {
         let (method, multipart) = match image {
             Some(image) => {
                 let jpeg = cover::square_jpeg(image, PLAYLIST_COVER)?;
-                let boundary = format!("sonora{:016x}", fastrand::u64(..));
+                let boundary = format!("sonicly{:016x}", fastrand::u64(..));
                 let mut body = format!(
                     "--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"cover.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n"
                 )
@@ -2018,7 +2018,7 @@ mod tests {
 
     use super::*;
 
-    const COVERS: &str = "https://navidrome.example/rest/getCoverArt?u=de%40ep.me&t=token&s=salt&v=1.16.1&c=sonora&f=json";
+    const COVERS: &str = "https://navidrome.example/rest/getCoverArt?u=de%40ep.me&t=token&s=salt&v=1.16.1&c=sonicly&f=json";
 
     #[test]
     fn cover_at_drops_the_size_for_the_original() {
@@ -2049,7 +2049,7 @@ mod tests {
 
     #[test]
     fn cover_at_refuses_a_foreign_url() {
-        let foreign = "https://other.example/rest/getCoverArt?u=de%40ep.me&t=token&s=salt&v=1.16.1&c=sonora&f=json&id=al-1&size=300";
+        let foreign = "https://other.example/rest/getCoverArt?u=de%40ep.me&t=token&s=salt&v=1.16.1&c=sonicly&f=json&id=al-1&size=300";
         assert_eq!(cover_url_at(COVERS, foreign, CoverSize::Full), None);
     }
 

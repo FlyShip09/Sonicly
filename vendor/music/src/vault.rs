@@ -63,7 +63,7 @@ const SALT: usize = 32;
 /// The bytes of the master key.
 pub const MASTER: usize = 32;
 /// Mixed into every key the vault derives, so a change of layout cannot read an older one.
-const VERSION: &[u8] = b"sonora vault 1";
+const VERSION: &[u8] = b"sonicly vault 1";
 /// What one track may take of the whole vault at most, as a fraction of the limit.
 const SHARE: u64 = 4;
 /// The folder inside the vault that players keeping their own files share.
@@ -1525,7 +1525,7 @@ fn footprint(path: &Path) -> u64 {
 fn pinned_root() -> PathBuf {
     dirs::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("sonora")
+        .join("sonicly")
         .join("downloads")
 }
 
