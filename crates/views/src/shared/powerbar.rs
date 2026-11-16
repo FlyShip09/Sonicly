@@ -39,8 +39,6 @@ const DROP: Pixels = px(28.);
 const ZOOM: f32 = 0.92;
 /// How hard the panel blurs as it starts to arrive.
 const BLUR: Pixels = px(18.);
-/// How hard the window behind the scrim blurs once the panel is open.
-const SCRIM_BLUR: Pixels = px(12.);
 /// How much of the page colour the scrim lays over the window.
 const SCRIM: f32 = 0.42;
 /// How hard the frost under the panel blurs what it covers.
@@ -780,10 +778,9 @@ impl Render for Powerbar {
             .id("powerbar-scrim")
             .absolute()
             .inset_0()
+            // A flat dim, not a blur: the panel is the one frosted layer, and a blurred
+            // window under it would be glass on glass.
             .bg(theme.background.opacity(SCRIM * fade))
-            .when(frosted && SCRIM_BLUR * fade > BLUR_LEAST, |this| {
-                this.backdrop_blur(SCRIM_BLUR * fade)
-            })
             .when(self.open, |this| {
                 this.occlude()
                     .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
