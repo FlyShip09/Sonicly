@@ -188,8 +188,11 @@ nobody can see needs none.
   `-ExeArgs`, all read in `crates/sonicly/src/debug.rs` and listed in its header:
   `--debug-screen=<page or overlay>` (`settings:lyrics`, `now-playing`, `lyrics`, `powerbar`),
   `--debug-theme=<kind>`, `--debug-size=<w>x<h>`, `--debug-mute`, `--debug-open=<path>`,
-  `--debug-mini=card|bar`, `--debug-drop=<path>`, `--debug-ask=<path>` and `--debug-covers`.
-  Always pass `--debug-mute` when a capture plays something.
+  `--debug-mini=card|bar`, `--debug-drop=<path>`, `--debug-ask=<path>`, `--debug-covers`, and
+  for checks of the library and of playback `--debug-folder=<path>`, `--debug-import=<playlist>`,
+  `--debug-play=<text in a track's path>` and `--debug-level=<file>` (the level of the music ahead
+  of the volume, so a muted run still shows sound). Always pass `--debug-mute` when a run plays
+  something.
 - **The owner prefers building over test runs.** Verify with `cargo fmt`, `cargo check`,
   `cargo clippy --workspace --all-targets -- -D warnings` and `cargo build -p sonicly`. Write unit
   tests for new non-UI logic; run `cargo test` only when asked.
