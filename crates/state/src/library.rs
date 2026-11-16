@@ -658,6 +658,27 @@ fn holds_pin(items: &[music::PinTarget], uri: &str) -> bool {
     items.iter().any(|item| item.uri == uri && item.pinned)
 }
 
+/// Whether a change to `shelf` has an account to land in. A guest session has none, so the
+/// provider would only refuse the request: the listener is told what signing in gives them,
+/// under the Fluent key `key`, with a button to the accounts page, and the caller sends nothing.
+/// The local shelf needs no account.
+pub fn has_account(
+    session: &Entity<Session>,
+    shelf: Shelf,
+    key: &'static str,
+    cx: &mut App,
+) -> bool {
+    let session = session.read(cx);
+    if shelf.local() || !session.guest() {
+        return true;
+    }
+    let toast = Toast::new(Outcome::Info, key)
+        .name(session.provider_name().unwrap_or_default())
+        .open("toast-sign-in", Target::ProviderSettings);
+    Toasts::post(toast, cx);
+    false
+}
+
 /// Reports whether a provider accepted a favorite update when a caller is waiting for it.
 fn finish_save(completion: Option<oneshot::Sender<bool>>, succeeded: bool) {
     if let Some(completion) = completion {
@@ -681,6 +702,10 @@ impl Library {
             return;
         };
         if S::requests(self).contains_key(&id) {
+            finish_save(completion, false);
+            return;
+        }
+        if !has_account(&self.session, Shelf::of(&id), S::GUEST, cx) {
             finish_save(completion, false);
             return;
         }
@@ -723,10 +748,14 @@ impl Library {
                         }
                         log::warn!("library: cannot update the {}: {error:#}", S::TROUBLE);
                         let key = match saved {
-                            true => "toast-library-add-failed",
-                            false => "toast-library-remove-failed",
+                            true => "toast-favorite-add-failed",
+                            false => "toast-favorite-remove-failed",
                         };
-                        Toasts::linked(Outcome::Failed, key, name, target, cx);
+                        let toast = Toast::new(Outcome::Failed, key)
+                            .name(name)
+                            .target(target)
+                            .detail(crate::blamed(&error, cx));
+                        Toasts::post(toast, cx);
                         None
                     }
                 };
@@ -882,6 +911,8 @@ trait Savable: Clone + Send + Sized + 'static {
     const TROUBLE: &'static str;
     /// The family whose toast reports this kind's removals.
     const FAMILY: Family;
+    /// The Fluent key that tells a guest what signing in would let them keep.
+    const GUEST: &'static str;
 
     fn id(&self) -> Option<&str>;
     fn title(&self) -> &str;
@@ -905,6 +936,7 @@ trait Savable: Clone + Send + Sized + 'static {
 impl Savable for Track {
     const TROUBLE: &'static str = "saved track";
     const FAMILY: Family = Family::SavedTracks;
+    const GUEST: &'static str = "toast-guest-songs";
 
     fn gone(self) -> Gone {
         Gone::SavedTrack(self)
@@ -973,6 +1005,7 @@ impl Savable for Track {
 impl Savable for Album {
     const TROUBLE: &'static str = "saved album";
     const FAMILY: Family = Family::SavedAlbums;
+    const GUEST: &'static str = "toast-guest-albums";
 
     fn gone(self) -> Gone {
         Gone::SavedAlbum(self)
@@ -1019,6 +1052,7 @@ impl Savable for Album {
 impl Savable for SavedArtist {
     const TROUBLE: &'static str = "favorite artist";
     const FAMILY: Family = Family::SavedArtists;
+    const GUEST: &'static str = "toast-guest-artists";
 
     fn gone(self) -> Gone {
         Gone::SavedArtist(self)
@@ -1582,7 +1616,7 @@ impl Library {
                     }
                     Err(error) => {
                         log::warn!("library: cannot update the library pin: {error:#}");
-                        Toasts::show(Outcome::Failed, "toast-library-pin-failed", cx);
+                        Toasts::failed("toast-library-pin-failed", None, &error, cx);
                         done(false, cx);
                     }
                 }
@@ -1908,6 +1942,9 @@ impl Library {
             return;
         }
         let shelf = Shelf::of(&id);
+        if !has_account(&self.session, shelf, "toast-guest-library", cx) {
+            return;
+        }
         let Some(client) = self.session.read(cx).client_of(shelf) else {
             return;
         };
@@ -1938,7 +1975,7 @@ impl Library {
                             true => "toast-library-add-failed",
                             false => "toast-library-remove-failed",
                         };
-                        Toasts::linked(Outcome::Failed, failed, name, None, cx);
+                        Toasts::failed(failed, Some(name.into()), &error, cx);
                     }
                 }
                 cx.notify();
@@ -2251,7 +2288,13 @@ impl Library {
                     skipped,
                 } = imported;
                 let Some(playlist) = playlist else {
-                    Toasts::about(Outcome::Failed, "toast-playlist-import-empty", name, cx);
+                    // a file that names no song at all is empty or not a playlist, which is
+                    // another thing to fix than songs that are not in the library
+                    let key = match skipped {
+                        0 => "toast-playlist-import-unreadable",
+                        _ => "toast-playlist-import-empty",
+                    };
+                    Toasts::about(Outcome::Failed, key, name, cx);
                     return;
                 };
                 let target = Some(Target::Playlist(SharedString::from(playlist.id.clone())));
@@ -2861,7 +2904,7 @@ impl Library {
             }
             Err(error) => {
                 log::warn!("library: cannot reorder a playlist: {error:#}");
-                Toasts::show(Outcome::Failed, "toast-playlist-failed", cx);
+                Toasts::failed("toast-playlist-reorder-failed", None, &error, cx);
                 self.reorders.remove(&id);
                 cx.emit(LibraryEvent::ReorderFailed(id));
             }
@@ -3370,6 +3413,10 @@ impl Library {
             on_result(self, Err(()), cx);
             return false;
         }
+        if !has_account(&self.session, shelf, "toast-guest-playlists", cx) {
+            on_result(self, Err(()), cx);
+            return false;
+        }
         let Some(client) = self.session.read(cx).client_of(shelf) else {
             log::warn!("library: cannot {action} while signed out");
             Toasts::show(Outcome::Failed, "toast-playlist-signed-out", cx);
@@ -3403,11 +3450,13 @@ impl Library {
                     }
                     Err(error) => {
                         log::warn!("library: cannot {action}: {error:#}");
-                        let key = match music::cover::unusable(&error) {
-                            Some(unusable) => cover_problem(unusable),
-                            None => "toast-playlist-failed",
-                        };
-                        Toasts::show(Outcome::Failed, key, cx);
+                        // a picture that cannot be a cover has words of its own that say why
+                        match music::cover::unusable(&error) {
+                            Some(unusable) => {
+                                Toasts::show(Outcome::Failed, cover_problem(unusable), cx)
+                            }
+                            None => Toasts::failed("toast-playlist-failed", None, &error, cx),
+                        }
                         for id in invalidated {
                             cx.emit(LibraryEvent::PlaylistChanged(id));
                         }

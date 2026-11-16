@@ -249,7 +249,8 @@ impl SettingsView {
         if let Err(error) = kept {
             log::warn!("settings: cannot keep the library choice: {error:#}");
             Toasts::post(
-                Toast::new(Outcome::Failed, "toast-subsonic-library-failed"),
+                Toast::new(Outcome::Failed, "toast-subsonic-library-failed")
+                    .detail(format!("{error:#}")),
                 cx,
             );
             return;

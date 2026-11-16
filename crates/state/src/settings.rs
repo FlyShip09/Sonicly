@@ -54,6 +54,8 @@ use crate::{Hit, Outcome, Repeat, Sonicly, Toasts};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ConnectName {
+    // the name builds from before the rename wrote, as with `DiscordName`
+    #[serde(alias = "sonora")]
     Sonicly,
     #[default]
     Both,
@@ -1700,10 +1702,11 @@ impl AppSettings {
         let directory = themes_path(&self.path);
         if let Err(error) = themes::remove(&family, &directory) {
             log::warn!("settings: cannot delete theme {id}: {error:#}");
-            Toasts::about(
+            Toasts::with_detail(
                 Outcome::Failed,
                 "toast-theme-delete-failed",
-                family.name,
+                Some(family.name.into()),
+                format!("{error:#}"),
                 cx,
             );
             return false;
