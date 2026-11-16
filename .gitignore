@@ -1,0 +1,6 @@
+/target
+/.targets
+/reference
+/vendor/gpui
+/dist
+__pycache__/
