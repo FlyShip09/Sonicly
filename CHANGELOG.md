@@ -22,8 +22,13 @@ one line about what someone using Sonicly can now do.
 - Resting on an artist's or album's name shows a small card with its cover, a line of facts from the service and a play button.
 - The player bar and Now playing show what really plays, such as "FLAC 44.1 kHz / 16 bit" or "AAC 256 kbps", with every detail in its tooltip.
 - `sonicly --json current` describes the stream that plays under `stream`: codec, sample rate, bit depth of a lossless file, channels and bit rate of a lossy one, each only when the decoder, the file or the service reported it.
+- Sonicly opens on its mark settling bar by bar, then the sidebar, page and player bar come in; if your account takes longer to restore, the mark waits with it for up to a few seconds.
+- The play button and the playing row show a ring while a song is still being fetched, and only when the wait is long enough to notice.
+- A thin line runs under the title bar while a page waits on the network, and the sidebar counts the songs a library scan has read.
 
 ### Changed
+
+- Loading placeholders share one slow, soft sweep of light instead of each pulsing on its own.
 
 - The window has Sonicly's own look: a neutral frame on the system material, one type scale, covers with an edge, and album, playlist and song pages washed with the cover's colour.
 - A calmer desktop look: soft charcoal and white pages, a full-height sidebar whose highlight glides between rows, the page running up under the title bar, bold page titles, 13 px text by default, grouped settings, inset list rows and a player bar that floats above the page.

@@ -654,3 +654,61 @@ Newest last. One entry per decision: what was chosen, and why.
       and 0.7 to 0.9 s over three runs (131 MB and 0.7 s before, one run). Home draws one more
       block while a song plays, and the badge redraws the bar once when a track's stream is
       known.
+52. **The opening (M12).** At process start only (a static flag; a window reopened from the
+    tray, a theme change and the mini player never play it, and reduced motion skips it), the
+    window opens on the page colour with Sonicly's mark in its middle, drawn from five rounded
+    quads on the icon's 14-unit grid (spans 3–8, 0–8, 2–12, 6–14, 6–11, 5 px a unit). The bars
+    rise from dots one after another, 55 ms apart, each on a closed-form spring of 0.42 s with
+    a 0.22 bounce, like a level meter settling. Once the mark has settled (560 ms) and the
+    account is restored, it shrinks by 12% and fades over 220 ms, the mark ahead of the page
+    colour, while the shell arrives: sidebar from the left, then the page, then the player bar
+    from below, 60 ms apart, 8 px of travel and a fade over 240 ms each (`chrome::opening`).
+    The real interface is built under the mark from the first frame; the mark takes the
+    pointer only while it covers the shell. If the restore takes longer, the bars move gently
+    as a quiet meter for as long as it does, and after 3 s the shell comes regardless. The
+    welcome screen gets the same opening and its card arrives as the page does. The shell
+    parts are drawn uncached for the stagger's frames only, since a cached view replays the
+    opacity it was first painted with. Sheets: `docs/screenshots/m12/opening-ready.png`,
+    `opening-mark.png` (the bars close up), `opening-held.png` (`--debug-hold-start=2500`),
+    `opening-welcome.png`. Moving between the welcome screen and the workspace either way
+    plays the same stagger; that move itself was not caught on a sheet.
+53. **Waiting looks one way (M12).**
+    - **Placeholders.** `ui::Skeleton` no longer pulses each placeholder on its own clock: one
+      soft band of light (the text colour at 6% over the fill, 160 px soft sides) crosses the
+      window every 1.8 s, painted only where it passes over a placeholder, so every skeleton
+      on screen shares the one sweep. It asks for frames only while a placeholder is drawn and
+      holds still with motion reduced. The skeletons themselves were not reworked: Home,
+      album, playlist, artist, table and search placeholders keep their existing shapes, and
+      Home still shows Quick picks' skeleton for a guest whose feed then has none, which is a
+      shift. Skeleton-to-content stays as it was: shelves surface through the cascade and
+      covers fade in over their skeleton; text that replaces a skeleton still swaps in.
+    - **Spinner.** `ArrowRing::spinner` is the one inline spinner: a short arc going round a
+      faint track in a theme colour, at any `size`, still with motion reduced. `after_wait`
+      shows it only after 150 ms of work, fading in, so a quick answer shows nothing.
+    - **Buffering.** While the song wanted playing is being fetched or a seek is filling
+      (`PlaybackState::Loading`; the engine reports no other stall), the play button in the
+      player bar, the mini player and Now Playing (`transport::toggle`) and the playing row's
+      leading cell in every track table ring after 150 ms. A card's play button does not ring
+      yet. `PlaybackStatus` carries the buffering flag so a table redraws when it ends.
+      `--debug-hold-buffering=<ms>` holds the ring up for a capture, since a local song loads
+      inside the wait (`buffering-bar.png`).
+    - **Page-load line.** Pages that fetch say so through `ui::PageEdge::set_loading` (Home,
+      album and playlist, artist); after 200 ms of waiting the title bar runs a 2 px stretch,
+      30% of its width, along its foot in the accent colour every 1.2 s, and fades it out over
+      the quick span when the data lands. Local pages answer inside the delay and show nothing
+      (`page-load-line.png`, a guest's Home then an artist page).
+    - **Library scan.** The sidebar's foot carries a line while a scan runs: the plain ring,
+      filling as files are read, and "146 of 10000 songs", or while the folders are still being
+      walked and there is no total, the songs found so far with the ring turning. Every number
+      is the scan's own (`music::progress`). Seen counting on the 10,000-track library before
+      its wording was shortened to fit the sidebar; the final wording was not caught, since a
+      warm file cache now finishes that scan under the opening.
+    - **Not done:** pending states in place on buttons that start work (Play on a hero, Save,
+      Follow, Add folder, Import playlist, Download), a sign-in waiting on the browser,
+      opening and closing the mini player window, and a loading region announced as busy
+      beyond the opening's and the scan line's progress roles.
+    - Cost, Home at 1080x1080 on `.targets/media`, debug, same profile: first window 832–840 ms
+      after process start (874–893 before); working set at 8 s 126–127 MB (118–120 before);
+      CPU from 12 s to 42 s idle 0.1 s (0.2 before), with a song playing 0.9–1.1 s over three
+      runs (0.6–0.9 before over three). The rise in working set is the opening's frames having
+      been drawn uncached and the sweep's state; nothing runs once the shell is in.
