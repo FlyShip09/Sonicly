@@ -198,6 +198,34 @@ Not seen: the hover card (debug pointer moves raise no hover surface), the menus
 Cost, Home at 1080x1080 on the test library, debug: 119 MB idle and 0.2 s of CPU between 12 s
 and 42 s after start; 129-130 MB and 0.7-0.9 s with a track playing.
 
+## Opening and loading (M12)
+
+Built: at process start the window opens on the page colour with the five-bar mark drawn from
+quads; the bars rise one after another, the mark shrinks and fades, and the sidebar, page and
+player bar arrive in a short stagger. The real interface is built underneath from the first
+frame. If the account restore runs long the bars keep moving, and the shell comes regardless
+after 3 s. It plays at process start only and not under reduced motion. Also: a buffering ring
+on play controls after 150 ms of loading, a soft sweep over skeletons while something loads, a
+thin line under the title bar while a page's fetch is in flight, the scan's real counts at the
+foot of the sidebar, and the same stagger between the welcome screen and the app
+(`docs/DESIGN.md` 52-53).
+
+Seen by the lead: the opening's frame sequence in the merged build (the bars build, the mark
+fades as the sidebar appears, the full app follows, nothing jumps). Seen by the engineer on
+sheets: the held opening, the welcome-screen opening, the buffering ring, the page-load line,
+a guest's Home going from skeleton to content, and the scan counting 146, 537, 806 on the
+10,000-track library.
+
+Cost, Home at 1080x1080 on the test library, debug: first window 832-840 ms after start
+(874-893 ms before), working set 126-127 MB at 8 s (118-120 MB before; the 7 MB rise is not
+explained), idle CPU 0.1 s between 12 s and 42 s, 0.9-1.1 s with a track playing.
+
+Not done: pending states on buttons that start work (Play on a hero, Save, Follow, Add
+folder, Import, Download), a ring on card play buttons, a sign-in spinner, a transition for
+the mini player window. A guest's Home shows a Quick picks skeleton that then disappears,
+which shifts the layout. Not seen: the welcome-to-app move on a sheet, the buffering ring on a
+truly slow stream.
+
 ## Errors pass
 
 Started from the owner's own log, then a hunt through the app without an account.
