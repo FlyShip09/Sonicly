@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
 use gpui::{
-    AnyElement, App, Bounds, ElementId, Hsla, PathBuilder, Pixels, Point, Window, canvas,
+    AnimationExt as _, App, Bounds, ElementId, Hsla, PathBuilder, Pixels, Point, Window, canvas,
     ease_in_out, point, px,
 };
 
@@ -50,7 +50,12 @@ pub struct ArrowRing {
     color: Option<Hsla>,
     arrow: Option<Hsla>,
     backdrop: Option<Hsla>,
+    size: Pixels,
+    waits: bool,
 }
+
+/// How long work runs before a ring that waits shows, so a quick answer shows nothing.
+pub const WAIT: Duration = Duration::from_millis(150);
 
 impl ArrowRing {
     /// A ring `done` of the way round, from 0 to 1, or turning when `None`.
@@ -61,7 +66,29 @@ impl ArrowRing {
             color: None,
             arrow: None,
             backdrop: None,
+            size: SIZE,
+            waits: false,
         }
+    }
+
+    /// The thin turning ring alone, the app's spinner for an inline wait: a short arc going
+    /// round a faint track in `color`, still when motion is reduced.
+    pub fn spinner(id: impl Into<ElementId>, color: Hsla) -> Self {
+        Self::new(id, None).plain().color(color)
+    }
+
+    /// Draws the ring `size` across instead of an icon's size, such as around a play button.
+    pub fn size(mut self, size: Pixels) -> Self {
+        self.size = size;
+        self
+    }
+
+    /// Shows the ring only once it has been drawn for `WAIT`, fading it in, so work that
+    /// answers at once shows nothing. Draw it only while the work runs: the wait counts from
+    /// its first frame.
+    pub fn after_wait(mut self) -> Self {
+        self.waits = true;
+        self
     }
 
     /// The colour of the filled part of the ring, and of the arrow unless `arrow` sets its own.
@@ -103,7 +130,8 @@ impl RenderOnce for ArrowRing {
             backdrop: self.backdrop,
         };
         let animates = motion::animates(cx);
-        let sweep = window.use_keyed_state((self.id, "sweep"), cx, |_, _| Sweep::new(self.done));
+        let sweep =
+            window.use_keyed_state((self.id.clone(), "sweep"), cx, |_, _| Sweep::new(self.done));
         let frame = sweep.update(cx, |sweep, _| sweep.step(self.done, animates));
         let fades = look.backdrop.is_some() && frame.closed;
         if frame.moving || (fades && frame.shown > 0.) {
@@ -113,7 +141,22 @@ impl RenderOnce for ArrowRing {
             true => ease_in_out(frame.shown),
             false => 1.,
         };
-        mark(frame.arc, look.fade(shown))
+        let drawn = mark(frame.arc, look.fade(shown), self.size);
+        if !self.waits {
+            return drawn.into_any_element();
+        }
+        let fade = motion::Motion::Quick.span();
+        let total = WAIT + fade;
+        drawn
+            .with_animation(
+                (self.id, "wait"),
+                gpui::Animation::new(total),
+                move |ring, done| {
+                    let at = total.as_secs_f32() * done - WAIT.as_secs_f32();
+                    ring.opacity((at / fade.as_secs_f32()).clamp(0., 1.))
+                },
+            )
+            .into_any_element()
     }
 }
 
@@ -286,14 +329,13 @@ struct Arc {
     sweep: f32,
 }
 
-fn mark(arc: Arc, look: Look) -> AnyElement {
+fn mark(arc: Arc, look: Look, size: Pixels) -> impl IntoElement + Styled {
     canvas(
         |_, _, _| {},
         move |bounds, _, window, _| paint(bounds, arc, look, window),
     )
-    .size(SIZE)
+    .size(size)
     .flex_none()
-    .into_any_element()
 }
 
 /// Draws the mark into `bounds`. Over a backdrop the empty part of the ring is left out.

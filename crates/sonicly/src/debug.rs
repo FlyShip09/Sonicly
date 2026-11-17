@@ -41,6 +41,9 @@
 //!   `none` means no audio has been pulled yet.
 //! - `--debug-hold-start=<ms>` keeps the app reading as not ready for that long after start, so
 //!   the opening's mark shows its waiting state. The mark gives way after 3 s regardless.
+//! - `--debug-hold-buffering=<ms>` keeps the play controls showing their buffering ring for
+//!   that long after start while a song is wanted playing, since a local song loads before the
+//!   ring's wait is over. Only the ring is held; playback itself is untouched.
 //! - `--debug-at=<ms>:<step>` does `<step>` that many milliseconds after the window opens, so a
 //!   capture can catch motion. It may be given more than once. A step is a pointer event at
 //!   window coordinates in logical pixels (`move:x,y`, `down:x,y`, `up:x,y`, `click:x,y`,
@@ -80,6 +83,7 @@ pub struct Launch {
     level: Option<PathBuf>,
     steps: Vec<(Duration, String)>,
     hold: Option<Duration>,
+    buffering: Option<Duration>,
 }
 
 /// How often `--debug-level` writes a line, and `--debug-import` looks whether the scan is over.
@@ -117,6 +121,9 @@ pub fn take(args: Vec<OsString>) -> (Vec<OsString>, Launch) {
                 "--debug-hold-start" => {
                     launch.hold = value.parse().ok().map(Duration::from_millis);
                 }
+                "--debug-hold-buffering" => {
+                    launch.buffering = value.parse().ok().map(Duration::from_millis);
+                }
                 "--debug-at" => {
                     if let Some((at, step)) = value.split_once(':')
                         && let Ok(at) = at.parse()
@@ -147,6 +154,9 @@ impl Launch {
     pub fn start(&self, start: Destination, cx: &mut App) -> Destination {
         if let Some(hold) = self.hold {
             views::hold_opening(std::time::Instant::now() + hold, cx);
+        }
+        if let Some(hold) = self.buffering {
+            views::hold_buffering(std::time::Instant::now() + hold, cx);
         }
         let settings = Sonicly::global(cx).settings.clone();
         if let Some(theme) = self.theme.clone() {

@@ -7,7 +7,7 @@ use gpui::{AnyElement, App, ElementId, Entity, Global, SharedString, div};
 use i18n::t;
 use state::{Elsewhere, Playback, Repeat, Sonicly};
 use ui::Tipped as _;
-use ui::{ActiveTheme as _, Button, Perch, Side, Text, tabular};
+use ui::{ActiveTheme as _, ArrowRing, Button, Perch, Side, Text, tabular};
 
 use crate::shared::ambient;
 
@@ -197,22 +197,33 @@ pub(crate) fn transport(playback: &Entity<Playback>, big: bool, cx: &App) -> imp
         .child(repeat(playback, frosted, cx))
 }
 
-pub(crate) fn toggle(playback: &Entity<Playback>, big: bool, frosted: bool, cx: &App) -> Button {
+pub(crate) fn toggle(
+    playback: &Entity<Playback>,
+    big: bool,
+    frosted: bool,
+    cx: &App,
+) -> AnyElement {
+    let theme = *cx.theme();
     let held = playback.read(cx);
     let steered = steered(cx);
     let playing = steered
         .as_ref()
         .map_or_else(|| held.wants_playing(), |remote| remote.state.playing);
     let idle = held.track().is_none() && steered.is_none();
+    let buffering = buffering(playback, cx);
     let playback = playback.clone();
 
     let (icon, tooltip) = match playing {
         true => ("icons/pause.svg", "play-pause"),
         false => ("icons/play.svg", "play-resume"),
     };
+    let reach = match big {
+        true => theme.metrics.control,
+        false => theme.metrics.control_small,
+    };
 
     // One id for both states, so the button keeps its press and swaps one icon for the other.
-    Button::new("play-pause")
+    let button = Button::new("play-pause")
         .ghost()
         .when(frosted, Button::frosted)
         .when(!big, Button::small)
@@ -221,7 +232,58 @@ pub(crate) fn toggle(playback: &Entity<Playback>, big: bool, frosted: bool, cx: 
         .disabled(idle)
         .on_click(move |_, _, cx| {
             playback.update(cx, |playback, cx| playback.toggle_play(cx));
+        });
+
+    // A song still being fetched, or a seek still filling, rings the button once the wait is
+    // long enough to notice, and a song that starts at once shows nothing.
+    div()
+        .relative()
+        .flex_none()
+        .child(button)
+        .when(buffering, |this| {
+            this.child(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        ArrowRing::spinner("play-pause-buffering", theme.foreground)
+                            .size(reach)
+                            .after_wait(),
+                    ),
+            )
         })
+        .into_any_element()
+}
+
+/// Whether the song the player holds is wanted playing but has no sound yet: being fetched,
+/// or filling after a seek. Another device's playback is never this app's to wait on.
+pub(crate) fn buffering(playback: &Entity<Playback>, cx: &App) -> bool {
+    let held = playback.read(cx);
+    let shown = held.is_loading()
+        || cx
+            .try_global::<HeldBuffering>()
+            .is_some_and(HeldBuffering::on);
+    steered(cx).is_none() && shown && held.wants_playing()
+}
+
+/// Keeps the buffering ring up until a moment, for a debug run that wants to see it on a
+/// local song, whose fetch is over before the ring's wait.
+struct HeldBuffering(std::time::Instant);
+
+impl HeldBuffering {
+    fn on(&self) -> bool {
+        std::time::Instant::now() < self.0
+    }
+}
+
+impl Global for HeldBuffering {}
+
+/// Holds the buffering ring up until `until`, for debug captures only.
+pub fn hold_buffering(until: std::time::Instant, cx: &mut App) {
+    cx.set_global(HeldBuffering(until));
 }
 
 fn shuffle(playback: &Entity<Playback>, frosted: bool, cx: &App) -> Button {
