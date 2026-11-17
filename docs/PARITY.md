@@ -46,5 +46,10 @@ running Sonicly.
 | UI | Floating mini player | Built; seen on Windows in captures, again in the merged build; macOS and Linux not run |
 | UI | Drag files onto the window to import | Built; drag-over state and question seen through debug launch flags, a real system drag not yet tried |
 | UI | Drawn covers for Favorites, Local Music, Recents | Built; seen in captures |
+| UI | Home: Continue listening, Recently played (decision 46) | Not in upstream; built. Seen on Windows: Continue listening held at a real position and playing (local and YouTube Music guest), Recently played from a guest's history, at 600, 1080 and 1440 wide. Local-only libraries keep no history, so they show neither Recently played nor a restored song |
+| UI | Album and playlist pages in two columns when wide (decision 47) | Not in upstream; built; seen at 1080 and 1440, dark and light, stacked at 600 |
+| UI | Artist page sections: albums, singles and EPs, appears on (decision 48) | Rebuilt as rails; seen for a guest's artist and local artists. Related artists not drawn: the provider data has none |
+| UI | Hover card on artist and album names (decision 49) | Not in upstream; built; not seen, needs a real pointer |
+| UI | Quality badge from the decoded stream (decision 50) | Not in upstream; built; seen for FLAC, ALAC and AAC in the player bar and Now playing |
 | UI | Welcome screen with three ways in (this computer, a service, no account) | Not in upstream; first run, the drop sheet over it and the landing in the library seen in captures; the folder picker not opened |
 | UI | Quiet coloured covers for albums, artists and songs without art | Not in upstream; built; seen in captures, real embedded art still wins |

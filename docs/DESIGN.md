@@ -558,3 +558,99 @@ Newest last. One entry per decision: what was chosen, and why.
       asked for, not the codec, sample rate, bit depth and bitrate decoded, and drawing the
       request would be the fake the owner ruled out. The engine needs to report those (a
       read-only `Playback::stream_info()` fed from `music::engine`), which is outside this branch.
+46. **Home opens on what you were doing (M11).** Top to bottom, every block from real data and
+    none drawn when its data is not there. Captures in `docs/screenshots/m11/` (`after-home-*`).
+    - **Continue listening** (`screens/home/resume.rs`): the song the player holds, playing or
+      held where the last session left it, as one sheet up to four covers wide: cover, title
+      (linking to its album), artists, and the play or pause button, which goes through
+      `state::Playback`. The heading reads "Now playing" while it plays. A held song shows a
+      thin line at its real position and "1:12 of 3:40"; a playing one shows its length alone,
+      because `Playback` only reports the position on events and a line that stood still while
+      the song ran would be false. A live line would redraw all of Home every tick (a child
+      view notifying dirties every ancestor), which is the cost the player bar's `Timeline` was
+      split out to avoid. While an account is still being restored with a saved song, a
+      skeleton of the same size holds the place, so the page does not jump when it lands.
+    - **Recently played** (`History::recent_items`): the play log, newest first, each album
+      once (built from what the play recorded: id, name, cover, the song's artists, since a play
+      does not keep the album's own credit) and a song with no album as itself, up to 15. The
+      song Continue listening shows is left out of it. Like the feed, it is taken again only
+      while Home is out of sight, so a song started from Home does not reshuffle the shelf in
+      view. The history keeps plays only for a signed-in account (`History::scope`), so a
+      local-only library has no Recently played and no restored song after a relaunch (the
+      restore also needs a provider slug, `Playback::adopt`). Changing either is a state-layer
+      decision, listed as a request rather than made here.
+    - Quick picks follow, then the provider's shelves. Quick picks that came back empty no
+      longer say "Like a few songs…" above shelves that are full; the line stays for a page with
+      nothing else on it. A signed-out library with no music folder shows the folder vacancy
+      with its Add folder button in place of both.
+    - Shelf arrows now page by whole cards: a page is as many cards as fit between the insets,
+      and every page starts on a card's edge (`shelves::slide`). Trackpad scrolling is free as
+      before.
+47. **Albums and playlists in two columns when wide (M11).** From `Room::Wide` of content (740 px,
+    so the owner's 1080 px window with its sidebar qualifies) the hero stands in a column of its
+    own, 1.75 covers wide (2 at `Room::Vast`): the cover across its top, the title wrapping onto
+    up to three lines at the page-title size, the facts and the actions under it. It stays in
+    view while the table scrolls beside it in the page's own scroller, and scrolls by itself
+    only when it is taller than the window. The cover's wash runs behind both columns from the
+    page's top. The title bar's compact title has nothing to do here, since the title never
+    leaves the screen; the hairline under the bar still follows the table's scroll. Narrower, the
+    page is stacked as before (`after-album-dark-600.png`). `PageHero::stacked` is the one new
+    builder.
+48. **Artist pages draw only what the artist has (M11).** The releases grid with its filter
+    pills and show-all toggle gave way to rails, as on Home: Albums (albums, compilations and
+    the rest) and Singles and EPs, each drawn only when the artist has one, then Appears on.
+    About the artist is drawn only when the provider has a biography; its stock line for an
+    artist with none is no longer shown. A local artist's songs are headed "Songs", not
+    "Popular", since nothing ranks them, and its facts line counts its albums and songs in the
+    library; a provider's keeps listeners and followers. The filler eyebrow over Popular
+    ("Explore this artist") is gone. Related artists are not drawn: `music::Artist` carries
+    none, and the provider modules are outside this branch.
+49. **A hover card on names (M11, shadcn's Hover Card).** `ui::HoverCarded::hover_card` is the
+    one primitive, on gpui's hoverable tooltip: it shows after 500 ms of rest, the pointer can
+    cross a 6 px strip that belongs to the card onto it, it leaves 500 ms after the pointer has
+    left both (gpui's own hide delay), and a scroll, a press outside it or a drag puts it away
+    for the rest of that hover. It rises 4 px and fades in over the quick span. What it holds is
+    `chrome::PeekCard`: the cover, the name, one line of facts from the provider's own overview
+    (listeners or followers for an artist; a local artist's album and song counts; an album's
+    kind, year and song count) and a play button. The overview comes through the session's
+    catalog (`state::Peek`), so the card and the page it opens share one fetch and one cache;
+    until it lands the card shows the name and cover the link came with and a skeleton where
+    the facts go, and an overview the provider refuses leaves the kind of thing it is. Every
+    artist link (`cells::artist_links`: table rows, card captions, album heroes) and the player
+    bar's artists carry it, and so does a row's album cell. Not seen on screen: the debug
+    pointer steps raise neither tooltips nor hover cards (a plain button tooltip does not show
+    under them either), so the card needs a real pointer to check.
+50. **The quality badge (M11).** Now that `Playback::stream_info` reports what the engine really
+    decodes, the player bar (classic and stacked layouts) and Now Playing draw a quiet outlined
+    badge after the title: the codec with the rate and depth of a lossless stream ("FLAC
+    44.1 kHz / 16 bit", "ALAC 48 kHz / 16 bit") or the bit rate of a lossy one ("AAC 131 kbps"),
+    with every known fact in its tooltip and for screen readers. Nothing is drawn when the
+    engine reports nothing, and no word like "Lossless" or "Hi-Res" is added: the numbers say
+    it. The centred bar layout leaves it out, since its title keeps equal room either side.
+51. **Motion and menus from Magic UI and shadcn, restrained (M11).**
+    - The queue and lyrics sidebar slides in 24 px from the window's edge and fades in over the
+      quick span as it opens; the page takes its width at once, so only the sidebar draws while
+      it moves. Closing is immediate. Resizing both sidebars by their edge, with widths kept in
+      settings between set limits, and the overlay scrollbars that show on scroll and hover and
+      fade (decisions 39 and earlier) were already there and were left as they are.
+    - `ui::Ticker` (Magic UI's Number Ticker): a count that changes in place runs to its new
+      value over up to 320 ms in tabular figures, and screen readers hear only the value it
+      lands on. Used for an album's or playlist's song count. Not used for the running clock.
+    - `ArrowRing::plain`: the library scan in Settings shows a ring that fills as files are
+      read, and turns while the walk has no total yet. Downloads already had the ring.
+    - Not built: a blur-fade, since gpui blurs images and backdrops but not an arbitrary
+      element, and the toast stack already enters with a fade and a move (decision 45); queue
+      additions entering one at a time. A theme change already cross-fades every colour over
+      320 ms (`Theme::fade`), from the theme cards and the adaptive switch alike, so nothing was
+      added.
+    - Menus: `MenuItem::shortcut` lines a shortcut up at the row's end in the quiet key caps,
+      and `MenuItem::destructive` colours a removal's label and icon with the theme's danger
+      colour. Remove from playlist and Remove from history carry both (the Delete key does the
+      same on their tables); Delete playlist and Delete file are marked destructive. No other
+      menu item has a shortcut that really does it where the menu opens, so none was invented.
+      No breadcrumb was added: no page has a parent it sits inside, only pages it links to.
+    - Cost, Home at 1080x1080 on `.targets/media`, debug, fresh profile: idle 119 MB at 8 s and
+      0.2 s of CPU from 12 s to 42 s (125 MB and 0.1 s before); with a song playing 129 to 130 MB
+      and 0.7 to 0.9 s over three runs (131 MB and 0.7 s before, one run). Home draws one more
+      block while a song plays, and the badge redraws the bar once when a track's stream is
+      known.
