@@ -39,6 +39,8 @@ one line about what someone using Sonicly can now do.
 
 ### Fixed
 
+- With local files alone and no account, Sonicly now keeps a play history and brings the last song back, paused where it stopped, on the next start.
+- An artist without a biography says so instead of showing a stock sentence.
 - Opening the song Sonicly was restoring from the last run no longer leaves it paused at 0:00.
 - Commands sent from a terminal reach the running Sonicly on Windows.
 - A playlist that names a file split by a cue sheet imports every track of it.

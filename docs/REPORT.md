@@ -169,6 +169,35 @@ Cost of the new look, Home at 1080x1080 on the test library, one run each: 114 M
 and after; CPU between 12 s and 42 s after start 0.3 s before, 0.1 s after; with a track
 playing 131 MB and 0.6 s before, 126 MB and 0.7 s after.
 
+## Layout, components and the last motion items (M10, M11)
+
+Built: a seek bar that swells under the pointer, clipped titles that scroll once on hover, a
+queue row that closes its gap, a compact title in the title bar on scrolled album, artist and
+playlist pages, a hairline under the title bar once a page has scrolled, quick search answers
+grouped by kind, slim pinned rows; Home opening with Continue listening and Recently played;
+album and playlist pages in two columns when wide; artist pages as rails (Albums, Singles and
+EPs, Appears on) drawn only for data that exists; a hover card on artist and album names; the
+queue panel sliding in; a count that runs to its new value; a scan ring; a quality badge drawn
+from the stream the engine reports; shortcut and destructive styling in menus
+(`docs/DESIGN.md` 43-51). Patterns were read from shadcn/ui and Magic UI and rebuilt with
+Sonicly's own elements; Magic UI's glows, particles and shine borders were left out on purpose.
+
+Seen by the lead in the merged build: the compact title appearing and leaving on a scrolled
+album page (frame sequence); Home with Continue listening, Recently played and real shelves
+(YouTube Music as a guest); the two-column album page at 1440 wide; the artist page's rails;
+after a relaunch with local files alone, the last song back paused at 0:10 of 0:18 with the
+badge reading `FLAC 44.1 kHz / 16 bit`, and the play recorded in the history.
+
+Found in that review and fixed: with local files alone there was no play history and no
+restored song (both were keyed to a signed-in service); an artist without a biography showed a
+stock sentence, which now says no biography is available.
+
+Not seen: the hover card (debug pointer moves raise no hover surface), the menus' new look
+(the debug steps cannot right-click), grouped quick search on screen, shelf snapping.
+
+Cost, Home at 1080x1080 on the test library, debug: 119 MB idle and 0.2 s of CPU between 12 s
+and 42 s after start; 129-130 MB and 0.7-0.9 s with a track playing.
+
 ## Errors pass
 
 Started from the owner's own log, then a hunt through the app without an account.
