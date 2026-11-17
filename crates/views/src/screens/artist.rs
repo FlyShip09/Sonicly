@@ -1007,6 +1007,8 @@ impl Render for ArtistView {
         self.cover_viewer.update(cx, |viewer, cx| {
             viewer.close_if_stale(owner.as_deref(), cover.as_deref(), window, cx)
         });
+        let fetching = self.detail.read(cx).is_loading() || self.detail.read(cx).is_filling();
+        ui::PageEdge::set_loading(fetching, cx);
         if let Some(failure) = self.failure(cx) {
             return div()
                 .id("artist-failure")

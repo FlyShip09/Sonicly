@@ -12,7 +12,7 @@ use ui::{
 };
 
 use crate::chrome::{
-    AppNotice, Chrome, PlayerBar, SidebarLeft, SidebarRight, SwipeCue, TitleBarOptions,
+    AppNotice, Chrome, PlayerBar, SidebarLeft, SidebarRight, SwipeCue, TitleBarOptions, opening,
 };
 use crate::shared::menus::CardMenu;
 use crate::shells::Shell;
@@ -186,9 +186,21 @@ impl Render for Workspace {
         // closed one hides itself and takes no space at all.
         let sidebar_width = self.sidebar.read(cx).occupied_width();
         let edged = sidebar_width > Pixels::ZERO || overlay_width > Pixels::ZERO;
-        let sidebar = match overlay || sidebar_width == gpui::Pixels::ZERO {
-            true => self.sidebar.clone().into_any_element(),
-            false => self
+        // While the opening hands over, the sidebar, the page and the player bar arrive one
+        // after another. Each is drawn uncached for those frames, since a cached view replays
+        // the opacity it was first painted with.
+        let arrival = opening::arrival(cx);
+        if arrival.is_some() {
+            window.request_animation_frame();
+        }
+        let sidebar = match (overlay || sidebar_width == gpui::Pixels::ZERO, arrival) {
+            (true, _) => self.sidebar.clone().into_any_element(),
+            (false, Some(parts)) => {
+                opening::arriving(div().flex_none().w(sidebar_width).h_full(), parts[0], true)
+                    .child(self.sidebar.clone())
+                    .into_any_element()
+            }
+            (false, None) => self
                 .sidebar
                 .clone()
                 .cached(StyleRefinement::default().w(sidebar_width).h_full())
@@ -227,12 +239,27 @@ impl Render for Workspace {
         // rendered uncached. Every screen sizes its root `size_full`, so the layout
         // is the one the cache would have used, and only the frames of the
         // transition pay for the render.
-        let content = match (dissolving && hidden > 0.) || !self.cached {
-            true => self.content.clone().into_any_element(),
-            false => self
+        let content = match ((dissolving && hidden > 0.) || !self.cached, arrival) {
+            (_, Some(parts)) => {
+                opening::arriving(div().flex().flex_col().size_full(), parts[1], false)
+                    .child(self.content.clone())
+                    .into_any_element()
+            }
+            (true, None) => self.content.clone().into_any_element(),
+            (false, None) => self
                 .content
                 .clone()
                 .cached(StyleRefinement::default().size_full())
+                .into_any_element(),
+        };
+        let player_bar = match arrival {
+            Some(parts) => opening::arriving(div().w_full().h(bar_height), parts[2], false)
+                .child(self.player_bar.clone())
+                .into_any_element(),
+            None => self
+                .player_bar
+                .clone()
+                .cached(StyleRefinement::default().w_full().h(bar_height))
                 .into_any_element(),
         };
 
@@ -366,11 +393,7 @@ impl Render for Workspace {
                 div()
                     .relative()
                     .when(underlap, |bar| bar.absolute().left_0().right_0().bottom_0())
-                    .child(
-                        self.player_bar
-                            .clone()
-                            .cached(StyleRefinement::default().w_full().h(bar_height)),
-                    ),
+                    .child(player_bar),
             )
             // Deferred so the cards sit above the sidebars' resize grips. The root draws the
             // dialogs after the shell, so those still cover them.

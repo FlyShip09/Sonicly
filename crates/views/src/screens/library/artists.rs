@@ -90,7 +90,7 @@ impl ArtistSource {
             playback.play_origin(origin.clone(), cx)
         });
 
-        cells::index(cell, playing, true, None, None, press, cx)
+        cells::index(cell, playing, false, true, None, None, press, cx)
     }
 
     pub(super) fn at(&self, row: usize, cx: &App) -> Option<SavedArtist> {

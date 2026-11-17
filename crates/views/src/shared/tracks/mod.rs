@@ -43,12 +43,19 @@ const SETTLED: f32 = 0.5;
 
 /// The current track, its `Playback::control` and its queue origin. A screen keeps the last
 /// status and redraws only when it changes, including a move between collections of the same song.
-pub(crate) type PlaybackStatus = (Option<String>, Option<bool>, Option<Origin>);
+/// The last field is whether that track is still being fetched, which rings its row.
+pub(crate) type PlaybackStatus = (Option<String>, Option<bool>, Option<Origin>, bool);
 
 pub(crate) fn playback_status(playback: &Entity<Playback>, cx: &App) -> PlaybackStatus {
+    let buffering = crate::shared::transport::buffering(playback, cx);
     let playback = playback.read(cx);
     let track = playback.track().and_then(|track| track.id.clone());
-    (track, playback.control(), playback.origin(cx).cloned())
+    (
+        track,
+        playback.control(),
+        playback.origin(cx).cloned(),
+        buffering,
+    )
 }
 pub(crate) trait Tracks: 'static {
     fn tracks<'a>(&self, cx: &'a App) -> Joined<'a, Track>;
@@ -487,7 +494,10 @@ impl TrackSource {
 
         let number = self.number(track, cx);
 
-        cells::index(cell, playing, playable, number, preload, press, cx)
+        // the row that started a song still being fetched rings in place of its glyph
+        let waiting =
+            playing == Some(true) && crate::shared::transport::buffering(&self.playback, cx);
+        cells::index(cell, playing, waiting, playable, number, preload, press, cx)
     }
 
     fn title_cell(

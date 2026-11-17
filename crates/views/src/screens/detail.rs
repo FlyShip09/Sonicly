@@ -909,6 +909,8 @@ impl Render for DetailView {
         self.cover_viewer.update(cx, |viewer, cx| {
             viewer.close_if_stale(owner.as_deref(), cover.as_deref(), window, cx)
         });
+        // the title bar draws a thin line while the page waits on the network for long
+        ui::PageEdge::set_loading(self.detail.read(cx).is_loading(), cx);
         if let Some(failure) = self.failure(cx) {
             return div()
                 .id("detail-failure")

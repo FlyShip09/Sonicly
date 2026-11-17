@@ -95,9 +95,13 @@ impl RenderOnce for Face {
 /// The transport cell at the head of a row. `number` is the label the row rests at; `None`
 /// counts the rows, which is what a list with no numbering of its own wants. `playing` is the
 /// row's `Playback::control`, `None` for a row that is not the current one.
+/// A row's leading cell: its number, or the playing glyph on the row that plays, with the
+/// play control under the pointer. `waiting` rings the playing row while its song is fetched.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn index<F>(
     cell: &Cell<F>,
     playing: Option<bool>,
+    waiting: bool,
     playable: bool,
     number: Option<SharedString>,
     preload: Option<Tap>,
@@ -118,6 +122,11 @@ pub(crate) fn index<F>(
             .into_any_element()
     };
     let resting = match playing {
+        Some(true) if waiting => div()
+            .id(("index-waiting", cell.row))
+            .group_hover(ROW_GROUP, |style| style.invisible())
+            .child(ui::ArrowRing::spinner(("index-ring", cell.row), theme.foreground).after_wait())
+            .into_any_element(),
         Some(true) => dimmed(PLAYING, theme.foreground),
         Some(false) => dimmed(PAUSE, theme.muted_foreground),
         None => div()

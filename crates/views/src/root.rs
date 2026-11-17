@@ -182,6 +182,8 @@ pub struct Root {
     navigation_transition: Option<Task<()>>,
     /// The entrance the shell plays as the window moves from one shell to another.
     shell_entrance: Option<Entrance>,
+    /// The mark the window opens on at process start, until the shell has arrived.
+    opening: Option<crate::chrome::Opening>,
     /// How much of the fullscreen player its opening still hides, springing from 1 as it opens
     /// to 0, where it lets go. The player fades in as it zooms up from a little smaller.
     shell_zoom: Option<Sprung>,
@@ -414,6 +416,7 @@ impl Root {
             pending: None,
             navigation_transition: None,
             shell_entrance: None,
+            opening: crate::chrome::Opening::begin(cx),
             shell_zoom: None,
             shell_leave: None,
             shell_left: false,
@@ -1189,6 +1192,11 @@ impl Render for Root {
             SessionState::Restoring | SessionState::SignedIn(_) | SessionState::Offline(_) => false,
             SessionState::Authorizing(_) => self.signing_in,
         };
+        // Moving between the welcome screen and the workspace, either way, brings the new one in
+        // with the same stagger the opening ends on, rather than swapping it in at once.
+        if self.signing_in != show_sign_in && self.opening.is_none() && !cx.reduce_motion() {
+            crate::chrome::opening::arrive(cx);
+        }
         self.signing_in = show_sign_in;
         self.drop_zone
             .update(cx, |zone, _| zone.whole_window(show_sign_in));
@@ -1225,6 +1233,21 @@ impl Render for Root {
 
         let theme = *cx.theme();
         window.set_rem_size(theme.font_size);
+        // The app is ready to hand over once the account is restored; the shell under the mark
+        // is built and live all along.
+        let ready = !self.session.read(cx).is_pending();
+        let opening = self
+            .opening
+            .as_mut()
+            .and_then(|opening| opening.step(ready, cx));
+        match opening.is_some() {
+            true => window.request_animation_frame(),
+            false => self.opening = None,
+        }
+        let arrived = crate::chrome::opening::arrival(cx).map(|parts| parts[1]);
+        if arrived.is_some() && show_sign_in {
+            window.request_animation_frame();
+        }
         let appearance = ui::backdrop(theme.blur_window, theme.transparent, ui::material(cx));
         if self.background != Some(appearance) {
             self.background = Some(appearance);
@@ -1538,7 +1561,12 @@ impl Render for Root {
             .when(ambient, |this| this.child(self.ambient.clone()))
             // The sign-in screen fills the whole window, under the bar.
             .when(show_sign_in, |this| {
-                this.child(div().absolute().inset_0().child(self.login.clone()))
+                let login = div().absolute().inset_0();
+                let login = match arrived {
+                    Some(arrived) => crate::chrome::opening::arriving(login, arrived, false),
+                    None => login,
+                };
+                this.child(login.child(self.login.clone()))
             })
             // The bar only changes when it is told to, so a frame drawn for the lyrics or the
             // progress bar replays it rather than building it again.
@@ -1555,7 +1583,10 @@ impl Render for Root {
         // A closed menu or dialog fades out here, over everything else in the window.
         let root = root
             .child(ui::lingers())
-            .children(crate::chrome::cover_specimens(window, cx));
+            .children(crate::chrome::cover_specimens(window, cx))
+            .when_some(opening, |root, frame| {
+                root.child(crate::chrome::opening::overlay(&frame, &theme))
+            });
         #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         let root = root.child(WindowFrame::new());
         root
