@@ -63,6 +63,12 @@ library-not-loaded = Your library did not load
 library-scanning = Looking through your folders…
 library-scanning-found = Looking through your folders… { $found } so far
 library-scanning-progress = Reading your music… { $read } of { $found }
+scan-line-reading = { $read } of { $found } songs
+scan-line-found = { $found ->
+        [one] { $found } song found
+       *[other] { $found } songs found
+    }
+scan-line-walking = Looking for music…
 library-part-not-loaded = This part of your library did not load
 library-local-unconfigured = Add a folder of music to start your library
 drop-add-library = { $count ->
