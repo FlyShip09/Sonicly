@@ -355,6 +355,7 @@ impl HomeView {
 
 impl Render for HomeView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        ui::PageEdge::set_loading(self.is_loading(cx), cx);
         if let Some(failure) = self.failure(cx) {
             return div()
                 .id("home-failure")
