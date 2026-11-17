@@ -396,7 +396,6 @@ song-content = コンテンツ
 song-explicit = 露骨な表現あり
 song-clean = 露骨な表現なし
 artist-about = アーティストについて
-artist-about-fallback = アーティストの人気曲やリリースを見てみましょう。
 artist-about-open = アーティストを表示
 song-copyright = © { $notice }
 

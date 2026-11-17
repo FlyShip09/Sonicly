@@ -429,7 +429,6 @@ song-content = Përmbajtja
 song-explicit = Eksplicite
 song-clean = E pastër
 artist-about = Rreth artistit
-artist-about-fallback = Eksploro këngët dhe publikimet popullore të artistit.
 artist-about-open = Shko te artisti
 song-copyright = © { $notice }
 

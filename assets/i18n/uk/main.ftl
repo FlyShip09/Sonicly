@@ -447,7 +447,6 @@ song-content = Контент
 song-explicit = Ненормативна лексика
 song-clean = Без обмежень
 artist-about = Про виконавця
-artist-about-fallback = Послухайте популярні треки та релізи виконавця.
 artist-about-open = Перейти до виконавця
 song-copyright = © { $notice }
 

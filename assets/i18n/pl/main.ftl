@@ -447,7 +447,6 @@ song-content = Treść
 song-explicit = Wulgaryzmy
 song-clean = Bez wulgaryzmów
 artist-about = O wykonawcy
-artist-about-fallback = Poznaj popularne utwory i wydawnictwa tego wykonawcy.
 artist-about-open = Przejdź do wykonawcy
 song-copyright = © { $notice }
 

@@ -429,7 +429,6 @@ song-content = Inhalt
 song-explicit = Explizit
 song-clean = Jugendfrei
 artist-about = Über den Künstler
-artist-about-fallback = Entdecke die beliebten Songs und Veröffentlichungen des Künstlers.
 artist-about-open = Zum Künstler
 song-copyright = © { $notice }
 

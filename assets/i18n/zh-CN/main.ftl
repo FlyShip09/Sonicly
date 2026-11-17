@@ -429,7 +429,6 @@ song-content = 内容
 song-explicit = 露骨内容
 song-clean = 干净版
 artist-about = 关于歌手
-artist-about-fallback = 探索这位歌手的热门歌曲和发行作品。
 artist-about-open = 前往歌手
 song-copyright = © { $notice }
 
