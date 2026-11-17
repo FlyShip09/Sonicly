@@ -533,7 +533,7 @@ impl Queue {
         let resume = self
             .session
             .read(cx)
-            .provider_slug()
+            .home_slug()
             .filter(|_| !self.blank())
             .map(|slug| {
                 record(

@@ -705,7 +705,12 @@ impl Playback {
                 };
                 this.rebind(playback, cx);
             }
-            SessionEvent::SignedOut => this.teardown(cx),
+            SessionEvent::SignedOut => {
+                this.teardown(cx);
+                // signed out with a music folder set is local files alone, which restore the
+                // last run's queue as an account does at sign-in
+                this.adopt(cx);
+            }
             // The online engine gives way to the one that plays downloads, picking the current
             // track up where it was. A provider with none stops streaming altogether.
             SessionEvent::WentOffline => match session.read(cx).playback() {
@@ -2353,7 +2358,7 @@ impl Playback {
         if self.track.is_some() || !self.queue.read(cx).is_empty() {
             return;
         }
-        let Some(slug) = self.session.read(cx).provider_slug() else {
+        let Some(slug) = self.session.read(cx).home_slug() else {
             return;
         };
         let Some(resume) = self

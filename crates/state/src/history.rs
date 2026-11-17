@@ -272,8 +272,18 @@ impl History {
     ) -> Self {
         cx.subscribe(&session, |this, _, event, cx| match event {
             SessionEvent::SignedIn | SessionEvent::Reconnected => this.refresh(cx),
-            SessionEvent::SignedOut => this.reset(cx),
-            SessionEvent::WentOffline | SessionEvent::LocalChanged => {}
+            SessionEvent::SignedOut => {
+                this.reset(cx);
+                if this.scope(cx).is_some() {
+                    this.refresh(cx);
+                }
+            }
+            SessionEvent::LocalChanged => {
+                if this.tracks.is_empty() && this.session.read(cx).local_only() {
+                    this.refresh(cx);
+                }
+            }
+            SessionEvent::WentOffline => {}
         })
         .detach();
         cx.subscribe(&playback, |this, _, event, cx| match event {
@@ -624,11 +634,15 @@ impl History {
 
     fn scope(&self, cx: &Context<Self>) -> Option<String> {
         let session = self.session.read(cx);
-        let SessionState::SignedIn(profile) = session.state() else {
-            return None;
-        };
-        let provider = session.provider_slug()?;
-        Some(format!("{provider}:{}", profile.id))
+        match session.state() {
+            SessionState::SignedIn(profile) => {
+                let provider = session.provider_slug()?;
+                Some(format!("{provider}:{}", profile.id))
+            }
+            // local files alone keep a history of their own
+            _ if session.local_only() => Some(format!("{}:files", session.local_slug())),
+            _ => None,
+        }
     }
 
     fn reset(&mut self, cx: &mut Context<Self>) {
