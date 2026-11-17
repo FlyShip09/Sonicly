@@ -119,6 +119,12 @@ impl Opening {
     }
 }
 
+/// Starts the shell's staggered arrival now, as when the welcome screen gives way to the
+/// workspace or comes back after a sign-out.
+pub(crate) fn arrive(cx: &mut App) {
+    cx.set_global(Arrival(Instant::now()));
+}
+
 /// Holds the opening's mark up until `until`, for a debug run.
 pub fn hold_opening(until: Instant, cx: &mut App) {
     cx.set_global(Held(until));

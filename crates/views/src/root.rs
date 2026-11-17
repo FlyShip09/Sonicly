@@ -1192,6 +1192,11 @@ impl Render for Root {
             SessionState::Restoring | SessionState::SignedIn(_) | SessionState::Offline(_) => false,
             SessionState::Authorizing(_) => self.signing_in,
         };
+        // Moving between the welcome screen and the workspace, either way, brings the new one in
+        // with the same stagger the opening ends on, rather than swapping it in at once.
+        if self.signing_in != show_sign_in && self.opening.is_none() && !cx.reduce_motion() {
+            crate::chrome::opening::arrive(cx);
+        }
         self.signing_in = show_sign_in;
         self.drop_zone
             .update(cx, |zone, _| zone.whole_window(show_sign_in));
@@ -1240,6 +1245,9 @@ impl Render for Root {
             false => self.opening = None,
         }
         let arrived = crate::chrome::opening::arrival(cx).map(|parts| parts[1]);
+        if arrived.is_some() && show_sign_in {
+            window.request_animation_frame();
+        }
         let appearance = ui::backdrop(theme.blur_window, theme.transparent, ui::material(cx));
         if self.background != Some(appearance) {
             self.background = Some(appearance);
