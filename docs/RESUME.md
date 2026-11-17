@@ -85,8 +85,11 @@ powershell -ExecutionPolicy Bypass -File scripts/shot.ps1 -Exe target/release/so
   subsystem, Sonicly icon, version resource 0.1.0), the zip 30.1 MB. Home at
   1080x1080 after 8 s, YouTube Music guest: 145 MB working set, 150 MB private,
   0.9 s CPU, first window 716 ms after process start. One run, not an average.
-- **Built from the final branch on 2026-11-16:** the portable zip (30.5 MB) and
-  the installer (23.4 MB, compiled with the owner's Inno Setup 6, never run).
+- **Built from the final branch on 2026-11-16 (after M12):** the portable zip
+  (30.6 MB) and the installer (22.4 MB, compiled with the owner's Inno Setup 6).
+  The release exe shows its first window 659 ms after start on a first run, at
+  111 MB working set. The owner has installed an earlier build of the same day
+  to `%LOCALAPPDATA%\Programs\Sonicly`; the lead has not run the installer.
 - **Not built:** any macOS or Linux package, an arm64 build. Nothing is
   code-signed, so SmartScreen will warn on first run.
 - **Not seen:** the star rows and switch under Settings, About; the star button
