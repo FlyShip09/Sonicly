@@ -39,6 +39,8 @@
 //!   and the loudest band of the music in dBFS, heard ahead of the equalizer and the volume, so
 //!   a muted run can still show that sound reaches the output chain. `-200.0` is silence, and
 //!   `none` means no audio has been pulled yet.
+//! - `--debug-hold-start=<ms>` keeps the app reading as not ready for that long after start, so
+//!   the opening's mark shows its waiting state. The mark gives way after 3 s regardless.
 //! - `--debug-at=<ms>:<step>` does `<step>` that many milliseconds after the window opens, so a
 //!   capture can catch motion. It may be given more than once. A step is a pointer event at
 //!   window coordinates in logical pixels (`move:x,y`, `down:x,y`, `up:x,y`, `click:x,y`,
@@ -77,6 +79,7 @@ pub struct Launch {
     play_ids: Vec<String>,
     level: Option<PathBuf>,
     steps: Vec<(Duration, String)>,
+    hold: Option<Duration>,
 }
 
 /// How often `--debug-level` writes a line, and `--debug-import` looks whether the scan is over.
@@ -111,6 +114,9 @@ pub fn take(args: Vec<OsString>) -> (Vec<OsString>, Launch) {
                     launch.play_ids = value.split(',').map(str::to_owned).collect();
                 }
                 "--debug-level" => launch.level = Some(PathBuf::from(value)),
+                "--debug-hold-start" => {
+                    launch.hold = value.parse().ok().map(Duration::from_millis);
+                }
                 "--debug-at" => {
                     if let Some((at, step)) = value.split_once(':')
                         && let Ok(at) = at.parse()
@@ -139,6 +145,9 @@ impl Launch {
     /// fullscreen panel. Returns the page to open on, the one `--debug-screen` names by its
     /// address or `start` otherwise.
     pub fn start(&self, start: Destination, cx: &mut App) -> Destination {
+        if let Some(hold) = self.hold {
+            views::hold_opening(std::time::Instant::now() + hold, cx);
+        }
         let settings = Sonicly::global(cx).settings.clone();
         if let Some(theme) = self.theme.clone() {
             settings.update(cx, |settings, cx| settings.set_theme(theme, cx));

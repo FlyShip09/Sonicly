@@ -349,6 +349,7 @@ queue-return-playing = Back to now playing
 
 # player bar
 player-nothing-playing = Nothing playing
+opening-busy = Opening Sonicly
 player-percent = { $value }%
 player-shuffle = Shuffle
 player-repeat = Repeat
