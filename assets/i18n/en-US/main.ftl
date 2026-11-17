@@ -367,6 +367,14 @@ mini-player-bar = Fold into a bar
 mini-player-card = Show the cover
 player-time-left = -{ $time }
 player-time-left-spoken = { $time } left
+quality-rate = { $rate } kHz
+quality-depth = { $bits } bit
+quality-kbps = { $kbps } kbps
+quality-channels = { $count ->
+        [1] Mono
+        [2] Stereo
+       *[other] { $count } channels
+    }
 devices-this-computer = This computer
 devices-jam-join = Join a Jam…
 devices-jam-join-title = Join a Jam
