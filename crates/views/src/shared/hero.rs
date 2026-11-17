@@ -27,6 +27,8 @@ const ACTION_SKELETON: Pixels = px(96.);
 const COVER_GAP: Rems = rems(1.25);
 /// The space between the buttons in a row of hero actions.
 pub(crate) const ACTION_GAP: Rems = rems(0.5);
+/// How many lines a stacked hero's title wraps onto before it is clipped.
+const STACKED_LINES: usize = 3;
 /// The name a clickable hero cover is seen under, for the cover viewer to fly from and back to.
 pub(crate) const COVER_FLIGHT: &str = "hero-cover";
 
@@ -373,6 +375,8 @@ pub(crate) struct PageHero {
     pin: Option<Pin>,
     pending: bool,
     washed: bool,
+    /// The width of the column a stacked hero stands in, with its cover across the top.
+    stacked: Option<Pixels>,
 }
 
 impl PageHero {
@@ -395,7 +399,16 @@ impl PageHero {
             pin: None,
             pending: false,
             washed: false,
+            stacked: None,
         }
+    }
+
+    /// Stands the hero in a column `width` wide: the cover across its top and the title, facts
+    /// and actions under it, the title wrapping onto a few lines rather than clipped. A stacked
+    /// hero draws no wash of its own, since its page washes behind both of its columns.
+    pub(crate) fn stacked(mut self, width: Pixels) -> Self {
+        self.stacked = Some(width);
+        self
     }
 
     /// The width a hero `width` wide leaves beside its cover for the title and the actions.
@@ -506,7 +519,7 @@ impl RenderOnce for PageHero {
         let wash = self
             .cover
             .as_deref()
-            .filter(|_| self.washed && !self.pending)
+            .filter(|_| self.washed && !self.pending && self.stacked.is_none())
             .and_then(|cover| Some((cover, ui::cover_palette(cover, cx)?.primary?)))
             .map(|(cover, tint)| {
                 let reach = theme.metrics.inset + crate::chrome::Chrome::margin(window, cx);
@@ -519,7 +532,12 @@ impl RenderOnce for PageHero {
                 )
             });
 
-        let art = theme.metrics.cover;
+        let art = self.stacked.unwrap_or(theme.metrics.cover);
+        let stacked = self.stacked.is_some();
+        let title_size = match stacked {
+            true => Text::Title,
+            false => Text::Display,
+        };
         let drag_start = self.drag_start.map(Rc::from);
         let starter = drag_start.clone();
         let cover_click: Option<Rc<CoverHandler>> = self.cover_click.map(Rc::from);
@@ -529,9 +547,10 @@ impl RenderOnce for PageHero {
                 .id(self.id)
                 .flex()
                 .flex_none()
-                .items_end()
-                .gap(COVER_GAP)
-                .pb_6()
+                .map(|this| match stacked {
+                    true => this.flex_col().gap_5(),
+                    false => this.items_end().gap(COVER_GAP).pb_6(),
+                })
                 .child(
                     Skeleton::new()
                         .flex_none()
@@ -545,16 +564,15 @@ impl RenderOnce for PageHero {
                         .flex_col()
                         .flex_1()
                         .min_w_0()
-                        .h(art)
-                        .justify_end()
+                        .when(!stacked, |this| this.h(art).justify_end())
                         .gap_2()
                         .line_height(relative(LEADING))
                         .children(self.eyebrow.map(|eyebrow| eyebrow_label(eyebrow, cx)))
                         .child(
-                            skeleton_line(theme.text(Text::Display)).child(
+                            skeleton_line(theme.text(title_size)).child(
                                 Skeleton::new()
-                                    .w(TITLE_SKELETON)
-                                    .h(theme.text(Text::Display)),
+                                    .w(TITLE_SKELETON.min(art))
+                                    .h(theme.text(title_size)),
                             ),
                         )
                         .child(
@@ -575,9 +593,10 @@ impl RenderOnce for PageHero {
             .relative()
             .flex()
             .flex_none()
-            .items_end()
-            .gap(COVER_GAP)
-            .pb_6()
+            .map(|this| match stacked {
+                true => this.flex_col().gap_5(),
+                false => this.items_end().gap(COVER_GAP).pb_6(),
+            })
             .children(wash)
             .child({
                 let artwork = match (self.cover, self.generated) {
@@ -637,8 +656,7 @@ impl RenderOnce for PageHero {
                     .flex_col()
                     .flex_1()
                     .min_w_0()
-                    .h(art)
-                    .justify_end()
+                    .when(!stacked, |this| this.h(art).justify_end())
                     .gap_2()
                     .line_height(relative(LEADING))
                     .children(self.eyebrow.map(|eyebrow| eyebrow_label(eyebrow, cx)))
@@ -648,10 +666,10 @@ impl RenderOnce for PageHero {
                             .items_center()
                             .gap_3()
                             .min_w_0()
-                            .text_size(theme.text(Text::Display))
-                            .line_height(relative(Text::Display.leading()))
-                            .letter_spacing(Text::Display.tracking())
-                            .font_weight(ui::title_weight(Text::Display))
+                            .text_size(theme.text(title_size))
+                            .line_height(relative(title_size.leading()))
+                            .letter_spacing(title_size.tracking())
+                            .font_weight(ui::title_weight(title_size))
                             .child(
                                 div()
                                     .id((self.id.clone(), "title"))
@@ -659,8 +677,10 @@ impl RenderOnce for PageHero {
                                     .aria_level(1)
                                     .aria_label(self.title.clone())
                                     .min_w_0()
-                                    .truncate()
-                                    .tails()
+                                    .map(|this| match stacked {
+                                        true => this.line_clamp(STACKED_LINES),
+                                        false => this.truncate().tails(),
+                                    })
                                     .when(!self.title.is_empty(), |this| {
                                         this.tip_label(self.title.clone(), Perch::Below)
                                     })
@@ -693,7 +713,7 @@ impl RenderOnce for PageHero {
 /// the hero's foot and reaching `reach` past it on either side to the page's edges. It fades in
 /// over the slow motion span, keyed by its cover so a new cover washes in again, and appears at
 /// once with motion reduced.
-fn wash(cover: &str, color: Hsla, reach: Pixels, above: Pixels, cx: &App) -> AnyElement {
+pub(crate) fn wash(cover: &str, color: Hsla, reach: Pixels, above: Pixels, cx: &App) -> AnyElement {
     let wash = div()
         .absolute()
         .top(-above)

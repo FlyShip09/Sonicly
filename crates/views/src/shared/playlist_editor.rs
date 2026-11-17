@@ -56,6 +56,13 @@ impl PlaylistEditor {
     }
 
     pub fn open(edit: Edit, window: &mut Window, cx: &mut App) {
+        // A guest hears that a playlist needs an account before typing a name for one.
+        let session = Sonicly::global(cx).session.clone();
+        if let Edit::Create { shelf, .. } = &edit
+            && !state::has_account(&session, *shelf, "toast-guest-playlists", cx)
+        {
+            return;
+        }
         let editor = Self::entity(cx);
         editor.update(cx, |this, cx| this.show(edit, window, cx));
     }

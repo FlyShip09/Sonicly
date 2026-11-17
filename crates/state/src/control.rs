@@ -237,6 +237,13 @@ impl Control {
             reply.send(Reply::Done).ok();
             return;
         }
+        // A guest's like would only be refused by the provider, so the answer names the cause.
+        let session = self.session.read(cx);
+        if !shelf.local() && session.guest() {
+            let name = session.provider_name().unwrap_or_default().to_owned();
+            reply.send(Reply::Failed(Failure::NeedsAccount(name))).ok();
+            return;
+        }
         let completed = self
             .library
             .update(cx, |library, cx| library.save_track(track, wanted, cx));
@@ -516,6 +523,12 @@ impl Control {
         cx: &mut Context<Self>,
     ) {
         let session = self.session.read(cx);
+        // The session remembers the provider it last used even after it signed out, and that
+        // one is not current: nothing plays from it until someone signs in again.
+        let live = !matches!(
+            session.state(),
+            SessionState::SignedOut | SessionState::Failed(_)
+        );
         let value = match command {
             ProviderCommand::List => Value::Providers(
                 session
@@ -523,12 +536,12 @@ impl Control {
                     .map(|info| wire::Provider {
                         slug: info.slug.to_owned(),
                         stored: info.stored,
-                        current: info.active,
+                        current: info.active && live,
                     })
                     .collect(),
             ),
             ProviderCommand::Current(None) => {
-                Value::Provider(session.provider_slug().map(str::to_owned))
+                Value::Provider(session.provider_slug().filter(|_| live).map(str::to_owned))
             }
             ProviderCommand::Current(Some(slug)) => return self.switch(slug, reply, cx),
         };
@@ -670,6 +683,12 @@ fn session(command: SessionCommand, cx: &mut App) -> Reply {
         }
         SessionCommand::Start if !listening.read(cx).available(cx) => {
             return Reply::Failed(Failure::SignedOut);
+        }
+        // The app says this in a toast, which whoever typed the command never sees.
+        SessionCommand::Start | SessionCommand::Join(Some(_))
+            if !listening.read(cx).has_server(cx) =>
+        {
+            return Reply::Failed(Failure::NoSessionsServer);
         }
         SessionCommand::Start => listening.update(cx, |listening, cx| listening.start(cx)),
         SessionCommand::Join(Some(code)) => {
@@ -857,6 +876,15 @@ fn current(playback: &Playback, cx: &App) -> Option<Current> {
         provider,
         liked: id.is_some_and(|id| sonicly.library.read(cx).saved(id)),
         origin: playback.origin(cx).map(wire_origin),
+        stream: playback.stream_info(cx).map(|stream| {
+            Box::new(wire::Stream {
+                codec: stream.codec.map(str::to_owned),
+                sample_rate: stream.sample_rate,
+                bit_depth: stream.bit_depth,
+                channels: stream.channels,
+                bitrate: stream.kbps,
+            })
+        }),
     })
 }
 
@@ -876,7 +904,15 @@ fn queue_snapshot(playback: &Playback, cx: &App) -> QueueSnapshot {
         .filter_map(|at| entry(QueuePosition::Past(at)))
         .collect();
     let current = match view.sections.current {
-        true => entry(QueuePosition::Current),
+        true => entry(QueuePosition::Current).map(|mut entry| {
+            // The queue keeps a track as it was listed, which may carry no length. The player
+            // learns the real one as it opens the track, and `sonicly current` prints that.
+            let playing = playback.shown_track(cx);
+            if let Some(playing) = playing.filter(|playing| playing.id == entry.track.id) {
+                entry.track.duration = playing.duration.as_secs();
+            }
+            entry
+        }),
         false => None,
     };
     let upcoming = (0..view.sections.upcoming)

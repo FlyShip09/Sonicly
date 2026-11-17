@@ -429,7 +429,6 @@ song-content = Konten
 song-explicit = Eksplisit
 song-clean = Versi Bersih
 artist-about = Tentang artis
-artist-about-fallback = Jelajahi lagu populer dan rilisan dari artis ini.
 artist-about-open = Buka profil artis
 song-copyright = © { $notice }
 

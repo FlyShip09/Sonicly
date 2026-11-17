@@ -169,6 +169,100 @@ Cost of the new look, Home at 1080x1080 on the test library, one run each: 114 M
 and after; CPU between 12 s and 42 s after start 0.3 s before, 0.1 s after; with a track
 playing 131 MB and 0.6 s before, 126 MB and 0.7 s after.
 
+## Layout, components and the last motion items (M10, M11)
+
+Built: a seek bar that swells under the pointer, clipped titles that scroll once on hover, a
+queue row that closes its gap, a compact title in the title bar on scrolled album, artist and
+playlist pages, a hairline under the title bar once a page has scrolled, quick search answers
+grouped by kind, slim pinned rows; Home opening with Continue listening and Recently played;
+album and playlist pages in two columns when wide; artist pages as rails (Albums, Singles and
+EPs, Appears on) drawn only for data that exists; a hover card on artist and album names; the
+queue panel sliding in; a count that runs to its new value; a scan ring; a quality badge drawn
+from the stream the engine reports; shortcut and destructive styling in menus
+(`docs/DESIGN.md` 43-51). Patterns were read from shadcn/ui and Magic UI and rebuilt with
+Sonicly's own elements; Magic UI's glows, particles and shine borders were left out on purpose.
+
+Seen by the lead in the merged build: the compact title appearing and leaving on a scrolled
+album page (frame sequence); Home with Continue listening, Recently played and real shelves
+(YouTube Music as a guest); the two-column album page at 1440 wide; the artist page's rails;
+after a relaunch with local files alone, the last song back paused at 0:10 of 0:18 with the
+badge reading `FLAC 44.1 kHz / 16 bit`, and the play recorded in the history.
+
+Found in that review and fixed: with local files alone there was no play history and no
+restored song (both were keyed to a signed-in service); an artist without a biography showed a
+stock sentence, which now says no biography is available.
+
+Not seen: the hover card (debug pointer moves raise no hover surface), the menus' new look
+(the debug steps cannot right-click), grouped quick search on screen, shelf snapping.
+
+Cost, Home at 1080x1080 on the test library, debug: 119 MB idle and 0.2 s of CPU between 12 s
+and 42 s after start; 129-130 MB and 0.7-0.9 s with a track playing.
+
+## Opening and loading (M12)
+
+Built: at process start the window opens on the page colour with the five-bar mark drawn from
+quads; the bars rise one after another, the mark shrinks and fades, and the sidebar, page and
+player bar arrive in a short stagger. The real interface is built underneath from the first
+frame. If the account restore runs long the bars keep moving, and the shell comes regardless
+after 3 s. It plays at process start only and not under reduced motion. Also: a buffering ring
+on play controls after 150 ms of loading, a soft sweep over skeletons while something loads, a
+thin line under the title bar while a page's fetch is in flight, the scan's real counts at the
+foot of the sidebar, and the same stagger between the welcome screen and the app
+(`docs/DESIGN.md` 52-53).
+
+Seen by the lead: the opening's frame sequence in the merged build (the bars build, the mark
+fades as the sidebar appears, the full app follows, nothing jumps). Seen by the engineer on
+sheets: the held opening, the welcome-screen opening, the buffering ring, the page-load line,
+a guest's Home going from skeleton to content, and the scan counting 146, 537, 806 on the
+10,000-track library.
+
+Cost, Home at 1080x1080 on the test library, debug: first window 832-840 ms after start
+(874-893 ms before), working set 126-127 MB at 8 s (118-120 MB before; the 7 MB rise is not
+explained), idle CPU 0.1 s between 12 s and 42 s, 0.9-1.1 s with a track playing.
+
+Not done: pending states on buttons that start work (Play on a hero, Save, Follow, Add
+folder, Import, Download), a ring on card play buttons, a sign-in spinner, a transition for
+the mini player window. A guest's Home shows a Quick picks skeleton that then disappears,
+which shifts the layout. Not seen: the welcome-to-app move on a sheet, the buffering ring on a
+truly slow stream.
+
+## Errors pass
+
+Started from the owner's own log, then a hunt through the app without an account.
+
+| Fault | Cause | Fix | Seen or reasoned |
+| --- | --- | --- | --- |
+| The settings file had stopped loading, so no change was being saved | `discord_name` and `spotify_connect_name` held the value an early build wrote, and one unreadable value fails the whole file | Both values are read again; unit tests | The owner's own file loads in a scratch profile. Tests compile, not run |
+| Heart as a guest answered "could not be added" (401) | Library changes were sent whatever the session | `state::has_account` at the three places every save, library change and playlist change passes through; a toast names the service and opens Settings, Providers | Seen: song heart, album heart, `sonicly like on`. Reasoned: menus, artist follow, playlist follow |
+| Failure toasts gave no reason | Errors were logged and dropped | The reason rides on the toast's second line; a track that will not play carries the engine's reason | Seen for a damaged local file |
+| WASAPI "stream configuration is no longer valid" | Device or format change | None needed: the output is retired and the engine reloads the track where it was heard | The owner's log shows the reopen in the same second; position read from code |
+| `gpui::window: RefCell already borrowed` | Taskbar and tray shell calls made inside an app update let Windows deliver window messages gpui then drops | Both make their shell calls from a task of their own | Mechanism seen (a message inside the call on five of five launches); none since in the logs kept, which is not proof |
+| Debug `key:` steps crashed | The step lent out `Root` while a key press redraws it | Steps go through the untyped window handle; `key:a` types | Seen: typing, Enter, Escape in quick search |
+| Search found nothing in a files-only library | Ranking read the streaming shelf only | Both shelves ranked | Seen |
+| Junk files listed as songs | Any file with an audio extension became a track | Left out unless a reader knows it as audio | Seen, 6 of 6 |
+| Home showed only Quick picks with no account | A sign-out settling at startup cancelled the local feed | The local feed is asked for again after it | Seen by the lead |
+
+Added: `Playback::stream_info` and `stream` in `sonicly --json current`, read for the eight
+local formats (the lead read `FLAC, 44100 Hz, 16 bit, 2 channels` from a playing file in the
+merged build). Nothing is guessed: a service that does not say reports nothing.
+
+Known from this pass and not fixed:
+
+- Files that are not audio and were indexed before this build stay listed until Rescan.
+- The Apple Music visitor mode (`--debug-guest=apple`) asks for the account's home feed and
+  recents and logs three 403s.
+- A seek past the end of a track logs a decoder warning before moving on.
+- An Ogg file cut short lists as 0:00.
+- One unreadable value still fails the whole `settings.json`; the app then names the line.
+- After a relaunch the app reloads a track that failed and fails on it again at start.
+- `sonicly search` on the command line answers only from a signed-in service, not local files.
+- `data/library.db` under the config folder, left by the first from-scratch build, is never
+  read.
+
+Not exercised in this pass: rescan after files change, queue editing, playlist export,
+the equalizer, settings toggles across a relaunch, the mini player, file open, `sonicly://`
+links, single-instance hand-over, guest context-menu saves and follows, Apple previews.
+
 ## Memory
 
 Working set of the debug build as `scripts/shot.ps1` prints it.

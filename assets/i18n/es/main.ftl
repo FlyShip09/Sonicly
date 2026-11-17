@@ -429,7 +429,6 @@ song-content = Contenido
 song-explicit = Explícito
 song-clean = Sin contenido explícito
 artist-about = Sobre el artista
-artist-about-fallback = Descubre las canciones populares y los lanzamientos del artista.
 artist-about-open = Ir al artista
 song-copyright = © { $notice }
 

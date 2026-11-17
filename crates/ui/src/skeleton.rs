@@ -1,16 +1,22 @@
-use std::time::Duration;
+use std::sync::OnceLock;
+use std::time::{Duration, Instant};
 
 use gpui::prelude::*;
 use gpui::{
-    Animation, AnimationExt as _, App, Div, Interactivity, Pixels, SharedString, StyleRefinement,
-    Window, div, ease_in_out,
+    App, Bounds, Div, Hsla, Interactivity, Pixels, SharedString, StyleRefinement, Window, canvas,
+    div, fill, linear_color_stop, linear_gradient, point, px,
 };
 
 use crate::theme::ActiveTheme as _;
 
-const PULSE: Duration = Duration::from_millis(1400);
-/// The opacity a placeholder holds with motion reduced, the middle of its pulse.
+/// How strongly a placeholder's fill shows.
 const STILL: f32 = 0.55;
+/// How long the light takes to cross the window, slow enough to read as calm.
+const SWEEP: Duration = Duration::from_millis(1800);
+/// How wide each soft side of the light is.
+const SWEEP_BAND: Pixels = px(160.);
+/// How much lighter the middle of the light is, as the text colour laid over the fill.
+const SWEEP_LIGHT: f32 = 0.06;
 
 #[derive(IntoElement)]
 pub struct Skeleton {
@@ -57,28 +63,66 @@ impl RenderOnce for Skeleton {
         let theme = cx.theme();
         let overrides = std::mem::take(base.style());
 
-        let mut skeleton = base.bg(theme.muted).when_else(
-            circle,
-            |this| this.rounded_full(),
-            |this| this.rounded(theme.radius),
-        );
+        let mut skeleton = base
+            .relative()
+            .overflow_hidden()
+            .bg(theme.muted.opacity(STILL))
+            .when_else(
+                circle,
+                |this| this.rounded_full(),
+                |this| this.rounded(theme.radius),
+            );
         skeleton.style().refine(&overrides);
 
-        // With motion reduced the placeholder holds still at the middle of its pulse.
+        // With motion reduced the placeholder holds still.
         if cx.reduce_motion() {
-            return skeleton.opacity(STILL).into_any_element();
+            return skeleton.into_any_element();
         }
-        skeleton
-            .with_animation(
-                "skeleton",
-                Animation::new(PULSE).repeat().with_easing(ease_in_out),
-                |this, delta| {
-                    let fade = 1. - (delta * std::f32::consts::TAU).cos().abs() * 0.5;
-                    this.opacity(0.4 + fade * 0.3)
-                },
-            )
-            .into_any_element()
+        let light = theme.foreground.opacity(SWEEP_LIGHT);
+        skeleton.child(sweep(light)).into_any_element()
     }
+}
+
+/// When the sweep's clock started, shared by every placeholder so the light crosses the whole
+/// window as one band rather than each placeholder pulsing on its own.
+static SWEEP_EPOCH: OnceLock<Instant> = OnceLock::new();
+
+/// A soft band of light crossing the window from left to right, painted where it passes over
+/// this placeholder. It asks for the next frame only while a placeholder is drawn, which is
+/// only while something loads.
+fn sweep(light: Hsla) -> impl IntoElement {
+    canvas(
+        |_, _, _| {},
+        move |bounds, _, window, _| {
+            window.request_animation_frame();
+            let epoch = *SWEEP_EPOCH.get_or_init(Instant::now);
+            let turn = (epoch.elapsed().as_secs_f32() / SWEEP.as_secs_f32()).fract();
+            let reach = window.viewport_size().width + SWEEP_BAND * 2.;
+            let middle = reach * turn - SWEEP_BAND;
+            if middle + SWEEP_BAND < bounds.left() || middle - SWEEP_BAND > bounds.right() {
+                return;
+            }
+            let clear = light.opacity(0.);
+            let side = |from: Pixels, to: Pixels, rising: bool| {
+                let (start, end) = match rising {
+                    true => (clear, light),
+                    false => (light, clear),
+                };
+                fill(
+                    Bounds::from_corners(point(from, bounds.top()), point(to, bounds.bottom())),
+                    linear_gradient(
+                        90.,
+                        linear_color_stop(start, 0.),
+                        linear_color_stop(end, 1.),
+                    ),
+                )
+            };
+            window.paint_quad(side(middle - SWEEP_BAND, middle, true));
+            window.paint_quad(side(middle, middle + SWEEP_BAND, false));
+        },
+    )
+    .absolute()
+    .inset_0()
 }
 
 #[derive(IntoElement)]

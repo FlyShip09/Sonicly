@@ -4,7 +4,8 @@ Read this first in a new session.
 
 - **Branch:** `integration`, cut from `m0/setup` with `m1/sources`, `m2/identity`,
   `m6/floating` and `m5/lyrics-style` merged in that order (merge commits), then
-  `m8/release`, `m8/onboarding`, `m9/apple` and `m9/motion`. Pushed; pull request 2
+  `m8/release`, `m8/onboarding`, `m9/apple`, `m9/motion`, `m10/motion`, `m10/errors`,
+  `m11/layout` and `m12/loading`. Pushed; pull request 2
   into `main` is open. `main` holds the M0 setup; `archive/v0-native` is the earlier
   from-scratch build, kept for reference.
 - **Base:** Sonora at commit `6e3cfb0` (full hash in `docs/UPSTREAM.md`), cloned
@@ -21,8 +22,16 @@ Read this first in a new session.
   see Release below); M9 Apple Music through Apple's web player (37) and the
   calm desktop look with its motion (38-42, `docs/screenshots/m9/`). The
   self-updater's download-and-install code is deleted.
+  M10 and M11: the last motion items, grouped quick search, the errors pass
+  (guest saves ask for a sign-in, failure toasts carry reasons, early-build
+  settings load, local search, `Playback::stream_info`), then the layout pass
+  (Home with Continue listening, two-column album pages, artist rails, hover
+  card, quality badge; 43-51, `docs/screenshots/m10/`, `docs/screenshots/m11/`),
+  and history and resume for local files alone. M12: an opening animation at
+  process start and one loading vocabulary (52-53, `docs/screenshots/m12/`).
 - **Direction from the owner (2026-11-16):** clean and macOS-like, detailed, with
-  small action-driven animations.
+  small action-driven animations; shadcn/ui and Magic UI as pattern references,
+  rebuilt natively, nothing fake.
 - **Checks:** `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D
   warnings` and `cargo build -p sonicly` pass on `integration`. `cargo test` has
   not been run.

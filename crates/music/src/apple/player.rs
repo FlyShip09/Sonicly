@@ -438,7 +438,7 @@ impl Machine {
         if held.playing {
             let id = Some(held.id.clone());
             self.held = None;
-            self.emit(PlaybackEvent::Unavailable { id });
+            self.emit(PlaybackEvent::Unavailable { id, reason: None });
         }
     }
 
@@ -469,7 +469,10 @@ impl Machine {
             Trouble::SignIn => self.give_up(PlaybackEvent::Gated),
             Trouble::Subscription => self.give_up(PlaybackEvent::Barred(Barrier::Subscription)),
             Trouble::Engine => self.give_up(PlaybackEvent::Barred(Barrier::Player)),
-            Trouble::Track => self.give_up(PlaybackEvent::Unavailable { id }),
+            Trouble::Track => self.give_up(PlaybackEvent::Unavailable {
+                id,
+                reason: Some(format!("the web player answered {code}")),
+            }),
         }
     }
 
@@ -629,6 +632,7 @@ fn signal(kbps: u32) -> TrackSignal {
         channels: CHANNELS,
         normalisation: Normalisation::Off,
         direct: true,
+        nominal: false,
     }
 }
 
@@ -835,7 +839,10 @@ mod tests {
         machine.hear(Heard::Closed);
         assert_eq!(
             drain(&mut events).last(),
-            Some(&PlaybackEvent::Unavailable { id: id() })
+            Some(&PlaybackEvent::Unavailable {
+                id: id(),
+                reason: None
+            })
         );
     }
 

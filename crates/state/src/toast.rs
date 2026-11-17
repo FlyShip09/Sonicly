@@ -320,10 +320,23 @@ impl Toasts {
         Self::post(toast, cx);
     }
 
+    /// Shows a failure with why it happened on the line below, and tells `Network` about it, so
+    /// a failure that is really a lost connection puts the whole app offline and says so. The
+    /// text under `key` says what did not happen and what to do; the reason is the error's own.
+    pub fn failed(
+        key: impl Into<SharedString>,
+        name: Option<SharedString>,
+        error: &anyhow::Error,
+        cx: &mut App,
+    ) {
+        let reason = crate::blamed(error, cx);
+        Self::with_detail(Outcome::Failed, key, name, reason, cx);
+    }
+
     /// Shows a toast and returns its id, which [`Self::settle`] and [`Self::close`] take. Every
-    /// call shows a new toast, except a failure or warning that says the same thing as one
-    /// already up. Those can fire again on their own, so the one up restarts its clock instead
-    /// and its id is returned.
+    /// call shows a new toast, except a failure, warning or hint that says the same thing as
+    /// one already up. Those can fire again on their own or on every press of the same button,
+    /// so the one up restarts its clock instead and its id is returned.
     pub fn post(toast: Toast, cx: &mut App) -> usize {
         let toasts = Self::entity(cx);
         toasts.update(cx, |this, cx| this.push(toast, cx))
@@ -447,7 +460,10 @@ impl Toasts {
     }
 
     fn push(&mut self, toast: Toast, cx: &mut Context<Self>) -> usize {
-        let repeats = matches!(toast.outcome, Outcome::Failed | Outcome::Warning);
+        let repeats = matches!(
+            toast.outcome,
+            Outcome::Failed | Outcome::Warning | Outcome::Info
+        );
         if let Some(shown) = self
             .shown
             .iter_mut()

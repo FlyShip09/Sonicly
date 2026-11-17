@@ -516,7 +516,6 @@ song-explicit = 성인용(Explicit)
 song-local = 로컬 파일
 song-clean = 일반(Clean)
 artist-about = 아티스트 소개
-artist-about-fallback = 아티스트의 인기 곡과 발매작을 둘러보세요.
 artist-about-open = 아티스트로 이동
 song-copyright = © { $notice }
 track-row-name = { $artists }의 { $title }

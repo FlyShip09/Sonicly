@@ -1,11 +1,13 @@
 use std::time::Duration;
 
+use gpui::accesskit::Role;
 use gpui::accesskit::Toggled;
 use gpui::prelude::*;
-use gpui::{App, Entity, Global, SharedString, div};
+use gpui::{AnyElement, App, ElementId, Entity, Global, SharedString, div};
 use i18n::t;
 use state::{Elsewhere, Playback, Repeat, Sonicly};
-use ui::{ActiveTheme as _, Button, Side};
+use ui::Tipped as _;
+use ui::{ActiveTheme as _, ArrowRing, Button, Perch, Side, Text, tabular};
 
 use crate::shared::ambient;
 
@@ -39,6 +41,84 @@ pub(crate) enum ShellSwap {
 
 impl Global for ShellSwap {}
 const STEP: f32 = 0.004;
+
+/// The quiet badge naming what the engine really plays, such as "FLAC 44.1 kHz / 16 bit" or
+/// "AAC 256 kbps", with every fact it knows in its tooltip and for screen readers. Nothing when
+/// the engine reports nothing about the stream, so no quality is ever guessed.
+pub(crate) fn quality_badge(
+    id: impl Into<ElementId>,
+    playback: &Entity<Playback>,
+    cx: &App,
+) -> Option<AnyElement> {
+    let info = playback.read(cx).stream_info(cx)?;
+    let (label, detail) = quality(&info)?;
+    let theme = cx.theme();
+
+    Some(
+        div()
+            .id(id)
+            .role(Role::Label)
+            .aria_value(detail.clone())
+            .flex_none()
+            .px_1()
+            .rounded_xs()
+            .border_1()
+            .border_color(theme.border)
+            .text_size(theme.text(Text::Tiny))
+            .text_color(theme.muted_foreground)
+            .font_features(tabular())
+            .whitespace_nowrap()
+            .child(label)
+            .tip_label(detail, Perch::Above)
+            .into_any_element(),
+    )
+}
+
+/// The badge's words and its tooltip's from a stream's facts: the codec with the rate and depth
+/// of a lossless stream or the bit rate of a lossy one, then every fact known.
+fn quality(info: &music::StreamInfo) -> Option<(SharedString, SharedString)> {
+    let rate = info
+        .sample_rate
+        .map(|hz| t!("quality-rate", rate = kilohertz(hz)));
+    let depth = info.bit_depth.map(|bits| t!("quality-depth", bits = bits));
+    let kbps = info.kbps.map(|kbps| t!("quality-kbps", kbps = kbps));
+    let channels = info
+        .channels
+        .map(|count| t!("quality-channels", count = count));
+    let measure = match (&rate, &depth, &kbps) {
+        (Some(rate), Some(depth), _) => Some(SharedString::from(format!("{rate} / {depth}"))),
+        (_, _, Some(kbps)) => Some(kbps.clone()),
+        (Some(rate), None, None) => Some(rate.clone()),
+        _ => None,
+    };
+    let label = match (info.codec, measure) {
+        (Some(codec), Some(measure)) => format!("{codec} {measure}"),
+        (Some(codec), None) => codec.to_owned(),
+        (None, Some(measure)) => measure.to_string(),
+        (None, None) => return None,
+    };
+    let detail = [
+        info.codec.map(SharedString::new_static),
+        rate,
+        depth,
+        channels,
+        kbps,
+    ]
+    .into_iter()
+    .flatten()
+    .map(|part| part.to_string())
+    .collect::<Vec<_>>()
+    .join(" · ");
+    Some((label.into(), detail.into()))
+}
+
+/// A sample rate in kilohertz as a listener reads it: 44.1, 48, 96.
+fn kilohertz(hz: u32) -> String {
+    match hz % 1000 {
+        0 => (hz / 1000).to_string(),
+        _ => format!("{:.1}", hz as f32 / 1000.),
+    }
+}
 
 /// The other device playback is on, which the player shows instead of this app's own.
 pub(crate) fn steered(cx: &App) -> Option<Elsewhere> {
@@ -117,22 +197,33 @@ pub(crate) fn transport(playback: &Entity<Playback>, big: bool, cx: &App) -> imp
         .child(repeat(playback, frosted, cx))
 }
 
-pub(crate) fn toggle(playback: &Entity<Playback>, big: bool, frosted: bool, cx: &App) -> Button {
+pub(crate) fn toggle(
+    playback: &Entity<Playback>,
+    big: bool,
+    frosted: bool,
+    cx: &App,
+) -> AnyElement {
+    let theme = *cx.theme();
     let held = playback.read(cx);
     let steered = steered(cx);
     let playing = steered
         .as_ref()
         .map_or_else(|| held.wants_playing(), |remote| remote.state.playing);
     let idle = held.track().is_none() && steered.is_none();
+    let buffering = buffering(playback, cx);
     let playback = playback.clone();
 
     let (icon, tooltip) = match playing {
         true => ("icons/pause.svg", "play-pause"),
         false => ("icons/play.svg", "play-resume"),
     };
+    let reach = match big {
+        true => theme.metrics.control,
+        false => theme.metrics.control_small,
+    };
 
     // One id for both states, so the button keeps its press and swaps one icon for the other.
-    Button::new("play-pause")
+    let button = Button::new("play-pause")
         .ghost()
         .when(frosted, Button::frosted)
         .when(!big, Button::small)
@@ -141,7 +232,58 @@ pub(crate) fn toggle(playback: &Entity<Playback>, big: bool, frosted: bool, cx: 
         .disabled(idle)
         .on_click(move |_, _, cx| {
             playback.update(cx, |playback, cx| playback.toggle_play(cx));
+        });
+
+    // A song still being fetched, or a seek still filling, rings the button once the wait is
+    // long enough to notice, and a song that starts at once shows nothing.
+    div()
+        .relative()
+        .flex_none()
+        .child(button)
+        .when(buffering, |this| {
+            this.child(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .child(
+                        ArrowRing::spinner("play-pause-buffering", theme.foreground)
+                            .size(reach)
+                            .after_wait(),
+                    ),
+            )
         })
+        .into_any_element()
+}
+
+/// Whether the song the player holds is wanted playing but has no sound yet: being fetched,
+/// or filling after a seek. Another device's playback is never this app's to wait on.
+pub(crate) fn buffering(playback: &Entity<Playback>, cx: &App) -> bool {
+    let held = playback.read(cx);
+    let shown = held.is_loading()
+        || cx
+            .try_global::<HeldBuffering>()
+            .is_some_and(HeldBuffering::on);
+    steered(cx).is_none() && shown && held.wants_playing()
+}
+
+/// Keeps the buffering ring up until a moment, for a debug run that wants to see it on a
+/// local song, whose fetch is over before the ring's wait.
+struct HeldBuffering(std::time::Instant);
+
+impl HeldBuffering {
+    fn on(&self) -> bool {
+        std::time::Instant::now() < self.0
+    }
+}
+
+impl Global for HeldBuffering {}
+
+/// Holds the buffering ring up until `until`, for debug captures only.
+pub fn hold_buffering(until: std::time::Instant, cx: &mut App) {
+    cx.set_global(HeldBuffering(until));
 }
 
 fn shuffle(playback: &Entity<Playback>, frosted: bool, cx: &App) -> Button {
@@ -235,5 +377,18 @@ pub(crate) fn moved(before: Option<f32>, after: Option<f32>) -> bool {
     match (before, after) {
         (Some(before), Some(after)) => (before - after).abs() > STEP,
         (before, after) => before.is_some() != after.is_some(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::kilohertz;
+
+    #[test]
+    fn sample_rates_read_in_kilohertz() {
+        assert_eq!(kilohertz(44_100), "44.1");
+        assert_eq!(kilohertz(48_000), "48");
+        assert_eq!(kilohertz(192_000), "192");
+        assert_eq!(kilohertz(22_050), "22.1");
     }
 }

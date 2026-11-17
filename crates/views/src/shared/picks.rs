@@ -5,7 +5,7 @@ use gpui::prelude::*;
 use gpui::{App, ClickEvent, Entity, MouseDownEvent, Pixels, SharedString, Window, div};
 use music::{GenreItem, Track};
 use state::Playback;
-use ui::{ActiveTheme as _, Button, Card, eyebrow, section_heading, snapped, vacant};
+use ui::{ActiveTheme as _, Button, Card, section_heading, snapped, vacant};
 
 use crate::shared::cards;
 use crate::shared::track_card::{ContextHandler, StartHandler, TrackCard};
@@ -64,7 +64,6 @@ impl Rows {
 pub(crate) struct Picks {
     id: &'static str,
     title: &'static str,
-    eyebrow: Option<SharedString>,
     vacancy: &'static str,
     rows: Rows,
     playback: Entity<Playback>,
@@ -89,7 +88,6 @@ impl Picks {
         Self {
             id,
             title: "",
-            eyebrow: None,
             vacancy: "",
             rows: Rows::Tracks(tracks),
             playback,
@@ -116,7 +114,6 @@ impl Picks {
         Self {
             id,
             title: "",
-            eyebrow: None,
             vacancy: "",
             rows: Rows::Mixed(items),
             playback,
@@ -133,12 +130,6 @@ impl Picks {
 
     pub(crate) fn title(mut self, key: &'static str) -> Self {
         self.title = key;
-        self
-    }
-
-    /// The small line over the title, already worded: a key looked up at render, or a name.
-    pub(crate) fn eyebrow(mut self, label: impl Into<SharedString>) -> Self {
-        self.eyebrow = Some(label.into());
         self
     }
 
@@ -215,26 +206,14 @@ impl RenderOnce for Picks {
                     .items_end()
                     .justify_between()
                     .gap_4()
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_0()
-                            .children(self.eyebrow.map(|label| {
-                                eyebrow(label.clone(), cx)
-                                    .id(SharedString::from(format!("{id}-eyebrow")))
-                                    .role(Role::Label)
-                                    .aria_value(label)
-                            }))
-                            .child({
-                                let title = i18n::lookup(self.title, None);
-                                section_heading(title.clone(), cx)
-                                    .id(SharedString::from(format!("{id}-heading")))
-                                    .role(Role::Heading)
-                                    .aria_level(2)
-                                    .aria_label(title)
-                            }),
-                    )
+                    .child(div().flex().flex_col().gap_0().child({
+                        let title = i18n::lookup(self.title, None);
+                        section_heading(title.clone(), cx)
+                            .id(SharedString::from(format!("{id}-heading")))
+                            .role(Role::Heading)
+                            .aria_level(2)
+                            .aria_label(title)
+                    }))
                     .child(
                         div()
                             .flex()

@@ -13,6 +13,7 @@ use i18n::t;
 use music::{ArtistRef, Contributor};
 use router::{Destination, Link as _, navigate};
 use state::Playback;
+use ui::HoverCarded as _;
 use ui::{
     ActiveTheme as _, Artwork, Avatar, Badge, Cell, InlineLink, InlineLinks, ROW_GROUP, Theme,
     clock, tabular,
@@ -94,9 +95,13 @@ impl RenderOnce for Face {
 /// The transport cell at the head of a row. `number` is the label the row rests at; `None`
 /// counts the rows, which is what a list with no numbering of its own wants. `playing` is the
 /// row's `Playback::control`, `None` for a row that is not the current one.
+/// A row's leading cell: its number, or the playing glyph on the row that plays, with the
+/// play control under the pointer. `waiting` rings the playing row while its song is fetched.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn index<F>(
     cell: &Cell<F>,
     playing: Option<bool>,
+    waiting: bool,
     playable: bool,
     number: Option<SharedString>,
     preload: Option<Tap>,
@@ -117,6 +122,11 @@ pub(crate) fn index<F>(
             .into_any_element()
     };
     let resting = match playing {
+        Some(true) if waiting => div()
+            .id(("index-waiting", cell.row))
+            .group_hover(ROW_GROUP, |style| style.invisible())
+            .child(ui::ArrowRing::spinner(("index-ring", cell.row), theme.foreground).after_wait())
+            .into_any_element(),
         Some(true) => dimmed(PLAYING, theme.foreground),
         Some(false) => dimmed(PAUSE, theme.muted_foreground),
         None => div()
@@ -293,6 +303,32 @@ pub(crate) fn artist_links(
         color,
     )
     .on_click(|id, cx| navigate(Destination::Artist(id), cx))
+    .hover_card(|id, name, _, cx| crate::chrome::PeekCard::artist(id, name, cx))
+}
+
+/// An album's name in a row, linking to its page, with the album's hover card on it. `cover` is
+/// the one the row shows, which the card leads with until the album's own lands.
+pub(crate) fn album_link<F>(
+    cell: &Cell<F>,
+    name: impl Into<SharedString>,
+    album: SharedString,
+    cover: Option<String>,
+    color: Hsla,
+) -> AnyElement {
+    let name = name.into();
+    let spoken = name.clone();
+    let to = Destination::Album(album.clone());
+    line(cell, Some(color))
+        .id(("album", cell.row))
+        .role(Role::Link)
+        .aria_label(spoken.clone())
+        .hover(|style| style.underline())
+        .link(to)
+        .hover_card(move |_, cx| {
+            crate::chrome::PeekCard::album(album.clone(), spoken.clone(), cover.clone(), cx)
+        })
+        .child(name)
+        .into_any_element()
 }
 
 pub(crate) fn artists<F>(

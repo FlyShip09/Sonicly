@@ -705,7 +705,12 @@ impl Playback {
                 };
                 this.rebind(playback, cx);
             }
-            SessionEvent::SignedOut => this.teardown(cx),
+            SessionEvent::SignedOut => {
+                this.teardown(cx);
+                // signed out with a music folder set is local files alone, which restore the
+                // last run's queue as an account does at sign-in
+                this.adopt(cx);
+            }
             // The online engine gives way to the one that plays downloads, picking the current
             // track up where it was. A provider with none stops streaming altogether.
             SessionEvent::WentOffline => match session.read(cx).playback() {
@@ -1003,6 +1008,17 @@ impl Playback {
         )
     }
 
+    /// What the engine really plays for the track loaded now: the codec, and the rate, bit
+    /// depth, channels and bit rate as far as its decoder or its service reported them. `None`
+    /// until the engine has opened the track, and while another device plays, whose stream is
+    /// not this app's to describe. It follows the track, since it is kept by the track's id.
+    pub fn stream_info(&self, cx: &App) -> Option<music::StreamInfo> {
+        if self.steered(cx).is_some() {
+            return None;
+        }
+        Some(self.track_signal()??.stream())
+    }
+
     /// Keeps what an engine reported about the sound of track `id`, in place of any older
     /// report for it.
     fn learn_signal(&mut self, id: String, track: TrackSignal, cx: &mut Context<Self>) {
@@ -1248,9 +1264,11 @@ impl Playback {
                 Ok(_) => {}
                 Err(error) => {
                     log::error!("playback: cannot load radio queue: {error:#}");
-                    crate::noted(&error, cx);
-                    if this.origin(cx) == Some(&origin) {
-                        Toasts::about(Outcome::Failed, "toast-radio-failed", title, cx);
+                    match this.origin(cx) == Some(&origin) {
+                        true => {
+                            Toasts::failed("toast-radio-failed", Some(title.into()), &error, cx)
+                        }
+                        false => crate::noted(&error, cx),
                     }
                 }
             },
@@ -1575,7 +1593,7 @@ impl Playback {
                     }
                     Err(error) => {
                         log::error!("playback: cannot enqueue {source}: {error:#}");
-                        Toasts::show(Outcome::Failed, "toast-queue-failed", cx);
+                        Toasts::failed("toast-queue-failed", None, &error, cx);
                     }
                 }
             },
@@ -2036,9 +2054,11 @@ impl Playback {
                 Err(error) => {
                     this.seeded = None;
                     log::warn!("playback: cannot load similar tracks: {error:#}");
-                    crate::noted(&error, cx);
-                    if asked && this.radio {
-                        Toasts::about(Outcome::Failed, "toast-similar-failed", title, cx);
+                    match asked && this.radio {
+                        true => {
+                            Toasts::failed("toast-similar-failed", Some(title.into()), &error, cx)
+                        }
+                        false => crate::noted(&error, cx),
                     }
                 }
             },
@@ -2338,7 +2358,7 @@ impl Playback {
         if self.track.is_some() || !self.queue.read(cx).is_empty() {
             return;
         }
-        let Some(slug) = self.session.read(cx).provider_slug() else {
+        let Some(slug) = self.session.read(cx).home_slug() else {
             return;
         };
         let Some(resume) = self
@@ -3323,9 +3343,13 @@ impl Playback {
                 self.state = PlaybackState::Loading;
                 log::warn!("playback: the provider went stale, waiting for a reconnect");
             }
-            BackendEvent::Unavailable { .. } => {
+            BackendEvent::Unavailable { reason, .. } => {
                 let failed = self.track.take();
                 let target = failed.as_ref().and_then(song_target);
+                let local = failed
+                    .as_ref()
+                    .and_then(|track| track.id.as_deref())
+                    .is_some_and(music::is_local_id);
                 let name = failed
                     .as_ref()
                     .map_or_else(|| "?".to_owned(), |track| track.name.clone());
@@ -3345,7 +3369,18 @@ impl Playback {
                         Toasts::show(Outcome::Failed, "toast-playback-stopped", cx);
                     }
                     false => {
-                        Toasts::linked(Outcome::Failed, "toast-track-unplayable", name, target, cx)
+                        // a file that will not decode is damaged, and a stream that will not
+                        // load may well play in a minute, so each says what there is to do
+                        let key = match local {
+                            true => "toast-track-unreadable",
+                            false => "toast-track-unplayable",
+                        };
+                        let mut toast = Toast::new(Outcome::Failed, key).name(name).target(target);
+                        if let Some(reason) = reason {
+                            Network::failed(&reason, cx);
+                            toast = toast.detail(reason);
+                        }
+                        Toasts::post(toast, cx);
                     }
                 }
                 cx.emit(PlaybackEvent::EndedPlayback);
@@ -3508,12 +3543,10 @@ impl Playback {
                  until you sign in"
             );
         }
-        Toasts::about(
-            Outcome::Failed,
-            "toast-sign-in-to-play",
-            provider.to_owned(),
-            cx,
-        );
+        let toast = Toast::new(Outcome::Failed, "toast-sign-in-to-play")
+            .name(provider)
+            .open("toast-sign-in", Target::ProviderSettings);
+        Toasts::post(toast, cx);
         cx.notify();
     }
 

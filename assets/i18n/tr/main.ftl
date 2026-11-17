@@ -421,7 +421,6 @@ song-content = İçerik
 song-explicit = Müstehcen
 song-clean = Temiz
 artist-about = Sanatçı hakkında
-artist-about-fallback = Sanatçının popüler şarkılarını ve yayınlarını keşfet.
 artist-about-open = Sanatçıya git
 song-copyright = © { $notice }
 

@@ -717,7 +717,10 @@ async fn engine_loop<F: Fetch>(
                             announcing = None;
                             let refusal = match fetch.gated(&error) {
                                 true => PlaybackEvent::Gated,
-                                false => PlaybackEvent::Unavailable { id: Some(id) },
+                                false => PlaybackEvent::Unavailable {
+                                    id: Some(id),
+                                    reason: Some(format!("{error:#}")),
+                                },
                             };
                             events.send(refusal).ok();
                         }
@@ -980,6 +983,7 @@ impl<F: Fetch> Playing<F> {
                 false => Normalisation::Off,
             },
             direct: false,
+            nominal: false,
         };
         events
             .send(PlaybackEvent::Signal {
@@ -1206,7 +1210,10 @@ fn audio_loop<F: Fetch>(
                         true => cue.arm(),
                         false => {
                             events
-                                .send(PlaybackEvent::Unavailable { id: Some(id) })
+                                .send(PlaybackEvent::Unavailable {
+                                    id: Some(id),
+                                    reason: None,
+                                })
                                 .ok();
                         }
                     }
@@ -1269,6 +1276,7 @@ fn audio_loop<F: Fetch>(
                         events
                             .send(PlaybackEvent::Unavailable {
                                 id: Some(join.ended),
+                                reason: None,
                             })
                             .ok();
                         continue;
@@ -1300,7 +1308,10 @@ fn audio_loop<F: Fetch>(
                                 None => {
                                     log::warn!("playback: cannot seek {id}");
                                     events
-                                        .send(PlaybackEvent::Unavailable { id: Some(id) })
+                                        .send(PlaybackEvent::Unavailable {
+                                            id: Some(id),
+                                            reason: None,
+                                        })
                                         .ok();
                                     continue;
                                 }

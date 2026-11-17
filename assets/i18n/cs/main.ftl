@@ -450,7 +450,6 @@ song-content = Obsah
 song-explicit = Explicitní
 song-clean = Bez vulgarismů
 artist-about = O interpretu
-artist-about-fallback = Prozkoumej populární skladby a vydání interpreta.
 artist-about-open = Přejít na interpreta
 song-copyright = © { $notice }
 

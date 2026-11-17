@@ -1,12 +1,14 @@
 use gpui::prelude::*;
-use gpui::{Context, Entity, Pixels, Render, StyleRefinement, Window, div, px};
+use gpui::{Context, Entity, Pixels, Render, SharedString, StyleRefinement, Window, div, px};
 use state::{AppSettings, Playback, Queue, SideTab, Sonicly};
-use ui::{ActiveTheme as _, MIN_CONTENT, Panel, Room, Side};
+use ui::{ActiveTheme as _, MIN_CONTENT, Motion, Motioned as _, Panel, Room, Side};
 
 use crate::chrome::{Aside, Members};
 
 const MIN_WIDTH: Pixels = px(240.);
 const MAX_WIDTH: Pixels = px(560.);
+/// How far the sidebar travels as it slides in from the window's edge.
+const SLIDE: Pixels = px(24.);
 
 fn fills_content(width: Pixels) -> bool {
     !Room::of(width).fits(Room::Wide)
@@ -21,6 +23,8 @@ pub(crate) struct SidebarRight {
     width: Pixels,
     open: bool,
     tab: SideTab,
+    /// How many times the sidebar has opened, which keys its slide in so each opening plays it.
+    opens: usize,
 }
 
 impl SidebarRight {
@@ -61,6 +65,7 @@ impl SidebarRight {
             width,
             open,
             tab,
+            opens: 0,
         }
     }
 
@@ -95,6 +100,7 @@ impl SidebarRight {
 
     pub(crate) fn toggle(&mut self, cx: &mut Context<Self>) {
         self.open = !self.open;
+        self.opens += self.open as usize;
         if self.open && self.tab != SideTab::Members {
             let tab = self.tab;
             self.aside.update(cx, |aside, cx| aside.show(tab, cx));
@@ -119,6 +125,7 @@ impl SidebarRight {
             self.aside.update(cx, |aside, cx| aside.show(tab, cx));
         }
         self.tab = tab;
+        self.opens += !self.open as usize;
         self.open = true;
         self.remember(cx);
         cx.notify();
@@ -161,8 +168,11 @@ impl Render for SidebarRight {
         }
 
         let theme = *cx.theme();
+        // The page takes its new width at once and the sidebar slides in over it, so only the
+        // sidebar draws while it moves. One open since launch is the restored layout, not a move.
+        let slides = self.opens > 0 && !cx.reduce_motion();
 
-        Panel::new("sidebar-right", Side::Right, self.width)
+        let panel = Panel::new("sidebar-right", Side::Right, self.width)
             .limits(MIN_WIDTH, MAX_WIDTH)
             .reach(super::cap(MIN_WIDTH, MAX_WIDTH, MIN_CONTENT, window))
             .grip_above(super::Chrome::bottom(cx))
@@ -180,7 +190,17 @@ impl Render for SidebarRight {
                     .clone()
                     .cached(StyleRefinement::default().size_full())
                     .into_any_element(),
-            })
-            .into_any_element()
+            });
+        let shell = div().relative().flex().flex_none().h_full().child(panel);
+        match slides {
+            true => shell
+                .motion(
+                    SharedString::from(format!("sidebar-right-in-{}", self.opens)),
+                    Motion::Quick,
+                    |shell, shown| shell.left(SLIDE * (1. - shown)).opacity(shown),
+                )
+                .into_any_element(),
+            false => shell.into_any_element(),
+        }
     }
 }

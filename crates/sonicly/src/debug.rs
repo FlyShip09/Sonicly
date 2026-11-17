@@ -39,10 +39,16 @@
 //!   and the loudest band of the music in dBFS, heard ahead of the equalizer and the volume, so
 //!   a muted run can still show that sound reaches the output chain. `-200.0` is silence, and
 //!   `none` means no audio has been pulled yet.
+//! - `--debug-hold-start=<ms>` keeps the app reading as not ready for that long after start, so
+//!   the opening's mark shows its waiting state. The mark gives way after 3 s regardless.
+//! - `--debug-hold-buffering=<ms>` keeps the play controls showing their buffering ring for
+//!   that long after start while a song is wanted playing, since a local song loads before the
+//!   ring's wait is over. Only the ring is held; playback itself is untouched.
 //! - `--debug-at=<ms>:<step>` does `<step>` that many milliseconds after the window opens, so a
 //!   capture can catch motion. It may be given more than once. A step is a pointer event at
 //!   window coordinates in logical pixels (`move:x,y`, `down:x,y`, `up:x,y`, `click:x,y`,
-//!   `wheel:x,y,lines`), a keystroke (`key:ctrl-k`), `toggle`, `next` or `prev` on the player,
+//!   `wheel:x,y,lines`), a keystroke (`key:ctrl-k`, `key:enter`; a bare `key:a` or `key:space`
+//!   types into the focused field), `toggle`, `next` or `prev` on the player,
 //!   `back` or `forward` in the history, or `go:<what>` with anything `--debug-screen` takes.
 
 use std::ffi::OsString;
@@ -76,6 +82,8 @@ pub struct Launch {
     play_ids: Vec<String>,
     level: Option<PathBuf>,
     steps: Vec<(Duration, String)>,
+    hold: Option<Duration>,
+    buffering: Option<Duration>,
 }
 
 /// How often `--debug-level` writes a line, and `--debug-import` looks whether the scan is over.
@@ -110,6 +118,12 @@ pub fn take(args: Vec<OsString>) -> (Vec<OsString>, Launch) {
                     launch.play_ids = value.split(',').map(str::to_owned).collect();
                 }
                 "--debug-level" => launch.level = Some(PathBuf::from(value)),
+                "--debug-hold-start" => {
+                    launch.hold = value.parse().ok().map(Duration::from_millis);
+                }
+                "--debug-hold-buffering" => {
+                    launch.buffering = value.parse().ok().map(Duration::from_millis);
+                }
                 "--debug-at" => {
                     if let Some((at, step)) = value.split_once(':')
                         && let Ok(at) = at.parse()
@@ -138,6 +152,12 @@ impl Launch {
     /// fullscreen panel. Returns the page to open on, the one `--debug-screen` names by its
     /// address or `start` otherwise.
     pub fn start(&self, start: Destination, cx: &mut App) -> Destination {
+        if let Some(hold) = self.hold {
+            views::hold_opening(std::time::Instant::now() + hold, cx);
+        }
+        if let Some(hold) = self.buffering {
+            views::hold_buffering(std::time::Instant::now() + hold, cx);
+        }
         let settings = Sonicly::global(cx).settings.clone();
         if let Some(theme) = self.theme.clone() {
             settings.update(cx, |settings, cx| settings.set_theme(theme, cx));
@@ -332,8 +352,8 @@ impl Launch {
 /// Does one `--debug-at` step on the main window.
 fn perform(step: &str, window: gpui::WindowHandle<Root>, cx: &mut App) {
     use gpui::{
-        KeyDownEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent,
-        MouseUpEvent, PlatformInput, ScrollDelta, ScrollWheelEvent, point,
+        Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
+        PlatformInput, ScrollDelta, ScrollWheelEvent, point,
     };
 
     let (kind, value) = step.split_once(':').unwrap_or((step, ""));
@@ -373,14 +393,19 @@ fn perform(step: &str, window: gpui::WindowHandle<Root>, cx: &mut App) {
             modifiers,
             touch_phase: Default::default(),
         })],
-        "key" => match Keystroke::parse(value) {
-            Ok(keystroke) => vec![PlatformInput::KeyDown(KeyDownEvent {
-                keystroke,
-                is_held: false,
-                prefer_character_input: false,
-            })],
-            Err(_) => return log::warn!("debug: cannot read the keystroke {value}"),
-        },
+        "key" => {
+            let Ok(keystroke) = Keystroke::parse(value) else {
+                return log::warn!("debug: cannot read the keystroke {value}");
+            };
+            // Through the untyped handle, as the platform sends its own events: the typed one
+            // lends out `Root` for the length of the call, and a key press draws the window,
+            // which renders `Root`. A key no binding takes types its character.
+            cx.update_window(window.into(), |_, window, cx| {
+                window.dispatch_keystroke(keystroke, cx);
+            })
+            .ok();
+            return;
+        }
         _ => {
             let playback = Sonicly::global(cx).playback.clone();
             match kind {
@@ -405,13 +430,12 @@ fn perform(step: &str, window: gpui::WindowHandle<Root>, cx: &mut App) {
             return;
         }
     };
-    window
-        .update(cx, |_, window, cx| {
-            for event in events {
-                window.dispatch_event(event, cx);
-            }
-        })
-        .ok();
+    cx.update_window(window.into(), |_, window, cx| {
+        for event in events {
+            window.dispatch_event(event, cx);
+        }
+    })
+    .ok();
 }
 
 /// The window size `--debug-size` asked for, which wins over the size the window was last

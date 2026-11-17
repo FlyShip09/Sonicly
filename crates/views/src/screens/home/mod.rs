@@ -1,3 +1,5 @@
+mod resume;
+
 use std::rc::Rc;
 
 use crate::chrome::Chrome;
@@ -12,16 +14,22 @@ use gpui::{
 };
 use i18n::t;
 use music::GenreItem;
-use state::{Home, Network, Playback, Sonicly};
+use state::{History, HistoryState, Home, Network, Playback, Scan, Sonicly};
 use ui::{ActiveTheme as _, Lazy, Mode, Popup, Scrollbar, Scroller};
 
+use crate::shared::album_grid::CardGrid;
+use crate::shared::cards;
 use crate::shared::cells;
+use crate::shared::local;
 use crate::shared::picks::{Picks, Shape};
-use crate::shared::shelves::Shelves;
+use crate::shared::shelves::{Rail, RailSpec, Shelves};
 use crate::shared::tracks::{PlaybackStatus, playback_status};
 use crate::shared::trouble;
+use resume::Resume;
 
 const STEADY: Pixels = px(0.5);
+/// How many albums and songs Recently played holds, as many as a feed's shelf.
+const RECENT: usize = 15;
 /// Where a capture run opens a context menu, from the window's top left on both axes.
 #[cfg(debug_assertions)]
 const STAGED_MENU: Pixels = px(360.);
@@ -30,7 +38,17 @@ pub(crate) struct HomeView {
     home: Entity<Home>,
     playback: Entity<Playback>,
     playback_status: PlaybackStatus,
+    /// The second a paused song is held at, which Continue listening shows.
+    held_at: Option<u64>,
     shelves: Entity<Shelves>,
+    history: Entity<History>,
+    /// Recently played as last drawn. It is taken again from the history only while the page is
+    /// out of sight or has none, so a song started here does not shuffle the shelf in view.
+    recent: Rc<Vec<GenreItem>>,
+    /// Whether the history changed while the page was in view.
+    stale: bool,
+    visible: bool,
+    recent_rail: Rail,
     width: Pixels,
     quick_picks: Pager,
     scrollbar: Entity<Scrollbar>,
@@ -81,11 +99,28 @@ impl HomeView {
         let shelves = cx.new(|_| Shelves::new("home-shelf", me, playback.clone()));
         cx.observe(&shelves, |_, _, cx| cx.notify()).detach();
 
+        let history = Sonicly::global(cx).history.clone();
+        cx.observe(&history, |this: &mut Self, history, cx| {
+            match this.visible && !this.recent.is_empty() {
+                true => this.stale = true,
+                false => {
+                    this.recent = Rc::new(history.read(cx).recent_items(RECENT));
+                    this.recent_rail.rewind();
+                    cx.notify();
+                }
+            }
+        })
+        .detach();
+        let recent = Rc::new(history.read(cx).recent_items(RECENT));
+
         let current_playback = playback_status(&playback, cx);
+        let current_hold = held_at(&playback, cx);
         cx.observe(&playback, |this, playback, cx| {
             let current = playback_status(&playback, cx);
-            if this.playback_status != current {
+            let held = held_at(&playback, cx);
+            if this.playback_status != current || this.held_at != held {
                 this.playback_status = current;
+                this.held_at = held;
                 cx.notify();
             }
         })
@@ -95,7 +130,13 @@ impl HomeView {
             home,
             playback,
             playback_status: current_playback,
+            held_at: current_hold,
             shelves,
+            history,
+            recent,
+            stale: false,
+            visible: false,
+            recent_rail: Rail::new(me),
             width: Pixels::ZERO,
             quick_picks: Pager::default(),
             scrollbar: cx.new(|_| Scrollbar::new(ScrollHandle::new()).watching(me)),
@@ -107,6 +148,12 @@ impl HomeView {
     /// Tells the feed whether this page is the one on screen, so it lands changes to what is
     /// drawn only while nobody is looking.
     pub(crate) fn set_visible(&mut self, visible: bool, cx: &mut Context<Self>) {
+        self.visible = visible;
+        if !visible && std::mem::take(&mut self.stale) {
+            self.recent = Rc::new(self.history.read(cx).recent_items(RECENT));
+            self.recent_rail.rewind();
+            cx.notify();
+        }
         self.home
             .update(cx, |home, cx| home.set_visible(visible, cx));
     }
@@ -187,7 +234,7 @@ impl HomeView {
 
         Picks::mixed("quick-picks", items, self.playback.clone(), width, page)
             .title("home-quick-picks")
-            .vacancy("home-quick-picks-empty")
+            .vacancy(self.home.read(cx).vacancy(cx))
             .loading(self.home.read(cx).is_loading(cx))
             .on_previous(cx.listener(|this, _, _, cx| {
                 this.quick_picks.page = this.quick_picks.page.saturating_sub(1);
@@ -203,6 +250,80 @@ impl HomeView {
                 open_item_menu(&home, &opened, place, event, cx);
             })
             .into_any_element()
+    }
+
+    /// Recently played as a rail of albums and songs: skeletons while the history is still being
+    /// read, and nothing once it is read and holds no plays.
+    fn recently_played(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let grid = CardGrid::layout(self.width);
+        let tile = grid.card;
+        let columns = grid.columns.max(1);
+        // The song Continue listening shows leads the history; the rail lists what came before.
+        let shown = self.playback.read(cx).shown_track(cx);
+        let skip = self
+            .recent
+            .first()
+            .is_some_and(|item| holds(item, shown.as_ref())) as usize;
+        let count = self.recent.len() - skip;
+        if count == 0 {
+            let loading = matches!(self.history.read(cx).state(), HistoryState::Loading);
+            return (loading && self.recent.is_empty())
+                .then(|| Rail::pending(t!("home-recently-played"), tile, columns, window, cx));
+        }
+        self.recent_rail.sync();
+        let weak = cx.entity().downgrade();
+        let notify: Rc<dyn Fn(&mut App)> = Rc::new(move |cx: &mut App| {
+            weak.update(cx, |_, cx| cx.notify()).ok();
+        });
+        let items = self.recent.clone();
+        let playback = self.playback.clone();
+
+        Some(self.recent_rail.render(
+            RailSpec {
+                tag: "home-recent",
+                place: 0,
+                title: t!("home-recently-played"),
+                count,
+                tile,
+                columns,
+                tabs: None,
+            },
+            window,
+            cx,
+            &notify,
+            move |index, _, cx| {
+                let Some(item) = items.get(index + skip) else {
+                    return div().into_any_element();
+                };
+                cards::item_card(recent_id(item), item, &playback, cx)
+                    .tile(tile)
+                    .flat()
+                    .aria_position_in_set(index + 1)
+                    .aria_size_of_set(count)
+                    .into_any_element()
+            },
+        ))
+    }
+
+    /// What a signed-out library with no music folder shows in place of Quick picks and the
+    /// shelves: that a folder is what fills it, and the button that adds one.
+    fn unconfigured(&self, cx: &App) -> Option<AnyElement> {
+        let home = self.home.read(cx);
+        let session = Sonicly::global(cx).session.read(cx);
+        let empty = home.is_local(cx)
+            && !session.is_pending()
+            && !home.is_feeding()
+            && home.quick_picks().is_empty()
+            && home.sections().is_empty()
+            && session.local_paths().is_empty()
+            && Scan::global(cx).read(cx).progress().is_none();
+
+        empty.then(|| {
+            div()
+                .pt(cx.theme().metrics.section)
+                .child(local::unconfigured("home-unconfigured"))
+                .into_any_element()
+        })
     }
 
     /// The page home shows in place of its shelves: the No connection state the moment the
@@ -234,6 +355,7 @@ impl HomeView {
 
 impl Render for HomeView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        ui::PageEdge::set_loading(self.is_loading(cx), cx);
         if let Some(failure) = self.failure(cx) {
             return div()
                 .id("home-failure")
@@ -262,6 +384,10 @@ impl Render for HomeView {
         });
         let sections = self.home.read(cx).sections();
         let feeding = self.home.read(cx).is_feeding();
+        // Quick picks that came back empty say so only on a page with nothing else on it.
+        let pickless = !sections.is_empty()
+            && self.home.read(cx).quick_picks().is_empty()
+            && !self.home.read(cx).is_loading(cx);
         let width = self.width;
         let shelves = self
             .shelves
@@ -269,6 +395,10 @@ impl Render for HomeView {
                 true => shelves.pending(width, cx),
                 false => vec![shelves.render(sections, Mode::Grid, width, window, cx)],
             });
+
+        let resume = Resume::shown(&self.playback, cx).then(|| Resume::new(self.playback.clone()));
+        let recent = self.recently_played(window, cx);
+        let unconfigured = self.unconfigured(cx);
 
         Scroller::new("home-page", &self.scrollbar)
             .page()
@@ -281,8 +411,16 @@ impl Render for HomeView {
                     .flex()
                     .flex_col()
                     .gap(theme.metrics.section)
-                    .child(ui::held("home-quick-picks", picks))
-                    .children(shelves),
+                    .children(resume)
+                    .children(recent)
+                    .map(|this| match unconfigured {
+                        Some(vacancy) => this.child(vacancy),
+                        None => this
+                            .when(!pickless, |this| {
+                                this.child(ui::held("home-quick-picks", picks))
+                            })
+                            .children(shelves),
+                    }),
             )
             .when_some(context_menu, |this, menu| this.child(menu))
             .into_any_element()
@@ -307,4 +445,37 @@ fn open_item_menu(
         this.context_menu = Some((item, event.position));
         cx.notify();
     });
+}
+
+/// The second a paused song is held at, or nothing while it plays.
+fn held_at(playback: &Entity<Playback>, cx: &App) -> Option<u64> {
+    let playback = playback.read(cx);
+    match playback.control() == Some(true) {
+        true => None,
+        false => Some(playback.shown_time(cx).0.as_secs()),
+    }
+}
+
+/// Whether a Recently played item is the song in the player, or the album it is playing from.
+fn holds(item: &GenreItem, track: Option<&music::Track>) -> bool {
+    let Some(track) = track else {
+        return false;
+    };
+    match item {
+        GenreItem::Album(album) => track.album_id.as_deref() == Some(album.id.as_str()),
+        GenreItem::Track(played) => played.id.is_some() && played.id == track.id,
+        _ => false,
+    }
+}
+
+/// A Recently played card's id, from what it opens rather than where it stands.
+fn recent_id(item: &GenreItem) -> gpui::ElementId {
+    let key = match item {
+        GenreItem::Album(album) => format!("home-recent-album-{}", album.id),
+        GenreItem::Track(track) => {
+            format!("home-recent-track-{}", track.id.as_deref().unwrap_or(""))
+        }
+        _ => String::from("home-recent-other"),
+    };
+    gpui::ElementId::Name(key.into())
 }

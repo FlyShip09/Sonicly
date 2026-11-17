@@ -24,7 +24,7 @@ use crate::chrome::{Chrome, SidebarRight};
 use crate::shared::menus::ItemMenu;
 use crate::shared::pins::Pinned as _;
 use crate::shared::transport::{
-    COVER_FLIGHT, CoverAway, ShellSwap, like, moved, percent, transport, volume_icon,
+    COVER_FLIGHT, CoverAway, ShellSwap, like, moved, percent, quality_badge, transport, volume_icon,
 };
 use crate::shared::volume::{RisingVolume, VolumeHost, rising_volume, turn_volume};
 
@@ -467,6 +467,10 @@ impl PlayerBar {
             .when(explicit, |this| {
                 this.child(div().flex_none().child(Badge::explicit()))
             })
+            // a centred title keeps equal room either side, which a badge of any width breaks
+            .when(!centered, |this| {
+                this.children(quality_badge("now-playing-quality", &self.playback, cx))
+            })
             .child(like(track, &self.playback, cx));
         let headline = match centered {
             true => {
@@ -543,6 +547,9 @@ impl PlayerBar {
                         .text_size(artists)
                         .on_click(|id, cx| {
                             navigate(Destination::Artist(id), cx);
+                        })
+                        .hover_card(|id, name, _, cx| {
+                            crate::chrome::PeekCard::artist(id, name, cx)
                         }),
                     )
                     .max_w_full()

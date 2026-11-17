@@ -14,6 +14,7 @@ use crate::Artwork;
 use crate::form::Submit;
 use crate::glass::{GLASS_BLUR, blurring, popover_fill};
 use crate::input::Input;
+use crate::kbd::Kbd;
 use crate::label::Tails as _;
 use crate::linger::Linger;
 use crate::metrics::snapped;
@@ -30,6 +31,8 @@ pub const MENU_CONTEXT: &str = "Menu";
 
 pub(crate) const ESCAPE_KEY: &str = "escape";
 
+/// How strongly an item's shortcut shows beside its label, quieter than the label it repeats.
+const SHORTCUT_STRENGTH: f32 = 0.7;
 const SUBMENU_CLOSE_DELAY: Duration = Duration::from_millis(160);
 const SUBMENU_FALLBACK_WIDTH: Pixels = px(236.);
 const SUBMENU_TOP: Pixels = px(-14.);
@@ -426,6 +429,10 @@ pub struct MenuItem {
     icon: Option<&'static str>,
     leading: Option<AnyElement>,
     trailing: Option<AnyElement>,
+    /// The keys that do what the item does, drawn at the row's end.
+    shortcut: Option<SharedString>,
+    /// Whether the item removes or deletes something, which its label says in the danger colour.
+    destructive: bool,
     artwork: Option<Option<SharedString>>,
     tooltip: Option<SharedString>,
     press: Option<Action>,
@@ -452,6 +459,8 @@ impl MenuItem {
             icon: None,
             leading: None,
             trailing: None,
+            shortcut: None,
+            destructive: false,
             artwork: None,
             tooltip: None,
             press: None,
@@ -492,6 +501,8 @@ impl MenuItem {
             icon: None,
             leading: None,
             trailing: None,
+            shortcut: None,
+            destructive: false,
             artwork: None,
             tooltip: None,
             press: None,
@@ -535,6 +546,21 @@ impl MenuItem {
     /// Draws `leading` before the label, such as a small picture of what the item chooses.
     pub fn leading(mut self, leading: impl IntoElement) -> Self {
         self.leading = Some(leading.into_any_element());
+        self
+    }
+
+    /// Shows the keys that do the same as the item, such as `"delete"`, quietly at the row's end,
+    /// as a desktop menu lines its shortcuts up on the right. Only give keys that really do it
+    /// where the menu was opened.
+    pub fn shortcut(mut self, keys: impl Into<SharedString>) -> Self {
+        self.shortcut = Some(keys.into());
+        self
+    }
+
+    /// Marks an item that removes or deletes something, so its label and icon read in the
+    /// danger colour.
+    pub fn destructive(mut self) -> Self {
+        self.destructive = true;
         self
     }
 
@@ -868,12 +894,19 @@ impl RenderOnce for Menu {
                 icon,
                 leading,
                 trailing,
+                shortcut,
+                destructive,
                 artwork,
                 tooltip,
                 press,
                 submenu,
                 stays,
             } = item;
+            let ink = match (disabled, destructive) {
+                (true, _) => theme.muted_foreground,
+                (false, true) => theme.danger,
+                (false, false) => theme.popover_foreground,
+            };
 
             if let Some(content) = content {
                 return div()
@@ -947,6 +980,7 @@ impl RenderOnce for Menu {
                     |this| this.text_color(theme.muted_foreground).cursor_default(),
                     |this| this.cursor_pointer(),
                 )
+                .when(destructive && !disabled, |this| this.text_color(ink))
                 .when(marked, |this| this.bg(theme.secondary_active))
                 .when_some(fill, |this, fill| this.bg(fill))
                 // the label column fills the row, so a detail wraps at the menu's width rather
@@ -970,11 +1004,7 @@ impl RenderOnce for Menu {
                                     .path(icons::path(icon))
                                     .size(px(14.))
                                     .flex_none()
-                                    .text_color(if disabled {
-                                        theme.muted_foreground
-                                    } else {
-                                        theme.popover_foreground
-                                    }),
+                                    .text_color(ink),
                             )
                         })
                         .child(
@@ -998,6 +1028,14 @@ impl RenderOnce for Menu {
                 )
                 .when_some(trailing, |this, trailing| {
                     this.child(div().flex_none().child(trailing))
+                })
+                .when_some(shortcut, |this, keys| {
+                    this.child(
+                        div()
+                            .flex_none()
+                            .opacity(SHORTCUT_STRENGTH)
+                            .child(Kbd::new(keys).spoken((row_id.clone(), "keys"))),
+                    )
                 })
                 .when(selected || checked, |this| {
                     this.child(div().flex_none().child("✓"))

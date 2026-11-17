@@ -146,6 +146,9 @@ impl SidebarLeft {
         cx.observe(&library, |_, _, cx| cx.notify()).detach();
         cx.observe(&pins, |_, _, cx| cx.notify()).detach();
         cx.observe(&playback, |_, _, cx| cx.notify()).detach();
+        // the scan's line at the foot counts up as the scan reports, ten times a second at most
+        cx.observe(&state::Scan::global(cx), |_, _, cx| cx.notify())
+            .detach();
         let chrome = super::Chrome::entity(cx);
         cx.observe(&chrome, |_, _, cx| cx.notify()).detach();
         let me = cx.entity_id();
@@ -1024,7 +1027,8 @@ impl Render for SidebarLeft {
                                 false => perch,
                             }
                         }),
-                    ),
+                    )
+                    .children((!rail).then(|| scan_line(cx)).flatten()),
             )
             .children(self.menu(cx));
 
@@ -1127,4 +1131,44 @@ fn chevron(open: bool) -> &'static str {
         true => "icons/chevron-down.svg",
         false => "icons/chevron-right.svg",
     }
+}
+
+/// A quiet line at the sidebar's foot while the library scan runs, where the listener is
+/// looking whatever page is open: a ring that fills as the files are read, and the real counts
+/// the scan reports. While the folders are still being walked there is no total yet, so the
+/// ring turns and the line counts the songs found so far.
+fn scan_line(cx: &App) -> Option<AnyElement> {
+    let progress = state::Scan::global(cx).read(cx).progress()?;
+    let theme = cx.theme();
+    let caption = match (progress.percent(), progress.found) {
+        (Some(_), found) => i18n::t!("scan-line-reading", read = progress.read, found = found),
+        (None, 0) => i18n::t!("scan-line-walking"),
+        (None, found) => i18n::t!("scan-line-found", found = found),
+    };
+    Some(
+        div()
+            .id("sidebar-scan")
+            .role(gpui::accesskit::Role::ProgressIndicator)
+            .aria_label(caption.clone())
+            .absolute()
+            .left_0()
+            .right_0()
+            .bottom(super::Chrome::bottom(cx) + theme.metrics.pad)
+            .px_4()
+            .flex()
+            .items_center()
+            .gap_2()
+            .text_size(theme.text(Text::Small))
+            .text_color(theme.muted_foreground)
+            .child(
+                ui::ArrowRing::new(
+                    "sidebar-scan-ring",
+                    progress.percent().map(|percent| f32::from(percent) / 100.),
+                )
+                .plain()
+                .color(theme.primary),
+            )
+            .child(div().min_w_0().truncate().child(caption))
+            .into_any_element(),
+    )
 }

@@ -495,7 +495,6 @@ song-explicit = Tục tĩu
 song-local = Tệp cục bộ
 song-clean = Không tục tĩu
 artist-about = Giới thiệu nghệ sĩ
-artist-about-fallback = Khám phá các bài hát và bản phát hành nổi bật của nghệ sĩ.
 artist-about-open = Chuyển đến nghệ sĩ
 song-copyright = © { $notice }
 track-row-name = { $title } của { $artists }

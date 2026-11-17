@@ -2,7 +2,7 @@ use gpui::prelude::*;
 use gpui::{App, Context, Entity, FocusHandle, Global, Render, SharedString, Window, div};
 use i18n::t;
 use music::{Album, SavedArtist, Track};
-use state::{Detail, History, Io, Outcome, Shelf, Sonicly, Toasts, equalizer_profile_label};
+use state::{Detail, History, Io, Outcome, Shelf, Sonicly, Toast, Toasts, equalizer_profile_label};
 use ui::{Button, Dismiss, FORM_CONTEXT, Modal, Submit};
 
 #[derive(Clone)]
@@ -239,6 +239,7 @@ impl Confirm {
                     let result = io
                         .spawn(async move {
                             let mut failed = 0;
+                            let mut reason = String::new();
                             let mut deleted = Vec::new();
                             for id in ids {
                                 match provider.delete_track_file(&id).await {
@@ -248,27 +249,39 @@ impl Confirm {
                                         log::warn!(
                                             "local: cannot delete track file {id}: {error:#}"
                                         );
+                                        // the first reason stands for the rest in the toast
+                                        if reason.is_empty() {
+                                            reason = format!("{error:#}");
+                                        }
                                     }
                                 }
                             }
-                            (failed, deleted)
+                            (failed, reason, deleted)
                         })
                         .await;
 
-                    if let Ok((_, ref deleted)) = result {
+                    if let Ok((_, _, ref deleted)) = result {
                         library.update(cx, |library, cx| library.hide_local_tracks(deleted, cx));
                         playback.update(cx, |playback, cx| playback.remove_from_queue(deleted, cx));
                     }
                     match result {
-                        Ok((failed, _)) if failed > 0 => {
+                        Ok((failed, reason, _)) if failed > 0 => {
                             cx.update(|cx| {
-                                Toasts::show(Outcome::Failed, "toast-local-delete-failed", cx);
+                                let toast =
+                                    Toast::new(Outcome::Failed, "toast-local-delete-failed")
+                                        .count(failed)
+                                        .detail(reason);
+                                Toasts::post(toast, cx);
                             });
                         }
                         Err(error) => {
                             log::warn!("local: deletion task failed: {error}");
                             cx.update(|cx| {
-                                Toasts::show(Outcome::Failed, "toast-local-delete-failed", cx);
+                                let toast =
+                                    Toast::new(Outcome::Failed, "toast-local-delete-failed")
+                                        .count(0)
+                                        .detail(error.to_string());
+                                Toasts::post(toast, cx);
                             });
                         }
                         Ok(_) => {}

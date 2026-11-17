@@ -30,6 +30,9 @@ pub struct PageEdge {
     pub past: bool,
     /// The page's title and cover, for a compact heading to show once `past` holds.
     pub heading: Option<(SharedString, Option<SharedString>)>,
+    /// Whether the page is waiting on the network for what it shows, which the title bar
+    /// marks with a thin line once the wait is long enough to notice.
+    pub loading: bool,
 }
 
 struct EdgeInstalled(Entity<PageEdge>);
@@ -55,6 +58,15 @@ impl PageEdge {
     /// Forgets the page that was on show, for a new page that may not scroll at all.
     pub fn reset(cx: &mut App) {
         Self::publish(PageEdge::default(), cx);
+    }
+
+    /// Says whether the page on show is waiting on the network. A page that fetches calls it
+    /// while it draws; one that never does leaves it as the reset left it.
+    pub fn set_loading(loading: bool, cx: &mut App) {
+        let edge = Self::get(cx);
+        if edge.loading != loading {
+            Self::publish(PageEdge { loading, ..edge }, cx);
+        }
     }
 
     /// Records `next` and wakes the window when it differs. A page publishes while it draws,
@@ -257,6 +269,7 @@ impl RenderOnce for Scroller {
                     under: at > px(0.5),
                     past,
                     heading: heading.map(|(_, heading)| heading),
+                    loading: PageEdge::get(cx).loading,
                 },
                 cx,
             );

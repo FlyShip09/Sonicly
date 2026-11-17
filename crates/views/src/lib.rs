@@ -6,7 +6,7 @@ mod shells;
 
 #[cfg(target_os = "macos")]
 pub use chrome::traffic_lights;
-pub use chrome::{MiniPlayer, ToastStack, show_cover_specimens};
+pub use chrome::{MiniPlayer, ToastStack, hold_opening, show_cover_specimens};
 pub use root::Root;
 use screens::artist::ArtistView;
 use screens::detail::DetailView;
@@ -20,4 +20,5 @@ pub use screens::settings::SettingsView;
 use screens::song::SongView;
 use screens::user::UserView;
 use shared::adaptive::Adaptive;
+pub use shared::transport::hold_buffering;
 use shells::fullscreen::FullscreenView;

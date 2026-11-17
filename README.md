@@ -7,11 +7,11 @@ account with, in one library.
 Sonicly is free software under the GPL, version 3 or later. Its engine began as
 a port of [Sonora](https://github.com/sonorahq/sonora); see `NOTICE.md`.
 
-![Home](docs/screenshots/m9/home-local-dark.png)
+![Home](docs/screenshots/m11/home-resume-local-dark.png)
 
 | | |
 | --- | --- |
-| ![An album, light](docs/screenshots/m9/after-album-light.png) | ![Songs](docs/screenshots/m9/after-songs-dark.png) |
+| ![An album, wide](docs/screenshots/m11/after-album-dark-1440.png) | ![An artist](docs/screenshots/m11/after-artist-dark.png) |
 | ![Lyrics over a video](docs/screenshots/m5/lyrics-video.png) | ![Settings](docs/screenshots/m9/settings-general-dark.png) |
 
 ## What it does

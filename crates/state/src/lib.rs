@@ -22,6 +22,7 @@ mod mosaic;
 mod network;
 mod outputs;
 mod overload;
+mod peek;
 mod pins;
 mod playback;
 mod potoken;
@@ -63,7 +64,7 @@ pub use history::{History, HistoryState};
 pub use home::Home;
 pub use library::{
     Addition, CoverEdit, Leaving, Library, LibraryEvent, LibraryPart, LibraryState, Problem, Ready,
-    Shelf, cover_problem,
+    Shelf, cover_problem, has_account,
 };
 pub use link_download::{LinkDownload, LinkState};
 pub use links::{Links, Opened};
@@ -75,6 +76,7 @@ pub use music::connect::{Elsewhere, Repeat};
 pub use network::{Network, Reconnected};
 pub use outputs::Outputs;
 pub use overload::OutputLevel;
+pub use peek::{Peek, PeekKey};
 pub use pins::{PinSort, Pins};
 pub use playback::{
     Origin, Playback, PlaybackState, PositionTick, Sleep, Unreachable, VOLUME_STEP, Whence,
@@ -247,6 +249,7 @@ pub struct Sonicly {
     pub lyrics: Entity<Lyrics>,
     pub network: Entity<Network>,
     pub outputs: Entity<Outputs>,
+    pub peek: Entity<Peek>,
     pub pins: Entity<Pins>,
     pub playback: Entity<Playback>,
     pub sponsorblock: Entity<SponsorBlock>,
@@ -425,6 +428,7 @@ pub fn init(
     let link_download =
         cx.new(|cx| LinkDownload::new(settings.clone(), session.clone(), io.clone(), cx));
     let control = cx.new(|cx| Control::new(session.clone(), playback.clone(), library.clone(), cx));
+    let peek = cx.new(|cx| Peek::new(session.clone(), io.clone(), cx));
     discord::attach(
         playback.clone(),
         settings.clone(),
@@ -451,6 +455,7 @@ pub fn init(
         lyrics,
         network,
         outputs,
+        peek,
         pins,
         playback,
         potoken,

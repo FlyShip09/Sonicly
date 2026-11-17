@@ -342,6 +342,13 @@ impl Session {
         Some(provider.slug())
     }
 
+    /// Whose the saved queue and the play history are: the active service's, or the local
+    /// library's when the app runs on local files alone.
+    pub fn home_slug(&self) -> Option<&'static str> {
+        self.provider_slug()
+            .or_else(|| self.local_only().then(|| self.local_slug()))
+    }
+
     /// The host to try when checking whether the network is back. It is the active provider's
     /// own, so the check never touches a service the app is not already using.
     pub fn reach(&self) -> Option<String> {

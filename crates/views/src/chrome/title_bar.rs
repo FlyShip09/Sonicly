@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use gpui::Decorations;
 use gpui::accesskit::Role;
@@ -30,6 +32,17 @@ const EDGE: Pixels = px(1.);
 /// starts as it comes in.
 const HEADING_COVER: Pixels = px(20.);
 const HEADING_RISE: Pixels = px(4.);
+/// How long a page waits on the network before the load line shows, so a quick answer shows
+/// nothing.
+const LOAD_DELAY: Duration = Duration::from_millis(200);
+/// How thick the load line is, how much of the bar's width its bright stretch covers, and how
+/// long the stretch takes to cross.
+const LOAD_LINE: Pixels = px(2.);
+const LOAD_RUN: f32 = 0.3;
+const LOAD_TURN: Duration = Duration::from_millis(1200);
+
+/// When the load line's clock started, so a line that comes back carries on where it was.
+static LOAD_EPOCH: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
 
 /// Tells whether the page a refresh reloaded is still waiting for its data.
 pub(crate) type Busy = Box<dyn Fn(&App) -> bool>;
@@ -97,6 +110,10 @@ pub(crate) struct TitleBar {
     under: HoverFade,
     /// The page's compact heading, which shows once its large header has scrolled away.
     heading: HoverFade,
+    /// Since when the page has been waiting on the network, while it is.
+    waiting: Option<Instant>,
+    /// The thin line under the bar that a wait long enough to notice raises.
+    load: HoverFade,
 }
 
 impl EventEmitter<TitleBarEvent> for TitleBar {}
@@ -132,7 +149,62 @@ impl TitleBar {
             popovers: Popovers::default(),
             under: HoverFade::new(Motion::Quick.span()).leaving(dim_span()),
             heading: HoverFade::new(Motion::Quick.span()),
+            waiting: None,
+            load: HoverFade::new(Motion::Quick.span()),
         }
+    }
+
+    /// The page-load line: a short bright stretch running along the bar's foot while the page
+    /// on show has waited on the network for `LOAD_DELAY`, fading out once it lands. It asks
+    /// for frames only while it shows or is about to.
+    fn load_line(
+        &mut self,
+        loading: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<gpui::Div> {
+        let since = match loading {
+            true => Some(*self.waiting.get_or_insert_with(Instant::now)),
+            false => self.waiting.take().and(None),
+        };
+        let due = since.is_some_and(|since| since.elapsed() >= LOAD_DELAY);
+        if since.is_some() && !due {
+            window.request_animation_frame();
+        }
+        self.load.set(due);
+        let shown = self.load.level(window, cx);
+        if shown <= 0. {
+            return None;
+        }
+        let theme = cx.theme();
+        // a reduced-motion line holds still across the middle
+        let at = match cx.reduce_motion() {
+            true => (1. - LOAD_RUN) / 2.,
+            false => {
+                window.request_animation_frame();
+                let epoch = *LOAD_EPOCH.get_or_init(Instant::now);
+                let turn = (epoch.elapsed().as_secs_f32() / LOAD_TURN.as_secs_f32()).fract();
+                turn * (1. + LOAD_RUN) - LOAD_RUN
+            }
+        };
+        Some(
+            div()
+                .absolute()
+                .left_0()
+                .right_0()
+                .bottom_0()
+                .h(LOAD_LINE)
+                .overflow_hidden()
+                .child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .bottom_0()
+                        .left(gpui::relative(at))
+                        .w(gpui::relative(LOAD_RUN))
+                        .bg(theme.primary.opacity(shown)),
+                ),
+        )
     }
 
     /// Turns the refresh button until `busy` says the reloaded page has its data.
@@ -369,7 +441,7 @@ impl TitleBar {
 
 impl Render for TitleBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
+        let theme = *cx.theme();
         let height = ui::snapped(theme.metrics.title_bar, window);
         let navigation = self.options.navigation;
         let sidebar_right = self
@@ -408,6 +480,7 @@ impl Render for TitleBar {
         self.heading
             .set(navigation && edge.past && edge.heading.is_some());
         let under = self.under.level(window, cx);
+        let load_line = self.load_line(navigation && edge.loading, window, cx);
         let shown = self.heading.level(window, cx);
         let heading = edge.heading.filter(|_| shown > 0.).map(|(title, cover)| {
             div()
@@ -494,6 +567,7 @@ impl Render for TitleBar {
                                     .bg(theme.title_bar_border.opacity(under)),
                             )
                         })
+                        .when_some(load_line, |this, line| this.child(line))
                         .when(right > Pixels::ZERO, |this| {
                             this.child(
                                 div()

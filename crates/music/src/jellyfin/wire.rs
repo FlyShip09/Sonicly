@@ -214,15 +214,17 @@ impl Item {
             .iter()
             .find(|stream| stream.kind.as_deref() == Some("Audio"))?;
         let kbps = stream.bit_rate.map_or(0, |rate| rate / 1000);
-        let depth = stream.bit_depth.unwrap_or(16);
+        // a lossless stream the server gives no bit depth or rate for has no figure to show,
+        // and none is made up for it
+        let depth = stream.bit_depth;
         Some(
             match stream.codec.as_deref()?.to_ascii_lowercase().as_str() {
                 "flac" => Encoding::Flac {
-                    depth,
-                    rate: stream.sample_rate.unwrap_or(44_100),
+                    depth: depth?,
+                    rate: stream.sample_rate?,
                 },
-                "alac" => Encoding::Alac { depth },
-                codec if codec.starts_with("pcm") => Encoding::Pcm { depth },
+                "alac" => Encoding::Alac { depth: depth? },
+                codec if codec.starts_with("pcm") => Encoding::Pcm { depth: depth? },
                 "aac" => Encoding::Aac { kbps },
                 "vorbis" => Encoding::Vorbis { kbps },
                 "mp3" => Encoding::Mp3 { kbps },
