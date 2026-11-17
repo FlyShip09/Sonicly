@@ -666,6 +666,11 @@ impl FullscreenView {
                 .when(explicit, |this| {
                     this.child(explicit_badge("fullscreen-explicit", track.is_some()))
                 })
+                .children(crate::shared::transport::quality_badge(
+                    "fullscreen-quality",
+                    &self.playback,
+                    cx,
+                ))
                 .child(
                     div()
                         .flex()

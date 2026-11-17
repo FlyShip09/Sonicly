@@ -16,6 +16,7 @@ mod generated;
 mod glass;
 mod glide;
 mod hold;
+mod hover_card;
 mod info_card;
 mod inline_links;
 mod input;
@@ -57,6 +58,7 @@ mod switch;
 mod table;
 mod tabs;
 mod theme;
+mod ticker;
 mod time;
 mod toast;
 mod tooltip;
@@ -97,6 +99,7 @@ pub use glass::{
 };
 pub use glide::{Glide, ScrollPosition};
 pub use hold::{Held, Hold, held};
+pub use hover_card::{HoverCard, HoverCarded};
 pub use info_card::{Fact, InfoCard};
 pub use inline_links::{InlineLink, InlineLinks};
 pub use input::{
@@ -164,6 +167,7 @@ pub use theme::{
     MAX_TRANSPARENCY, MIN_FONT, MIN_LYRICS_SCALE, Theme, ThemeKind, ThemeOverrides, WindowBlur,
     WindowMaterial, backdrop,
 };
+pub use ticker::Ticker;
 pub use time::{clock, runtime, tabular};
 pub use toast::Toast;
 pub use tooltip::{Perch, Tipped, Tooltip};

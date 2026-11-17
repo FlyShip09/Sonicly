@@ -367,6 +367,14 @@ mini-player-bar = Fold into a bar
 mini-player-card = Show the cover
 player-time-left = -{ $time }
 player-time-left-spoken = { $time } left
+quality-rate = { $rate } kHz
+quality-depth = { $bits } bit
+quality-kbps = { $kbps } kbps
+quality-channels = { $count ->
+        [1] Mono
+        [2] Stereo
+       *[other] { $count } channels
+    }
 devices-this-computer = This computer
 devices-jam-join = Join a Jam…
 devices-jam-join-title = Join a Jam
@@ -529,7 +537,7 @@ artist-followers = { $count ->
    *[other] { $value } followers
 }
 artist-popular = Popular
-artist-popular-eyebrow = Explore this artist
+artist-songs = Songs
 artist-popular-empty = Nothing to play from this artist yet
 artist-popular-more = Show all
 artist-popular-less = Show less
@@ -538,13 +546,8 @@ artist-favorite-songs-count = { $count ->
     [one] { $count } song in your Favorites
    *[other] { $count } songs in your Favorites
 }
-artist-releases = Releases
-artist-releases-more = Show all
-artist-releases-less = Show less
-artist-filter-all = All
-artist-filter-albums = Albums
-artist-filter-singles = Singles
-artist-filter-eps = EPs
+artist-albums = Albums
+artist-singles = Singles and EPs
 artist-appears-on = Appears on
 album-also-like = You might also like
 album-tab-albums = Albums
@@ -573,6 +576,10 @@ release-podcast = Podcast
 release-meta = { $year } • { $kind }
 
 # home page
+home-continue = Continue listening
+home-now-playing = Now playing
+home-resume-time = { $position } of { $length }
+home-recently-played = Recently played
 home-quick-picks = Quick picks
 home-quick-picks-empty = Like a few songs and they will show up here
 home-quick-picks-guest = Sign in or add a music folder, and the songs you like will show up here
@@ -669,6 +676,11 @@ count-songs =
     { $count ->
         [one] { $count } song
        *[other] { $count } songs
+    }
+count-albums =
+    { $count ->
+        [one] { $count } album
+       *[other] { $count } albums
     }
 count-tracks =
     { $count ->

@@ -259,7 +259,13 @@ impl Shelves {
                         cx,
                     ))
                     .when(crowded, |this| {
-                        this.child(on_shelf_hover(self.arrows(place, &handle, &glide, me)))
+                        let paging = Paging {
+                            stride: card + RAIL_GAP,
+                            inset,
+                        };
+                        this.child(on_shelf_hover(
+                            self.arrows(place, &handle, &glide, paging, me),
+                        ))
                     }),
             )
             .child(Hold::new(
@@ -319,6 +325,7 @@ impl Shelves {
         place: usize,
         handle: &ScrollHandle,
         glide: &Glide,
+        paging: Paging,
         me: &WeakEntity<Self>,
     ) -> AnyElement {
         let at = glide.goal(handle).x;
@@ -330,11 +337,18 @@ impl Shelves {
             .items_center()
             .gap_1()
             .child(
-                self.arrow(self.tag("previous", place), false, handle, glide, me)
-                    .disabled(at >= -STEADY),
+                self.arrow(
+                    self.tag("previous", place),
+                    false,
+                    handle,
+                    glide,
+                    paging,
+                    me,
+                )
+                .disabled(at >= -STEADY),
             )
             .child(
-                self.arrow(self.tag("next", place), true, handle, glide, me)
+                self.arrow(self.tag("next", place), true, handle, glide, paging, me)
                     .disabled(reach > Pixels::ZERO && at <= STEADY - reach),
             )
             .into_any_element()
@@ -346,6 +360,7 @@ impl Shelves {
         forward: bool,
         handle: &ScrollHandle,
         glide: &Glide,
+        paging: Paging,
         me: &WeakEntity<Self>,
     ) -> Button {
         let handle = handle.clone();
@@ -364,7 +379,7 @@ impl Shelves {
                 false => "common-previous",
             })
             .on_click(move |_, window, cx| {
-                slide(&handle, &glide, forward, window);
+                slide(&handle, &glide, paging, forward, window);
                 me.update(cx, |_, cx| cx.notify()).ok();
             })
     }
@@ -466,13 +481,26 @@ fn dressed(card: Card, tile: Option<Pixels>, cx: &App) -> Card {
     }
 }
 
-fn slide(handle: &ScrollHandle, glide: &Glide, forward: bool, window: &mut Window) {
-    let page = handle.bounds().size.width;
+/// How a rail pages: one card and the gap after it, and the room the rail leaves at its sides.
+#[derive(Clone, Copy)]
+struct Paging {
+    stride: Pixels,
+    inset: Pixels,
+}
+
+/// Glides a rail a page on or back, a page being as many whole cards as fit between its
+/// insets, so every page starts on a card's edge rather than through one.
+fn slide(handle: &ScrollHandle, glide: &Glide, paging: Paging, forward: bool, window: &mut Window) {
     let at = glide.goal(handle);
+    let stride = paging.stride.max(px(1.));
+    let room = handle.bounds().size.width - paging.inset * 2.;
+    let page = stride * (room / stride).floor().max(1.);
+    let snapped = stride * (at.x / stride).round();
     let next = match forward {
-        true => at.x - page,
-        false => at.x + page,
+        true => snapped - page,
+        false => snapped + page,
     };
+    let next = next.clamp(-handle.max_offset().x, Pixels::ZERO);
 
     glide.aim(handle, point(next, at.y), window);
 }
@@ -531,8 +559,19 @@ impl Rail {
         let inset = cx.theme().metrics.inset;
         let scrolled = self.scroll.clone();
         let glided = self.glide.clone();
+        let paging = Paging {
+            stride: tile + RAIL_GAP,
+            inset,
+        };
         let arrows = match count > columns {
-            true => Some(arrows(tag, place, &self.scroll, &self.glide, notify)),
+            true => Some(arrows(
+                tag,
+                place,
+                &self.scroll,
+                &self.glide,
+                paging,
+                notify,
+            )),
             false => None,
         };
 
@@ -655,6 +694,7 @@ fn arrows(
     place: usize,
     scroll: &ScrollHandle,
     glide: &Glide,
+    paging: Paging,
     notify: &Rc<dyn Fn(&mut App)>,
 ) -> AnyElement {
     let at = glide.goal(scroll).x;
@@ -671,6 +711,7 @@ fn arrows(
                 false,
                 scroll,
                 glide,
+                paging,
                 notify,
             )
             .disabled(at >= -STEADY),
@@ -681,6 +722,7 @@ fn arrows(
                 true,
                 scroll,
                 glide,
+                paging,
                 notify,
             )
             .disabled(reach > Pixels::ZERO && at <= STEADY - reach),
@@ -693,6 +735,7 @@ fn arrow(
     forward: bool,
     scroll: &ScrollHandle,
     glide: &Glide,
+    paging: Paging,
     notify: &Rc<dyn Fn(&mut App)>,
 ) -> Button {
     let scroll = scroll.clone();
@@ -711,7 +754,7 @@ fn arrow(
             false => "common-previous",
         })
         .on_click(move |_, window, cx| {
-            slide(&scroll, &glide, forward, window);
+            slide(&scroll, &glide, paging, forward, window);
             notify(cx);
         })
 }

@@ -163,6 +163,9 @@ impl ItemMenu {
                 ),
             )
             .icon("icons/x.svg")
+            .destructive()
+            // the Delete key removes the picked rows of a playlist's table the same way
+            .shortcut("delete")
             .on_click(move |_, _, cx| {
                 Confirm::playlist_songs(ids.clone(), detail.clone(), count, cx)
             }),
@@ -187,6 +190,8 @@ impl ItemMenu {
             ),
         )
         .icon("icons/trash-2.svg")
+        .destructive()
+        .shortcut("delete")
         .on_click(move |_, _, cx| Confirm::history_songs(held.clone(), history.clone(), cx));
         self.build(tracks, None, Some(forget), None, columns, cx)
     }
@@ -489,6 +494,7 @@ impl ItemMenu {
                 counted("menu-delete-track-file", "menu-delete-track-files", count),
             )
             .icon("icons/trash-2.svg")
+            .destructive()
             .on_click(move |_, _, cx| Confirm::delete_track_files(ids.clone(), cx))
         });
 
@@ -1242,6 +1248,7 @@ pub(crate) fn playlist_menu(playlist: Playlist, playback: Entity<Playback>, cx: 
             .chain(
                 [MenuItem::new("delete-playlist", t!("menu-delete-playlist"))
                     .icon("icons/trash-2.svg")
+                    .destructive()
                     .on_click({
                         let playlist = playlist.clone();
                         move |_, window, cx| {

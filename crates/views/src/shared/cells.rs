@@ -13,6 +13,7 @@ use i18n::t;
 use music::{ArtistRef, Contributor};
 use router::{Destination, Link as _, navigate};
 use state::Playback;
+use ui::HoverCarded as _;
 use ui::{
     ActiveTheme as _, Artwork, Avatar, Badge, Cell, InlineLink, InlineLinks, ROW_GROUP, Theme,
     clock, tabular,
@@ -293,6 +294,32 @@ pub(crate) fn artist_links(
         color,
     )
     .on_click(|id, cx| navigate(Destination::Artist(id), cx))
+    .hover_card(|id, name, _, cx| crate::chrome::PeekCard::artist(id, name, cx))
+}
+
+/// An album's name in a row, linking to its page, with the album's hover card on it. `cover` is
+/// the one the row shows, which the card leads with until the album's own lands.
+pub(crate) fn album_link<F>(
+    cell: &Cell<F>,
+    name: impl Into<SharedString>,
+    album: SharedString,
+    cover: Option<String>,
+    color: Hsla,
+) -> AnyElement {
+    let name = name.into();
+    let spoken = name.clone();
+    let to = Destination::Album(album.clone());
+    line(cell, Some(color))
+        .id(("album", cell.row))
+        .role(Role::Link)
+        .aria_label(spoken.clone())
+        .hover(|style| style.underline())
+        .link(to)
+        .hover_card(move |_, cx| {
+            crate::chrome::PeekCard::album(album.clone(), spoken.clone(), cover.clone(), cx)
+        })
+        .child(name)
+        .into_any_element()
 }
 
 pub(crate) fn artists<F>(

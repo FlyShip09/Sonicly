@@ -77,6 +77,13 @@ impl ArrowRing {
         self
     }
 
+    /// Draws the ring alone, without the arrow, for work that is not a download, such as a
+    /// library scan.
+    pub fn plain(mut self) -> Self {
+        self.arrow = Some(gpui::transparent_black());
+        self
+    }
+
     /// Fills the whole circle behind the arrow with `color` and leaves out the empty part of the
     /// ring. The filled part then fades out once the work is done, leaving the disc alone.
     pub fn backdrop(mut self, color: Hsla) -> Self {

@@ -17,7 +17,6 @@ use gpui::{
     ParentElement as _, SharedString, Styled as _, WeakEntity, div,
 };
 use music::{Arrival, Track};
-use router::Destination;
 use state::{
     Detail, History, Library, Network, Origin, Playback, Progress, Reorder, Shelf, Sonicly,
 };
@@ -435,12 +434,12 @@ impl TrackSource {
             return cells::dim(cell, track.album.clone(), color);
         };
 
-        cells::link(
+        cells::album_link(
             cell,
-            "album",
             track.album.clone(),
+            album.into(),
+            track.cover.clone(),
             color,
-            Destination::Album(album.into()),
         )
     }
 

@@ -18,6 +18,9 @@ one line about what someone using Sonicly can now do.
 - Open Home, Songs, Albums, Artists and Playlists with Ctrl+1 to Ctrl+5, and show or hide the sidebar with Ctrl+Alt+S.
 - A star button in the title bar and under Settings, About opens Sonicly's repository and shows how many stars it has. The count is read from GitHub at most once a day; "Show the star count" under Settings, About turns that off.
 - Settings, About opens the licences of everything in the build, from the `THIRD-PARTY.md` shipped beside the program.
+- Home opens with the song you were listening to, where you left it, and a Recently played shelf from your history.
+- Resting on an artist's or album's name shows a small card with its cover, a line of facts from the service and a play button.
+- The player bar and Now playing show what really plays, such as "FLAC 44.1 kHz / 16 bit" or "AAC 256 kbps", with every detail in its tooltip.
 - `sonicly --json current` describes the stream that plays under `stream`: codec, sample rate, bit depth of a lossless file, channels and bit rate of a lossy one, each only when the decoder, the file or the service reported it.
 
 ### Changed
@@ -27,6 +30,9 @@ one line about what someone using Sonicly can now do.
 - Small motion that answers what you do: a liked heart pops, a card's play button rises under the pointer, segmented controls slide, pages come in from the side you moved towards, and a new song's title rises into the player bar. Reduce motion turns all of it off.
 - The seek bar thickens under the pointer, long titles in the player bar scroll to their end when you rest on them, songs removed from the queue close their gap, and a scrolled album, playlist or artist page shows its name in the title bar above a hairline.
 - Quick search groups its answers under Songs, Artists, Albums, Playlists and Commands, and pinned sidebar entries are slim rows like the rest of the sidebar.
+- In a wide window, album and playlist pages keep the cover, title and buttons in a column beside the songs.
+- Artist pages list albums and singles and EPs on their own shelves and leave out sections the artist has nothing for.
+- Shelf arrows page by whole cards, the queue sidebar slides in as it opens, song counts run to their new value, the library scan shows a progress ring, and removals in menus read in red with their shortcut beside them.
 - An empty local library and a page that failed to load say what to do next.
 - `settings.json` now records its version, so a later Sonicly can rename a setting without losing yours. A file written by a newer Sonicly is copied to `settings.v<version>.json` before an older one saves over it.
 - The licence text is in `LICENSE` (it was `COPYING`).
